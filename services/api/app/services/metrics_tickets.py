@@ -226,3 +226,40 @@ def monthly_invoicing(payload: dict[str, Any] | None, months: int) -> dict[str, 
             key=lambda c: (-c["total"], c["client"].lower()),
         ),
     }
+
+
+def volume_from_stats(stats: dict[str, Any] | None, months: int) -> dict[str, Any] | None:
+    """The Ticket Volume counts the Rewst way, from the monthly statistics CORE read through the HaloPSA report call: tickets opened per month (the same counts as the Ticket Summary), by type, by category and by client, for
+    the newest ``months`` months or a custom range. None when CORE has not sent them (the page then uses the weekly facts)."""
+    volume = (stats or {}).get("volume")
+    rows = (stats or {}).get("rows") or []
+    if not volume or not rows:
+        return None
+    per_month: dict[str, int] = {}
+    by_client: dict[str, int] = {}
+    for r in rows:
+        per_month[str(r["month"])] = per_month.get(str(r["month"]), 0) + int(r.get("created") or 0)
+    all_months = sorted(m for m, n in per_month.items() if n > 0)
+    chosen = pick_months(all_months, months)
+    want = set(chosen)
+    for r in rows:
+        if str(r["month"]) in want:
+            name = str(r.get("client_name") or "")
+            by_client[name] = by_client.get(name, 0) + int(r.get("created") or 0)
+
+    def matrix(items: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+        cell: dict[str, dict[str, int]] = {}
+        for i in items:
+            if str(i["month"]) in want:
+                cell.setdefault(str(i[key]), {})[str(i["month"])] = cell.get(str(i[key]), {}).get(str(i["month"]), 0) + int(i["n"])
+        return [{"name": k, "total": sum(v.values()), "by_month": v} for k, v in sorted(cell.items(), key=lambda kv: (-sum(kv[1].values()), kv[0].lower()))]
+
+    return {
+        "months": chosen,
+        "available_months": len(all_months),
+        "total_created": sum(per_month[m] for m in chosen),
+        "per_month": [{"month": m, "created": per_month[m]} for m in chosen],
+        "by_type": matrix(volume.get("types") or [], "type"),
+        "by_category": matrix(volume.get("categories") or [], "category"),
+        "by_client": [{"client": c, "created": n} for c, n in sorted(by_client.items(), key=lambda kv: (-kv[1], kv[0].lower())) if n > 0][:25],
+    }

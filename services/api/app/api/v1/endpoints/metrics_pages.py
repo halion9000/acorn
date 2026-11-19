@@ -114,7 +114,12 @@ async def ticket_volume(
 ) -> dict[str, Any]:
     """Tickets created by type, category, month and client; the priority mix of the last 60 days; stale tickets by tech."""
     detail, at = await _dataset(db, user, "ticket-detail")
-    return {"received_at": at, **mt.ticket_volume(detail, months, tech)}
+    out = {"received_at": at, **mt.ticket_volume(detail, months, tech)}
+    stats = (await db.execute(select(TicketStatsSnapshot).where(TicketStatsSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    held = mt.volume_from_stats(stats.payload if stats else None, months)
+    if held is not None:  # the monthly counts CORE read through the report call: the same ones the Ticket Summary shows, for as many months as are held
+        out = {**out, **held, "source": "report", "received_at": at or stats.received_at}  # type: ignore[union-attr]
+    return out
 
 
 @router.get("/open-tickets", dependencies=[Depends(require_permission("metrics:view"))])

@@ -1578,12 +1578,32 @@ class ResolutionIn(BaseModel):
     clients: list[ResolutionClientIn] = Field(max_length=200000)
 
 
+class VolumeTypeIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    type: str = Field(min_length=1, max_length=120)
+    n: int = Field(ge=0, le=10000000)
+
+
+class VolumeCategoryIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    category: str = Field(min_length=1, max_length=120)
+    n: int = Field(ge=0, le=10000000)
+
+
+class VolumeIn(BaseModel):
+    """The Ticket Volume page's counts by month over the whole window: tickets opened by type and by category (CORE's acorn-ticket-stats-sql.ts)."""
+
+    types: list[VolumeTypeIn] = Field(max_length=60000)
+    categories: list[VolumeCategoryIn] = Field(max_length=60000)
+
+
 class TicketStatsIn(BaseModel):
     months: list[str] = Field(max_length=40)
     rows: list[TicketMonthIn] = Field(max_length=60000)
     open_now: list[TicketOpenIn] = Field(max_length=5000)
     # Absent from an older CORE, or when that part could not be read: the resolution held from before stays.
     resolution: ResolutionIn | None = None
+    volume: VolumeIn | None = None
 
 
 class TicketStatsOut(BaseModel):
@@ -1604,6 +1624,8 @@ async def report_core_feed_ticket_stats(tenant_token: str, body: TicketStatsIn, 
     else:
         if payload.get("resolution") is None and (row.payload or {}).get("resolution") is not None:
             payload["resolution"] = row.payload["resolution"]  # this pass could not read it: keep the last one
+        if payload.get("volume") is None and (row.payload or {}).get("volume") is not None:
+            payload["volume"] = row.payload["volume"]
         row.payload, row.received_at = payload, now
     await db.commit()
     return TicketStatsOut(rows=len(body.rows), open_clients=len(body.open_now))

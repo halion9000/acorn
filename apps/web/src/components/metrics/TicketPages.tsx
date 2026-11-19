@@ -53,6 +53,7 @@ interface VolumeData {
   received_at: string | null;
   months: string[];
   total_created: number;
+  available_months?: number;
   by_type: { name: string; total: number; by_month: Record<string, number> }[];
   by_category: { name: string; total: number; by_month: Record<string, number> }[];
   per_month: { month: string; created: number }[];
@@ -76,6 +77,11 @@ export function TicketVolumeView() {
       <PeriodPicker period={period} options={LONG_PERIODS} />
       {data?.received_at && (
         <>
+          {data.available_months !== undefined && (
+            <p className="text-xs" style={{ color: 'var(--metrics-soft)' }} data-testid="volume-showing">
+              {showingText(data.months, data.available_months)}
+            </p>
+          )}
           <Cards items={[['Tickets created', num(data.total_created)], ['Stale tickets (over 30 days)', num(data.stale_by_tech.reduce((a, b) => a + b.tickets, 0))]]} />
           {matrix(data.by_type, 'Tickets created by ticket type', 'volume-by-type')}
           {matrix(data.by_category, 'Tickets created by category', 'volume-by-category')}
