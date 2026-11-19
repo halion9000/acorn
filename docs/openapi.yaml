@@ -66335,6 +66335,10 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ResolutionIn'
           - type: 'null'
+        volume:
+          anyOf:
+          - $ref: '#/components/schemas/VolumeIn'
+          - type: 'null'
       type: object
       required:
       - months
@@ -69398,6 +69402,71 @@ components:
       - home_tenant_id
       - tenants
       title: ViewableTenantsResponse
+    VolumeCategoryIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        category:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Category
+        n:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: N
+      type: object
+      required:
+      - month
+      - category
+      - n
+      title: VolumeCategoryIn
+    VolumeIn:
+      properties:
+        types:
+          items:
+            $ref: '#/components/schemas/VolumeTypeIn'
+          type: array
+          maxItems: 60000
+          title: Types
+        categories:
+          items:
+            $ref: '#/components/schemas/VolumeCategoryIn'
+          type: array
+          maxItems: 60000
+          title: Categories
+      type: object
+      required:
+      - types
+      - categories
+      title: VolumeIn
+      description: 'The Ticket Volume page''s counts by month over the whole window:
+        tickets opened by type and by category (CORE''s acorn-ticket-stats-sql.ts).'
+    VolumeTypeIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        type:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Type
+        n:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: N
+      type: object
+      required:
+      - month
+      - type
+      - n
+      title: VolumeTypeIn
     VulnerabilitiesReport:
       properties:
         vendor:
