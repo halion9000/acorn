@@ -45,3 +45,25 @@ Goal (Hal, 2026-11-13 and again 2026-11-14): A.C.O.R.N does for each client what
 4. Trust Center: public link per client, or sign-in only?
 5. Audits: will an outside auditor need to sign in, or does Live Oak export a package for them?
 6. Who may edit: technicians only, or the client's own people too (policy acceptance needs the client's people)?
+
+
+## Live comparison, 2026-11-19 (Live Oak's own Secureframe, read only)
+
+Read through the signed-in Secureframe tab: Dashboard, Tests, Controls, Frameworks, Audits, Data Room, Policies, Personnel, Access, Asset Inventory, Risk management, Vendors, Questionnaires. Live Oak's own data was read for its shape only; no names, numbers or policy text were copied here.
+
+What the 14 November plan listed as gaps is now built in A.C.O.R.N for clients: Frameworks, Controls, Tests, Policies (versions, approval, assignment, acceptance), People with onboarding and offboarding checklists, Access reviews, Audits with auditor access and files, Calendar, Risk register with heat map, Vendors with detected applications, Questionnaires, Trust Center, the control gap report and owner reminders. I did not compare each of those page by page; the differences below are the ones visible on the Secureframe screens today.
+
+| Secureframe screen | What it shows that A.C.O.R.N does not yet | Status |
+| --- | --- | --- |
+| Personnel | one table: status (Overdue tasks, All tasks completed, Not invited, Offboarded), Active / Inactive / Non-personnel / Auditors tabs, type (Employee, Contractor), in audit scope, access role, groups, managed computer, connected services, task notification frequency | status, Active and Inactive tabs, status filter, search and overdue-first order built 2026-11-19; type, audit scope, groups, managed computer, connected services and notification frequency not built |
+| Frameworks | for each framework not yet active, how many controls overlap with the active ones; add a custom framework; scoping rules (beta); per framework: tests passing, applicable tests, requirements, controls | not built |
+| Tests | a test library to enable tests from, Enabled and Custom tests tabs, a test activity log, Add test | library, custom tests and activity log not built |
+| Controls | Implemented and Inactive tabs, owner, health, "x of y tests passing", Add control | Inactive tab and Add control not built |
+| Asset Inventory | per device: last check-in, OS, source tools, owner, framework scope, manually scoped, and the five device checks (disk encryption, anti-virus, password policy, screen lock, firewall); categories Devices, Infrastructure, Repositories, Tickets | device checks per device, owner and scope not built on the Devices page |
+| Access > Accounts | every account per application with owner, in scope, roles, active, MFA and a Terminated count | Identities shows accounts per tool; the terminated count and in-scope flag are not built |
+| Dashboard | Tasks tab, Testing donut, Control health donut, vendor risk levels, action items by event (for example Evidence expired), active framework cards | the Compliance dashboard has most of this; the Tasks tab is not built |
+| Questionnaires and Knowledge Base | answers drafted from a knowledge base built by uploading finished questionnaires, a question usage meter | no knowledge base from uploads |
+| Data Room | folders of evidence with evidence type and relevant employee | audit files exist, a general data room does not |
+| Risk management | risk library, history, Archive tab, category, status per risk | library, history and Archive to be checked |
+
+Suggested order for the rest: tests library and custom tests, framework overlap and custom frameworks, device checks on Devices, the remaining Personnel columns, questionnaire knowledge base.

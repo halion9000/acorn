@@ -2459,5 +2459,15 @@
     "note": "Found while reviewing the pages: the API runs as ONE process (python -m app.scripts.serve starts one uvicorn) and was at 100% CPU while CORE's feed posts took 5 to 34 s each, so every page's API calls took about 6 s. The VM has 4 CPUs. Proposal: start uvicorn with 3 workers (it supports a shared socket), after checking the places that keep state in the process (worker heartbeat, in-memory caches) and with the deploy script's health check as the safety net; and make the heaviest feed posts (identities, devices, vulnerabilities) do their database work in smaller batches. Reply 'go' to do it, or say 'later'.",
     "detail": "Evidence: API log slow_request lines for POST /inbox/core-feed/{token}/... of 4.9 to 34 s; docker stats aisoc-api 104% CPU; page API calls 5 to 6.8 s while health answers in 0.1 ms locally.",
     "added": "2026-11-18"
+  },
+  {
+    "status": "in_progress",
+    "needs": "claude",
+    "area": "Compliance",
+    "key": "secureframe-compare-2026-11-19",
+    "title": "Compare with Live Oak's Secureframe and close the gaps",
+    "detail": "Hal signed in to Secureframe on 2026-11-19 so the screens can be compared with A.C.O.R.N's Compliance pages and the differences closed.",
+    "note": "Compared 13 screens (list in docs/SECUREFRAME_PARITY_PLAN.md). Built: People now shows a status per person (Overdue tasks, Tasks in progress, All tasks completed, No checklist started, Offboarded) with Active and Inactive tabs, a status filter and a search, overdue first. Not built yet, in the order suggested: tests library and custom tests, framework overlap and custom frameworks, the five device checks per device on Devices, the other People columns (type, audit scope, groups, notification frequency), the questionnaire knowledge base.",
+    "added": "2026-11-19"
   }
 ]

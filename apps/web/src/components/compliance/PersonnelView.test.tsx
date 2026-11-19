@@ -20,7 +20,7 @@ vi.mock('@/lib/auth-session', async (original) => {
 });
 vi.mock('@/components/mssp/ClientPicker', () => ({ ClientPicker: () => null, clientFromAddress: () => '' }));
 
-import { PersonnelView, checklistSummary } from './PersonnelView';
+import { PersonnelView, checklistSummary, personStatus, visiblePeople } from './PersonnelView';
 
 const progress = (over: Partial<{ started: boolean; total: number; done: number; open: number; overdue: number }> = {}) => ({ started: false, total: 0, done: 0, open: 0, overdue: 0, ...over });
 
@@ -47,8 +47,23 @@ describe('the people page', () => {
     render(<PersonnelView />);
     expect(await screen.findByText('Ann Lee')).toBeInTheDocument();
     expect(screen.getByText('Onboarding: 1 of 7 done, 1 overdue')).toBeInTheDocument();
+    expect(screen.getByTestId('person-status')).toHaveTextContent('Overdue tasks');
+    expect(screen.queryByTestId('person-status')?.textContent).not.toBe('Offboarded');
+    fireEvent.click(screen.getByRole('button', { name: /Inactive/ }));
+    await waitFor(() => expect(screen.getByTestId('person-status')).toHaveTextContent('Offboarded'));
     expect(screen.getByText('Offboarding: All 7 done')).toBeInTheDocument();
-    expect(screen.getByText('no longer active')).toBeInTheDocument();
+  });
+
+  it('narrows the list by status and by a search of name and address', async () => {
+    render(<PersonnelView />);
+    await screen.findByText('Ann Lee');
+    fireEvent.change(screen.getByLabelText('Search people'), { target: { value: 'zzz' } });
+    expect(screen.queryByText('Ann Lee')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Search people'), { target: { value: 'ANN' } });
+    expect(screen.getByText('Ann Lee')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'done' } });
+    expect(screen.queryByText('Ann Lee')).toBeNull();
+    expect(screen.getByTestId('people-overdue')).toHaveTextContent('1 with overdue tasks');
   });
 
   it('opens a person, starts the checklist that has no tasks, ticks a task off and adds one of their own', async () => {
@@ -69,5 +84,28 @@ describe('the people page', () => {
     fireEvent.click(add);
     await waitFor(() => expect(calls.some((c) => c.init?.method === 'POST' && c.url.endsWith('/ann%40x.com/tasks'))).toBe(true));
     expect(JSON.parse(String(calls.find((c) => c.init?.method === 'POST' && c.url.endsWith('/ann%40x.com/tasks'))!.init!.body))).toEqual({ kind: 'offboarding', title: 'Return the badge' });
+  });
+});
+
+describe('personStatus and visiblePeople', () => {
+  const p = (over: Record<string, unknown>) => ({ email: 'a@x.com', name: 'A', active: true, onboarding: { started: false, total: 0, done: 0, open: 0, overdue: 0 }, offboarding: { started: false, total: 0, done: 0, open: 0, overdue: 0 }, ...over }) as never;
+  const done = { started: true, total: 3, done: 3, open: 0, overdue: 0 };
+  const late = { started: true, total: 3, done: 1, open: 2, overdue: 1 };
+  const busy = { started: true, total: 3, done: 1, open: 2, overdue: 0 };
+
+  it('says offboarded first, then overdue, in progress, none started, or all completed', () => {
+    expect(personStatus(p({ active: false, onboarding: late })).key).toBe('offboarded');
+    expect(personStatus(p({ onboarding: late, offboarding: done })).key).toBe('overdue');
+    expect(personStatus(p({ onboarding: busy })).key).toBe('open');
+    expect(personStatus(p({})).key).toBe('none');
+    expect(personStatus(p({ onboarding: done })).key).toBe('done');
+  });
+
+  it('shows overdue people first, keeps inactive people on their own tab and searches name and address', () => {
+    const list = [p({ email: 'b@x.com', name: 'Bea', onboarding: done }), p({ email: 'a@x.com', name: 'Al', onboarding: late }), p({ email: 'z@x.com', name: 'Zed', active: false })];
+    expect(visiblePeople(list, { tab: 'active', status: '', query: '' }).map((x) => x.name)).toEqual(['Al', 'Bea']);
+    expect(visiblePeople(list, { tab: 'inactive', status: '', query: '' }).map((x) => x.name)).toEqual(['Zed']);
+    expect(visiblePeople(list, { tab: 'active', status: 'done', query: '' }).map((x) => x.name)).toEqual(['Bea']);
+    expect(visiblePeople(list, { tab: 'active', status: '', query: 'A@X' }).map((x) => x.name)).toEqual(['Al']);
   });
 });

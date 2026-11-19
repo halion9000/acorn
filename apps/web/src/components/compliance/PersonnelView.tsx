@@ -40,6 +40,32 @@ export function checklistSummary(p: Progress): string {
   return `${p.done} of ${p.total} done${p.overdue > 0 ? `, ${p.overdue} overdue` : ''}`;
 }
 
+export type StatusKey = 'overdue' | 'open' | 'done' | 'none' | 'offboarded';
+const STATUS: Record<StatusKey, { label: string; tone: string; rank: number }> = {
+  overdue: { label: 'Overdue tasks', tone: 'bg-red-500/15 text-red-300', rank: 0 },
+  open: { label: 'Tasks in progress', tone: 'bg-amber-500/15 text-amber-300', rank: 1 },
+  none: { label: 'No checklist started', tone: 'bg-gray-700/40 text-gray-300', rank: 2 },
+  done: { label: 'All tasks completed', tone: 'bg-emerald-500/15 text-emerald-300', rank: 3 },
+  offboarded: { label: 'Offboarded', tone: 'bg-gray-800 text-gray-400', rank: 4 },
+};
+
+/** One status for a person, the way Secureframe's People list shows it: offboarded, overdue tasks, tasks in progress, all tasks completed, or no checklist started (pure). */
+export function personStatus(p: Pick<Person, 'active' | 'onboarding' | 'offboarding'>): { key: StatusKey; label: string; tone: string } {
+  const lists = [p.onboarding, p.offboarding].filter((l) => l.started);
+  const key: StatusKey = !p.active ? 'offboarded' : lists.some((l) => l.overdue > 0) ? 'overdue' : lists.some((l) => l.open > 0) ? 'open' : lists.length === 0 ? 'none' : 'done';
+  return { key, label: STATUS[key].label, tone: STATUS[key].tone };
+}
+
+/** The people to show: the Active or Inactive tab, a status, and a search of name and address; overdue first, then by name (pure). */
+export function visiblePeople(people: Person[], opts: { tab: 'active' | 'inactive'; status: StatusKey | ''; query: string }): Person[] {
+  const needle = opts.query.trim().toLowerCase();
+  return people
+    .filter((p) => (opts.tab === 'active') === p.active)
+    .filter((p) => !opts.status || personStatus(p).key === opts.status)
+    .filter((p) => !needle || `${p.name ?? ''} ${p.email}`.toLowerCase().includes(needle))
+    .sort((a, b) => STATUS[personStatus(a).key].rank - STATUS[personStatus(b).key].rank || (a.name ?? a.email).localeCompare(b.name ?? b.email, undefined, { sensitivity: 'base' }));
+}
+
 const ghost = 'rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800 disabled:opacity-50';
 const input = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1.5 text-sm text-gray-100';
 const KIND_LABEL = { onboarding: 'Onboarding', offboarding: 'Offboarding' } as const;
@@ -56,6 +82,9 @@ export function PersonnelView() {
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState('');
   const [addKind, setAddKind] = useState<Task['kind']>('onboarding');
+  const [tab, setTab] = useState<'active' | 'inactive'>('active');
+  const [statusFilter, setStatusFilter] = useState<StatusKey | ''>('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -124,14 +153,37 @@ export function PersonnelView() {
       {problem ? <p className="text-sm text-red-300" role="alert">{problem}</p> : null}
       {people === null ? <p className="text-sm text-gray-500">Loading…</p> : null}
       {people?.length === 0 ? <p className="text-sm text-gray-500">No people are listed for this organization yet.</p> : null}
+      {people && people.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="people-filters">
+          {(['active', 'inactive'] as const).map((t) => (
+            <button key={t} type="button" aria-pressed={tab === t} onClick={() => setTab(t)} className={`rounded px-2 py-1 ${tab === t ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+              {t === 'active' ? 'Active' : 'Inactive'} ({people.filter((p) => p.active === (t === 'active')).length})
+            </button>
+          ))}
+          <select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusKey | '')} className={input}>
+            <option value="">Any status</option>
+            {(Object.keys(STATUS) as StatusKey[]).map((k) => (
+              <option key={k} value={k}>
+                {STATUS[k].label}
+              </option>
+            ))}
+          </select>
+          <input aria-label="Search people" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or address" className={input} />
+          <span className="text-xs text-gray-500" data-testid="people-overdue">
+            {people.filter((p) => p.active && personStatus(p).key === 'overdue').length} with overdue tasks
+          </span>
+        </div>
+      ) : null}
       <ul className="space-y-2">
-        {(people ?? []).map((p) => (
+        {visiblePeople(people ?? [], { tab, status: statusFilter, query }).map((p) => (
           <li key={p.email} className="rounded-lg border border-gray-800 bg-gray-900/50 p-3" data-testid="person">
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-gray-100">
                   {p.name ?? p.email}
-                  {!p.active ? <span className="ml-2 rounded bg-gray-800 px-1.5 py-0.5 text-xs font-normal text-gray-400">no longer active</span> : null}
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-normal ${personStatus(p).tone}`} data-testid="person-status">
+                    {personStatus(p).label}
+                  </span>
                 </div>
                 <div className="text-xs text-gray-500">{p.name ? p.email : ''}</div>
               </div>
