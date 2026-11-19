@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -46,11 +46,11 @@ async def huntress_versions(
 
 @router.get("/offline", summary="Devices a tool has shown as offline for more than a week (the clock starts when A.C.O.R.N first sees the device offline)")
 async def offline_devices(
-    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None, vendor: str = "unifi", days: int = 7
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None, vendor: str = "unifi", days: Annotated[int, Query(ge=1, le=365)] = 7
 ) -> dict[str, Any]:
     rows = await _rows(db, user.tenant_id, client_id, vendor)
     known = [{"client": c, "hostname": n, "model": mo, "offline_since": d.get("offline_since")} for c, n, d, _h, _m, mo in rows if rep.is_offline(d)]
-    return {"vendor": vendor, "days": days, "offline_now": len(known), "devices": rep.offline_for_days(known, datetime.now(UTC), max(1, min(days, 365)))}
+    return {"vendor": vendor, "days": days, "offline_now": len(known), "devices": rep.offline_for_days(known, datetime.now(UTC), days)}
 
 
 @router.get("/network-firmware", summary="Network devices (Auvik) running older firmware than another device of the same make and model")

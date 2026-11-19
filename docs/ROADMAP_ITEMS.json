@@ -247,7 +247,7 @@
     "title": "A6: weekly briefing paragraph",
     "area": "Reports",
     "status": "not_started",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "A6 (weekly briefing) is a written summary: which clients had what alerts, what changed, what is open. It overlaps with r7-cf-21 and the report scheduler (r7-af-32). Recommend: fold it into the report scheduler instead of a separate feature. Reply 'fold' or 'skip'."
   },
@@ -276,7 +276,7 @@
     "title": "12.19: file integrity monitoring baselines",
     "area": "Security",
     "status": "not_started",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "File integrity monitoring: record a baseline of key files on client machines and alert when they change. It needs an agent on each machine that we do not run (Huntress and Ninja do not expose it). Recommend: skip for now. Reply 'skip' or 'go'."
   },
@@ -285,7 +285,7 @@
     "title": "12.14: threat hunting",
     "area": "Security",
     "status": "not_started",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "Threat hunting would let you save a search over client alert data (for example 'every sign-in from a new country this week') and run it on a schedule. Reply 'go' for a first version (saved searches plus a daily run), or 'skip'."
   },
@@ -400,7 +400,7 @@
     "title": "Send SOC 2, ISO 27001, PCI DSS and HIPAA requirements from CORE so their control health comes from Secureframe too",
     "area": "Compliance",
     "status": "not_started",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "I checked: that was only copying the requirements text into A.C.O.R.N, which is already done. This item is the second step: control health (pass/fail per requirement) for SOC 2, ISO 27001, PCI DSS and HIPAA coming from Secureframe the way NIST CSF and CIS do now. Do you want that too? Reply 'go' or 'skip'."
   },
@@ -899,7 +899,7 @@
     "title": "Query-plan tests for the devices list on a table with many rows",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "note": "If we did it, the devices list would load one page at a time from the database instead of loading every device and paging in the program. Benefit: faster pages and less memory as the device count grows (you have thousands). It is a large change; today's speed is acceptable. Recommend: leave it. Reply 'do it' or I close it.",
     "added": "2026-11-14"
   },
@@ -1239,7 +1239,7 @@
     "title": "A per-client switch that requires single sign-on",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "note": "What it is for: it would force a client's users to sign in with their Microsoft account only (no A.C.O.R.N passwords) for the client sign-in. Only matters once clients log in (customer dashboard, client compliance). Recommend: defer until the client sign-in is live. Reply 'defer' or 'go'.",
     "added": "2026-11-14"
   },
@@ -1290,7 +1290,7 @@
     "title": "Decide how long audit logs are kept by default",
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "note": "Archived = older audit log rows moved out of the live database into Azure blob storage (cheap, kept read-only, retrievable on request). Recommend 12 months online, 7 years archived for compliance. OK? Reply 'ok' or give other numbers.",
     "added": "2026-11-14"
   },
@@ -1487,7 +1487,7 @@
     "title": "A Cipher job that drafts the weekly client review paragraph from the data",
     "area": "Round 7: CORE feature",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "Each Monday a draft paragraph per client could go to Slack (a channel) or e-mail to the account owner. About one model run per client per week. Reply with where it should go (Slack channel name or e-mail) or 'skip'."
   },
@@ -1815,7 +1815,7 @@
     "title": "Policies: a staff acceptance page with a link per person",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "note": "Both can be done: one-time e-mail links, or sign-in with Microsoft (SSO) so the click records who accepted. Recommend SSO for Live Oak staff and one-time links for outside people. Reply 'go' to build that.",
     "added": "2026-11-14"
   },
@@ -1902,7 +1902,7 @@
     "title": "Devices: a lifecycle view (age by purchase date, warranty, replacement plan)",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "added": "2026-11-14",
     "note": "No purchase date, so age comes from first seen plus warranty when available. I will build the lifecycle view that way and label it first seen. Reply 'go' to approve."
   },
@@ -2025,7 +2025,7 @@
     "title": "Settings: an export and import of settings between organizations",
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
-    "needs": "hal",
+    "needs": "signoff",
     "note": "It would copy rules (alert rules, suppressions, which frameworks are on) from one client or organization to another, never keys or secrets. Useful when setting up a new client like an existing one. Reply 'go' to build it, or 'skip'.",
     "added": "2026-11-14"
   },

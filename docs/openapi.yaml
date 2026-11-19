@@ -18863,6 +18863,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 365
+          minimum: 1
           default: 7
           title: Days
       responses:

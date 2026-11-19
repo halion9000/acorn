@@ -509,6 +509,7 @@ class TestEveryCreationPathSetsAName:
             "scripts/bootstrap_production.py": "account_name=chosen_name,",
             "scripts/seed_demo.py": 'account_name="demo",',
             "api/v1/endpoints/client_portal.py": "account_name=name,",
+            "api/v1/endpoints/audit_portal.py": "account_name=name,",
         }
         for rel, needle in expected.items():
             assert needle in (APP / rel).read_text(encoding="utf-8"), f"{rel} no longer names the account it creates ({needle})"
@@ -524,6 +525,7 @@ class TestEveryCreationPathSetsAName:
                 if re.search(r"(?<![\w.])User\(\s*$", line) or re.search(r"(?<![\w.])User\(id=|(?<![\w.])User\(tenant_id=", line):
                     found.append(p.relative_to(APP).as_posix())
         assert sorted(set(found)) == [
+            "api/v1/endpoints/audit_portal.py",
             "api/v1/endpoints/client_portal.py",
             "api/v1/endpoints/sso_microsoft.py",
             "api/v1/endpoints/tenants.py",
