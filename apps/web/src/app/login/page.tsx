@@ -184,7 +184,7 @@ function LoginInner() {
               Sign in to A.C.O.R.N
             </h1>
             <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-              Open-source AI SOC console. Sign in with your tenant&rsquo;s account.
+              Sign in with your tenant&rsquo;s account.
             </p>
           </div>
 

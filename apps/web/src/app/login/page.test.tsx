@@ -47,6 +47,12 @@ describe('the sign-in page', () => {
 
   // "/" is the project's public marketing site. A self-hosted console must not send people there from its own sign-in page (found live: a "Back to localhost" link
   // that, despite its label, led to the original project's site).
+  it('does not call itself an open-source console under the title', () => {
+    render(<LoginPage />);
+    expect(screen.queryByText(/Open-source AI SOC console/i)).toBeNull();
+    expect(screen.getByText(/Sign in with your tenant/)).toBeTruthy();
+  });
+
   it('has no link back to the marketing site', () => {
     const { container } = render(<LoginPage />);
     expect(container.textContent ?? '').not.toMatch(/back to localhost/i);
