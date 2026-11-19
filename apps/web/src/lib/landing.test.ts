@@ -9,6 +9,10 @@ describe('landingFor', () => {
   it('sends an auditor sign-in to the audit portal whatever page they asked for', () => {
     expect(landingFor('auditor', '/dashboard')).toBe('/audit-portal');
   });
+  it('sends a compliance viewer to the Compliance pages, or on to the Compliance page they asked for', () => {
+    expect(landingFor('compliance_viewer', '/dashboard')).toBe('/compliance');
+    expect(landingFor('compliance_viewer', '/compliance/audits')).toBe('/compliance/audits');
+  });
   it('sends everyone else where they were headed', () => {
     expect(landingFor('tenant_admin', '/alerts')).toBe('/alerts');
     expect(landingFor(undefined, '/dashboard')).toBe('/dashboard');

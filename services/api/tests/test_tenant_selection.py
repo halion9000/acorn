@@ -188,7 +188,7 @@ class TestSelectableTenants:
         assert "require_permission('alerts:read')" in ast.unparse(fn.args)  # ast.unparse normalises to single quotes
         # A person whose one role is a custom role holds exactly what that role grants, so "custom" (which has no built-in permissions) is not in this list.
         assert all(
-            has_permission(role, "alerts:read") for role in ROLE_PERMISSIONS if role not in {"custom", "client_viewer", "auditor"}
+            has_permission(role, "alerts:read") for role in ROLE_PERMISSIONS if role not in {"custom", "client_viewer", "auditor", "compliance_viewer"}
         )  # client_viewer and auditor are sealed to their own pages
 
 

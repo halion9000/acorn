@@ -11,7 +11,7 @@ import logging
 import secrets
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
@@ -65,6 +65,7 @@ async def portal_summary(user: PortalUser, db: DBSession, months: Annotated[int,
 
 
 class PortalUserOut(BaseModel):
+    role: str = "client_viewer"
     id: uuid.UUID
     tenant_id: uuid.UUID
     client_name: str
@@ -81,6 +82,8 @@ class CreatePortalUser(BaseModel):
     account_name: str
     email: EmailStr | None = None
     username: str | None = None
+    # client_viewer: the dashboard (needs the client linked to HaloPSA); compliance_viewer: the read-only Compliance pages.
+    role: Literal["client_viewer", "compliance_viewer"] = "client_viewer"
 
 
 class CreatedPortalUser(PortalUserOut):
@@ -100,6 +103,7 @@ async def _managed_children(db: Any, caller_tenant: uuid.UUID) -> dict[uuid.UUID
 
 async def _out(db: Any, user: User, tenant: Tenant) -> PortalUserOut:
     return PortalUserOut(
+        role=user.role,
         id=user.id,
         tenant_id=user.tenant_id,
         client_name=tenant.name,
@@ -118,7 +122,7 @@ async def _portal_user_of(db: Any, current: Any, user_id: uuid.UUID) -> tuple[Us
     async with cross_tenant_reads(db):
         user = (
             await db.execute(
-                select(User).where(User.id == user_id, User.role == client_portal.CLIENT_VIEWER_ROLE, User.tenant_id.in_(list(children)))
+                select(User).where(User.id == user_id, User.role.in_(client_portal.CLIENT_ROLES), User.tenant_id.in_(list(children)))
             )
         ).scalar_one_or_none()
     if user is None:
@@ -154,7 +158,7 @@ async def list_portal_users(current: AuthUser, db: DBSession) -> list[PortalUser
             (
                 await db.execute(
                     select(User)
-                    .where(User.role == client_portal.CLIENT_VIEWER_ROLE, User.tenant_id.in_(list(children)))
+                    .where(User.role.in_(client_portal.CLIENT_ROLES), User.tenant_id.in_(list(children)))
                     .order_by(User.account_name)
                 )
             )
@@ -176,7 +180,8 @@ async def create_portal_user(body: CreatePortalUser, current: AuthUser, db: DBSe
     child = children.get(body.child_tenant_id)
     if child is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That client is not one of yours.")
-    await client_portal.resolve_client(db, child.id)  # 409 with the reason when the client has no (or more than one) HaloPSA link
+    if body.role == client_portal.CLIENT_VIEWER_ROLE:
+        await client_portal.resolve_client(db, child.id)  # 409 with the reason when the client has no (or more than one) HaloPSA link
     try:
         name = validate_account_name(body.account_name)
     except InvalidAccountName as exc:
@@ -196,7 +201,7 @@ async def create_portal_user(body: CreatePortalUser, current: AuthUser, db: DBSe
         account_name=name,
         username=(body.username or name).strip()[:100] or name,
         hashed_password=get_password_hash(password),
-        role=client_portal.CLIENT_VIEWER_ROLE,
+        role=body.role,
     )
     async with acting_as_tenant(db, child.id):
         db.add(user)

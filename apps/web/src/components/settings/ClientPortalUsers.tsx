@@ -20,6 +20,7 @@ export function ClientPortalUsers() {
   const [clientId, setClientId] = useState('');
   const [account, setAccount] = useState('');
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'client_viewer' | 'compliance_viewer'>('client_viewer');
   const [problem, setProblem] = useState<string | null>(null);
   const [made, setMade] = useState<{ account: string; password: string } | null>(null);
 
@@ -43,7 +44,7 @@ export function ClientPortalUsers() {
     e.preventDefault();
     setProblem(null);
     try {
-      const r = await clientPortalApi.create({ child_tenant_id: clientId, account_name: account.trim(), ...(email.trim() ? { email: email.trim() } : {}) });
+      const r = await clientPortalApi.create({ child_tenant_id: clientId, account_name: account.trim(), role, ...(email.trim() ? { email: email.trim() } : {}) });
       setMade({ account: r.account_name, password: r.temporary_password });
       setAdding(false);
       setAccount('');
@@ -97,6 +98,13 @@ export function ClientPortalUsers() {
             </select>
           </label>
           <label className="text-xs text-gray-300">
+            Opens
+            <select aria-label="Opens" className={`${input} mt-1`} value={role} onChange={(e) => setRole(e.target.value as 'client_viewer' | 'compliance_viewer')}>
+              <option value="client_viewer">The client dashboard (tickets, hours, satisfaction)</option>
+              <option value="compliance_viewer">The Compliance pages, read only</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-300">
             Account name
             <input aria-label="Account name" className={`${input} mt-1`} value={account} onChange={(e) => setAccount(e.target.value)} />
           </label>
@@ -127,7 +135,7 @@ export function ClientPortalUsers() {
             <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div>
                 <p className="text-gray-100">
-                  {u.account_name} <span className="text-xs text-gray-400">at {u.client_name}</span>
+                  {u.account_name} <span className="text-xs text-gray-400">at {u.client_name}{u.role === 'compliance_viewer' ? ', Compliance pages' : ''}</span>
                 </p>
                 <p className="text-xs text-gray-500">
                   {u.is_active ? 'Active' : 'Turned off'}; {u.mfa_enabled ? 'authenticator app set up' : 'no authenticator app yet (the dashboard stays closed)'}

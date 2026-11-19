@@ -43185,6 +43185,13 @@ components:
           - type: string
           - type: 'null'
           title: Username
+        role:
+          type: string
+          enum:
+          - client_viewer
+          - compliance_viewer
+          title: Role
+          default: client_viewer
       type: object
       required:
       - child_tenant_id
@@ -43450,6 +43457,10 @@ components:
         to sign in. `username` is a display name and defaults to the account name.'
     CreatedPortalUser:
       properties:
+        role:
+          type: string
+          title: Role
+          default: client_viewer
         id:
           type: string
           format: uuid
@@ -54970,6 +54981,10 @@ components:
       title: PortalActionDone
     PortalUserOut:
       properties:
+        role:
+          type: string
+          title: Role
+          default: client_viewer
         id:
           type: string
           format: uuid

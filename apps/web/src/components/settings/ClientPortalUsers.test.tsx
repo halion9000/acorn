@@ -61,8 +61,20 @@ describe('Client dashboard sign-ins (Settings)', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
     await userEvent.type(screen.getByLabelText('Account name'), 'acme.owner');
     await userEvent.click(screen.getByRole('button', { name: 'Create sign-in' }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith({ child_tenant_id: 'c1', account_name: 'acme.owner' }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ child_tenant_id: 'c1', account_name: 'acme.owner', role: 'client_viewer' }));
     expect((await screen.findByTestId('portal-temp-password')).textContent).toContain('Tmp-Pass-123');
+  });
+
+  it('can make a read-only Compliance sign-in instead of a dashboard one', async () => {
+    users.mockResolvedValue([]);
+    create.mockResolvedValue({ ...row(), temporary_password: 'Tmp-Pass-123' });
+    render(<ClientPortalUsers />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a client sign-in' }));
+    await userEvent.selectOptions(await screen.findByLabelText('Client'), 'c1');
+    await userEvent.selectOptions(screen.getByLabelText('Opens'), 'compliance_viewer');
+    await userEvent.type(screen.getByLabelText('Account name'), 'acme.audit');
+    await userEvent.click(screen.getByRole('button', { name: 'Create sign-in' }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ child_tenant_id: 'c1', account_name: 'acme.audit', role: 'compliance_viewer' }));
   });
 
   it('resets the second step of one person', async () => {

@@ -7704,6 +7704,8 @@ export interface ClientPortalSummary {
   } | null;
 }
 export interface ClientPortalUser {
+  /** client_viewer (the dashboard) or compliance_viewer (the read-only Compliance pages). */
+  role?: string;
   id: string;
   tenant_id: string;
   client_name: string;
@@ -7717,7 +7719,7 @@ export interface ClientPortalUser {
 export const clientPortalApi = {
   summary: (months: number) => request<ClientPortalSummary>(`/api/v1/client-portal/summary?months=${months}`),
   users: () => request<ClientPortalUser[]>('/api/v1/mssp/client-portal-users'),
-  create: (body: { child_tenant_id: string; account_name: string; email?: string }) =>
+  create: (body: { child_tenant_id: string; account_name: string; email?: string; role?: 'client_viewer' | 'compliance_viewer' }) =>
     request<ClientPortalUser & { temporary_password: string }>('/api/v1/mssp/client-portal-users', { method: 'POST', body: JSON.stringify(body) }),
   resetMfa: (id: string) => request<{ done: boolean; detail: string }>(`/api/v1/mssp/client-portal-users/${encodeURIComponent(id)}/reset-mfa`, { method: 'POST' }),
   turnOff: (id: string) => request<{ done: boolean; detail: string }>(`/api/v1/mssp/client-portal-users/${encodeURIComponent(id)}`, { method: 'DELETE' }),

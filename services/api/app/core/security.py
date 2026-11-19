@@ -201,6 +201,9 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     "client_viewer": ["client_portal:view"],
     # An outside auditor, signed in to see ONE audit (the ones linked to them) and add files to it. Like client_viewer it reaches only its own routes (/audit-portal, see app/services/client_portal.py).
     "auditor": ["audit_portal:view"],
+    # A person at a CLIENT who may read that client's Compliance pages and nothing else (roadmap r7-af-35, r7-af-37). It holds reports:read, which also opens other report routes, so the role is sealed to GET requests on
+    # the compliance routes in get_current_user (app/services/client_portal.py), and needs an authenticator app.
+    "compliance_viewer": ["reports:read"],
     "api_service": [
         "alerts:read",
         "alerts:write",

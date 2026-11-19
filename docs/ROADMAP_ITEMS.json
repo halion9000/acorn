@@ -105,9 +105,9 @@
     "title": "Compliance in the client-facing part of A.C.O.R.N",
     "detail": "Offer the Compliance section to clients, after it works for Live Oak itself.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): do what you recommend for now (read-only overview and policies for chosen clients, client sign-in with the authenticator app). Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built as recommended: see r7-af-35 (same sign-in). Read-only, for the clients you create it for, with the authenticator app.",
     "added": "2026-11-14"
   },
   {
@@ -2033,9 +2033,9 @@
     "key": "r7-af-35",
     "title": "Roles: a role for read-only compliance viewers",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes: a read-only compliance role. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built: a read-only Compliance sign-in for a client's people (role compliance_viewer). Settings > Client dashboard sign-ins > Add: choose Opens: the Compliance pages, read only. They read everything under Compliance for their own company, change nothing, reach nothing else, and need an authenticator app. NOT seen live: please make a test sign-in for one client and click through the pages; tell me any that show an error (the client picker on some pages may not work for them).",
     "added": "2026-11-14"
   },
   {
@@ -2053,9 +2053,9 @@
     "key": "r7-af-37",
     "title": "A client-facing portal with only the compliance pages",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): basically everything under Compliance is visible, read-only. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built together with r7-af-35: everything under Compliance, read only.",
     "added": "2026-11-14"
   },
   {

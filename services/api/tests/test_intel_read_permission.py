@@ -133,7 +133,7 @@ class TestRolesAreUnchanged:
         intel:read. That the equality above is not vacuous is shown by the key and database-role tests below, which DO tell holders from
         non-holders."""
         # "custom" is left out: a person whose one role is a custom role holds exactly what that role lists.
-        assert all(has_permission(role, "intel:read") for role in ROLE_PERMISSIONS if role not in {"custom", "client_viewer", "auditor"}), {
+        assert all(has_permission(role, "intel:read") for role in ROLE_PERMISSIONS if role not in {"custom", "client_viewer", "auditor", "compliance_viewer"}), {
             r: has_permission(r, "intel:read") for r in ROLE_PERMISSIONS
         }
 

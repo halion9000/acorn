@@ -29,6 +29,11 @@ from app.services import ticket_metrics as tm
 
 CLIENT_VIEWER_ROLE = "client_viewer"
 AUDITOR_ROLE = "auditor"
+COMPLIANCE_VIEWER_ROLE = "compliance_viewer"
+# The roles a person at a customer signs in with: the dashboard, or the read-only Compliance pages.
+CLIENT_ROLES = (CLIENT_VIEWER_ROLE, COMPLIANCE_VIEWER_ROLE)
+# What the compliance viewer may read (GET only): the Compliance pages and what they list.
+COMPLIANCE_READ_PREFIXES = ("/compliance/", "/governance", "/personnel", "/risk-register", "/me/policies")
 VENDOR = "halopsa"
 VIEW_AS_HEADER = "x-view-as-tenant"
 
@@ -68,11 +73,28 @@ def auditor_reach_allowed(method: str, path: str) -> bool:
     return rel.startswith("/audit-portal/") or (method.upper(), rel) in _AUDITOR_SESSION_PATHS
 
 
+def is_session_path(method: str, path: str) -> bool:
+    """The sign-in routes a client sign-in may always call (end the session, renew it, change the password, set up the authenticator app)."""
+    return (method.upper(), relative_path(path)) in _AUDITOR_SESSION_PATHS
+
+
+def compliance_reach_allowed(method: str, path: str) -> bool:
+    """A compliance viewer may only READ the Compliance routes, plus ending the session, renewing it, changing their own password and the authenticator app (the sign-in routes the dashboard sign-in has)."""
+    rel = relative_path(path)
+    if method.upper() == "GET" and any(rel == p.rstrip("/") or rel.startswith(p if p.endswith("/") else p + "/") for p in COMPLIANCE_READ_PREFIXES):
+        return True
+    return (method.upper(), rel) in _AUDITOR_SESSION_PATHS
+
+
 def enforce_reach(role: str, request: Request | None) -> None:
     """403 for a client_viewer asking for anything outside ``ALLOWED_PATHS`` (also when the request names another tenant to view). A direct call with no request is not an HTTP request and is left alone."""
     if request is not None and role == AUDITOR_ROLE:
         if request.headers.get(VIEW_AS_HEADER) is not None or not auditor_reach_allowed(request.method, request.url.path):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This sign-in can only open the audits it was invited to.")
+        return
+    if request is not None and role == COMPLIANCE_VIEWER_ROLE:
+        if request.headers.get(VIEW_AS_HEADER) is not None or not compliance_reach_allowed(request.method, request.url.path):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This sign-in can only read the Compliance pages.")
         return
     if role != CLIENT_VIEWER_ROLE or request is None:
         return

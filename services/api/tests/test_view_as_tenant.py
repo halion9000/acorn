@@ -1372,6 +1372,7 @@ class TestCapabilities:
             "billing": [],
             "client_viewer": [],
             "auditor": [],
+            "compliance_viewer": [],
             "api_service": [],
         }
 

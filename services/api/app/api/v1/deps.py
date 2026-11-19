@@ -318,6 +318,13 @@ async def get_current_user(
     requested = None if request is None or credentials is None else request.headers.get(VIEW_AS_HEADER)
     if not requested or not requested.strip() or is_account_level(request.url.path):
         await tag_session(db, user.tenant_id)
+        if request is not None and user.role == client_portal.COMPLIANCE_VIEWER_ROLE and not client_portal.is_session_path(request.method, request.url.path):
+            from app.services import totp_store  # noqa: PLC0415
+
+            if not await totp_store.is_enabled(db, user.user_id, user.tenant_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="mfa_setup_required: set up an authenticator app (Settings, Two-step sign-in) before the Compliance pages open."
+                )
         return user
     if user.scopes is not None:
         raise refuse_api_key()
