@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
-import { PeriodPicker, periodQuery, usePeriod, type CustomRange } from './kit';
-import { PageHeader, StatCard } from '@/components/ui/kit';
+import { Columns, Panel, PeriodPicker, Table, monthShort, num, periodQuery, selectClass, usePeriod, type CustomRange } from './kit';
+import { PageHeader } from '@/components/ui/kit';
 
 interface Summary {
   months: string[];
@@ -16,7 +16,11 @@ interface Summary {
   hours_per_month: number | null;
   clients: string[];
   by_month: { month: string; hours: number }[];
-  by_agent: { agent_id: string; name: string; hours: number }[];
+  by_agent: { agent_id: string; name: string; team?: string; hours: number }[];
+  engineers?: { name: string; team: string; total: number; by_month: Record<string, number> }[];
+  teams?: string[];
+  client_months?: { client: string; total: number; by_month: Record<string, number> }[];
+  type_months?: { type: string; total: number; by_month: Record<string, number> }[];
   by_client: { client: string; hours: number }[];
   by_type: { type: string; hours: number }[];
 }
@@ -36,37 +40,12 @@ export const widthPercent = (hours: number, total: number): number => (total > 0
 
 const pill = (on: boolean) => `rounded border px-2.5 py-1 text-xs ${on ? 'border-blue-500 bg-blue-500/20 text-blue-200' : 'border-gray-700 text-gray-300 hover:bg-gray-800'}`;
 
-function Bars({ title, rows, total, testId }: { title: string; rows: { label: string; hours: number }[]; total: number; testId: string }) {
-  return (
-    <section className="rounded-lg border border-gray-700 bg-gray-800 p-3" data-testid={testId}>
-      <h2 className="mb-2 text-sm font-semibold text-white">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="text-sm text-gray-500">No hours in this period.</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {rows.slice(0, 15).map((r) => (
-            <li key={r.label} className="text-sm text-gray-200">
-              <div className="flex justify-between gap-3">
-                <span className="truncate">{r.label}</span>
-                <span className="tabular-nums text-gray-400">{hoursText(r.hours)}</span>
-              </div>
-              <div className="mt-0.5 h-1.5 rounded bg-gray-700">
-                <div className="h-1.5 rounded bg-blue-500" style={{ width: `${widthPercent(r.hours, total)}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      {rows.length > 15 && <p className="mt-2 text-xs text-gray-500">The {rows.length - 15} smallest are not shown.</p>}
-    </section>
-  );
-}
-
 export function LaborHoursView() {
   const [denied, setDenied] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const period = usePeriod(3);
   const [client, setClient] = useState('');
+  const [team, setTeam] = useState('');
   const [data, setData] = useState<LaborData | null>(null);
 
   const load = useCallback(async (m: number, range: CustomRange | null, c: string) => {
@@ -91,7 +70,7 @@ export function LaborHoursView() {
   const s = data?.summary;
   return (
     <div className="space-y-4 p-6">
-      <PageHeader title="Labor hours" subtitle="Hours worked on tickets, by month, engineer, client and ticket type. Updated about once a day." />
+      <PageHeader title="Labor Hours" subtitle="Hours worked on tickets, by month, engineer, client and ticket type. Updated about once a day." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -113,23 +92,31 @@ export function LaborHoursView() {
         </p>
       )}
       {s && data?.received_at && (
-        <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="labor-cards">
-            {[
-              ['Hours worked', hoursText(s.total_hours)],
-              ['A month on average', hoursText(s.hours_per_month)],
-              ['Engineers', String(s.by_agent.length)],
-            ].map(([label, value]) => (
-              <StatCard key={label} label={label} value={value} />
-            ))}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Bars testId="by-month" title="By month" total={s.total_hours} rows={s.by_month.map((r) => ({ label: monthName(r.month), hours: r.hours }))} />
-            <Bars testId="by-type" title="By ticket type" total={s.total_hours} rows={s.by_type.map((r) => ({ label: r.type, hours: r.hours }))} />
-            <Bars testId="by-agent" title="By engineer" total={s.total_hours} rows={s.by_agent.map((r) => ({ label: r.name, hours: r.hours }))} />
-            <Bars testId="by-client" title="By client" total={s.total_hours} rows={s.by_client.map((r) => ({ label: r.client, hours: r.hours }))} />
-          </div>
-        </>
+        <div className="space-y-4">
+          <Panel title="Total Hours By Month" testId="by-month">
+            <Columns points={s.by_month.map((r) => ({ label: monthShort(r.month), value: r.hours }))} unit=" h" />
+          </Panel>
+          <Panel title="Labor Hours by Engineer" testId="by-agent">
+            <label className="mb-3 flex items-center gap-2 text-sm text-gray-300">
+              Team
+              <select aria-label="Team" className={selectClass} value={team} onChange={(e) => setTeam(e.target.value)}>
+                <option value="">All Teams</option>
+                {(s.teams ?? []).map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Table head={['Engineer', 'Team', ...s.months.map(monthShort)]} rows={(s.engineers ?? []).filter((e) => !team || e.team === team).map((e) => [e.name, e.team || 'Unknown', ...s.months.map((m) => num(e.by_month[m] ?? 0, 2))])} />
+          </Panel>
+          <Panel title="Labor Hours by Client" testId="by-client">
+            <Table head={['Client', ...s.months.map(monthShort)]} rows={(s.client_months ?? []).map((c) => [c.client, ...s.months.map((m) => num(c.by_month[m] ?? 0, 2))])} />
+          </Panel>
+          <Panel title="Labor Hours by Ticket Type" testId="by-type">
+            <Table head={['Ticket Type', ...s.months.map(monthShort)]} rows={(s.type_months ?? []).map((t) => [t.type, ...s.months.map((m) => num(t.by_month[m] ?? 0, 2))])} />
+          </Panel>
+        </div>
       )}
     </div>
   );

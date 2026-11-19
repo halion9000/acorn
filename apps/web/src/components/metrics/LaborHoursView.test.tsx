@@ -21,6 +21,13 @@ const body = () => ({
     by_agent: [{ agent_id: '40', name: 'Dan Kemp', hours: 18 }, { agent_id: '41', name: 'Vic Cio', hours: 2.5 }],
     by_client: [{ client: 'Acme Dental, Inc.', hours: 16.5 }],
     by_type: [{ type: 'Remote Support', hours: 15 }],
+    teams: ['Pod 1'],
+    engineers: [
+      { name: 'Dan Kemp', team: 'Pod 1', total: 18, by_month: { '2026-09': 8, '2026-10': 10 } },
+      { name: 'Vic Cio', team: '', total: 2.5, by_month: { '2026-10': 2.5 } },
+    ],
+    client_months: [{ client: 'Acme Dental, Inc.', total: 16.5, by_month: { '2026-09': 6.5, '2026-10': 10 } }],
+    type_months: [{ type: 'Remote Support', total: 15, by_month: { '2026-09': 5, '2026-10': 10 } }],
   },
 });
 const answer = (b: unknown, status = 200) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(b) });
@@ -55,20 +62,23 @@ describe('the Labor hours page', () => {
     expect(await screen.findByTestId('labor-empty')).toBeTruthy();
   });
 
-  it('shows the totals and the four breakdowns', async () => {
+  it('shows the hours by month as a chart and engineers, clients and ticket types by month in tables, with a team filter', async () => {
     render(<LaborHoursView />);
-    const cards = await screen.findByTestId('labor-cards');
-    expect(within(cards).getByText('20.5 h')).toBeTruthy();
-    expect(within(cards).getByText('10.25 h')).toBeTruthy();
-    expect(within(screen.getByTestId('by-agent')).getByText('Dan Kemp')).toBeTruthy();
-    expect(within(screen.getByTestId('by-type')).getByText('Remote Support')).toBeTruthy();
+    const agents = await screen.findByTestId('by-agent');
+    expect(within(agents).getAllByRole('columnheader').map((h) => (h.textContent ?? '').replace(/[↕▲▼]/g, '').trim())).toEqual(['Engineer', 'Team', 'Sep 26', 'Oct 26']);
+    expect(within(agents).getByText('Dan Kemp')).toBeTruthy();
+    expect(within(agents).getByText('Unknown')).toBeTruthy();
     expect(within(screen.getByTestId('by-month')).getByText('Oct 26')).toBeTruthy();
-    expect(within(screen.getByTestId('by-client')).getByText('Acme Dental, Inc.')).toBeTruthy();
+    expect(within(screen.getByTestId('by-client')).getByText('6.5')).toBeTruthy();
+    expect(within(screen.getByTestId('by-type')).getByText('Remote Support')).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Team'), 'Pod 1');
+    expect(within(screen.getByTestId('by-agent')).queryByText('Vic Cio')).toBeNull();
+    expect(within(screen.getByTestId('by-agent')).getByText('Dan Kemp')).toBeTruthy();
   });
 
   it('asks again for the period and the client the person picks', async () => {
     render(<LaborHoursView />);
-    await screen.findByTestId('labor-cards');
+    await screen.findByTestId('by-agent');
     await userEvent.click(screen.getByRole('button', { name: 'Last 12 months' }));
     await waitFor(() => expect(authFetch.mock.calls.some(([u]) => String(u).includes('months=12'))).toBe(true));
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'Birch Law');

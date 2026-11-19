@@ -282,3 +282,10 @@ def test_user_roles_count_who_holds_each_directory_role_per_client_and_skip_empt
     ]
     assert r["clients"][0]["members"]["Global Administrator"][1] == {"name": "Bob", "upn": "bob@a.example", "enabled": False}
     assert mc.user_roles(None) == {"roles": [], "clients": []}
+
+
+def test_stale_tickets_carry_their_type_opened_day_and_idle_days():
+    detail = {"weeks": [], "rows": [], "open": [], "stale": [{"ticket_id": "9", "client_name": "Acme", "agent": "Dan", "title": "VPN", "priority": "Low", "status": "On Hold", "age_days": 90, "type": "Project", "opened": "2026-08-01", "last_activity": "2026-11-10", "idle_days": 4}, {"ticket_id": "8", "client_name": "Acme", "agent": "Dan", "title": "x", "priority": "", "status": "", "age_days": 50}]}
+    first, second = mt.ticket_volume(detail, 1)["stale"]
+    assert (first["type"], first["opened"], first["last_activity"], first["idle_days"]) == ("Project", "2026-08-01", "2026-11-10", 4)
+    assert second["idle_days"] is None and second["last_activity"] == ""

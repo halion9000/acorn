@@ -207,3 +207,21 @@ def test_thirty_seven_months_are_accepted_from_core_and_the_summary_can_cover_th
     assert tm.summarize(kept, 12)["created"] == 120
     with pytest.raises(Exception):
         feed.TicketStatsIn.model_validate({**stats, "months": _year_of_months(41)})
+
+
+def test_labor_hours_give_engineers_clients_and_types_by_month_with_each_engineers_team():
+    payload = {
+        "months": ["2026-10", "2026-11"],
+        "agents": [{"id": "5", "name": "Zed", "team": "Pod 1"}, {"id": "6", "name": "Amy", "team": ""}],
+        "hours": [
+            {"month": "2026-10", "client": "Acme", "agent_id": 5, "hours": 2, "charge_type": "Alert"},
+            {"month": "2026-11", "client": "Acme", "agent_id": 6, "hours": 1.5, "charge_type": "Alert"},
+            {"month": "2026-11", "client": "Birch", "agent_id": 5, "hours": 1, "charge_type": "Project"},
+        ],
+    }
+    r = tm.labor_hours(payload, 12)
+    assert [(e["name"], e["team"], e["total"], e["by_month"]) for e in r["engineers"]] == [("Amy", "", 1.5, {"2026-11": 1.5}), ("Zed", "Pod 1", 3.0, {"2026-10": 2.0, "2026-11": 1.0})]
+    assert r["teams"] == ["Pod 1"]
+    assert [(c["client"], c["by_month"]) for c in r["client_months"]] == [("Acme", {"2026-10": 2.0, "2026-11": 1.5}), ("Birch", {"2026-11": 1.0})]
+    assert [(t["type"], t["total"]) for t in r["type_months"]] == [("Alert", 3.5), ("Project", 1.0)]
+    assert tm.labor_hours(payload, 12, "Birch")["engineers"][0]["name"] == "Zed" and len(tm.labor_hours(payload, 12, "Birch")["engineers"]) == 1

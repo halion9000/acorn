@@ -127,7 +127,7 @@ describe('the Ticket resolution page', () => {
     expect(within(members).getByText('Dan Kemp')).toBeInTheDocument();
     const clients = screen.getByTestId('resolution-clients-table');
     expect(within(clients).getByText('Birch Law')).toBeInTheDocument();
-    expect(within(clients).getAllByRole('columnheader').map((h) => (h.textContent ?? '').replace(/[↕▲▼]/g, '').trim())).toEqual(['Customer', 'Total', 'Sep 26', 'Oct 26']);
+    expect(within(clients).getAllByRole('columnheader').map((h) => (h.textContent ?? '').replace(/[↕▲▼]/g, '').trim())).toEqual(['Customer', 'Sep 26', 'Oct 26']);
     expect(screen.getByTestId('resolution-showing')).toHaveTextContent('Showing Sep 2026 - Oct 2026 (2 months) - 43 months of data are held');
   });
 

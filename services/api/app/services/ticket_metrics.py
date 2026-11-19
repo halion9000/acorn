@@ -147,8 +147,12 @@ def labor_hours(payload: dict[str, Any], months: int, client: str | None = None)
     chosen = pick_months(all_months, months)
     want = set(chosen)
     agents = {str(a.get("id")): str(a.get("name") or "") for a in payload.get("agents") or []}
+    teams = {str(a.get("id")): str(a.get("team") or "") for a in payload.get("agents") or []}
     key = name_key(client) if client else ""
     clients: dict[str, str] = {}
+    cell_agent: dict[str, dict[str, float]] = {}
+    cell_client: dict[str, dict[str, float]] = {}
+    cell_type: dict[str, dict[str, float]] = {}
     by_month: dict[str, float] = {m: 0.0 for m in chosen}
     by_agent: dict[str, float] = {}
     by_client: dict[str, float] = {}
@@ -167,18 +171,30 @@ def labor_hours(payload: dict[str, Any], months: int, client: str | None = None)
         by_client[name] = by_client.get(name, 0.0) + hours
         charge = str(h.get("charge_type") or "(none)")
         by_type[charge] = by_type.get(charge, 0.0) + hours
+        for table, who in ((cell_agent, agent), (cell_client, name), (cell_type, charge)):
+            table.setdefault(who, {})[month] = table.get(who, {}).get(month, 0.0) + hours
 
     def top(d: dict[str, float]) -> list[tuple[str, float]]:
         return sorted(d.items(), key=lambda kv: (-kv[1], kv[0].lower()))
 
+    def matrix(cells: dict[str, dict[str, float]], label: str, names: dict[str, str] | None = None) -> list[dict[str, Any]]:
+        return [
+            {label: (names or {}).get(k) or (f"Agent {k}" if names is not None else k), "total": round(sum(v.values()), 2), "by_month": {m: round(x, 2) for m, x in v.items()}}
+            for k, v in sorted(cells.items(), key=lambda kv: (((names or {}).get(kv[0]) or kv[0]).lower()))
+        ]
+
     total = sum(by_month.values())
     return {
+        "engineers": [{**row, "team": teams.get(k) or ""} for row, k in zip(matrix(cell_agent, "name", agents), sorted(cell_agent, key=lambda a: (agents.get(a) or a).lower()), strict=True)],
+        "teams": sorted({t for t in teams.values() if t}, key=str.lower),
+        "client_months": matrix(cell_client, "client"),
+        "type_months": matrix(cell_type, "type"),
         "months": chosen,
         "total_hours": round(total, 2),
         "hours_per_month": round(total / len(chosen), 2) if chosen else None,
         "clients": sorted(clients.values(), key=str.lower),
         "by_month": [{"month": m, "hours": round(by_month[m], 2)} for m in chosen],
-        "by_agent": [{"agent_id": a, "name": agents.get(a) or f"Agent {a}", "hours": round(v, 2)} for a, v in top(by_agent)],
+        "by_agent": [{"agent_id": a, "name": agents.get(a) or f"Agent {a}", "team": teams.get(a) or "", "hours": round(v, 2)} for a, v in top(by_agent)],
         "by_client": [{"client": c, "hours": round(v, 2)} for c, v in top(by_client)],
         "by_type": [{"type": t, "hours": round(v, 2)} for t, v in top(by_type)],
     }

@@ -37,6 +37,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/reports/client-review': { title: 'Client Review', description: 'Coverage, identity, alerts and insurance readiness for one client' },
   '/vcio-risk-scoring': { title: 'Client Risk Score', description: 'A client’s Business Review scored by risk, with a NIST CSF 2.0 reading' },
   '/settings/secure-score': { title: 'Secure Score', description: 'Microsoft Secure Score per client, and what would raise it' },
+  '/settings/scorecard': { title: 'Scorecard settings', description: 'The weighted template the staff scorecard is worked out with' },
   '/settings/signin-scores': { title: 'Sign-in Scores', description: 'The most unusual sign-ins, across clients' },
   '/settings/client-cleanup': { title: 'Client Cleanup', description: 'Clients with nothing in them' },
   '/settings/platform-health': { title: 'Platform Health', description: 'Is every service answering' },

@@ -17,9 +17,9 @@ const answer = (b: unknown, status = 200) => Promise.resolve({ ok: status < 300,
 
 const DATA: Record<string, unknown> = {
   'staff-metrics': { received_at: at, weeks: [{ week: W1, utilization: 45, closed: 32 }, { week: W2, utilization: 40, closed: 9 }], members: [{ engineer: 'Dan', team: 'Pod 1', utilization: 55, closed: 40, labor_hours: 42 }], teams: ['Pod 1', 'Pod 2'] },
-  pods: { received_at: at, weeks: [W1], pods: [{ pod: 'Pod 1', engineers: 1, utilization: 55, resolved: 40, created: 7, days_off: 2, holidays: 0, weekly: [{ week: W1, engineers: [{ engineer: 'Dan', utilization: 70, resolved: 31, created: 5, days_off: 0, holidays: 0 }] }] }] },
+  pods: { received_at: at, weeks: [W1], rows: [{ week: W1, pod: 'Pod 1', engineer: 'Dan', resolved: 31, created: 5, logged_hours: 28, days_off: 0, holidays: 0 }], pods: [{ pod: 'Pod 1', engineers: 1, utilization: 55, resolved: 40, created: 7, days_off: 2, holidays: 0, weekly: [{ week: W1, engineers: [{ engineer: 'Dan', utilization: 70, resolved: 31, created: 5, days_off: 0, holidays: 0 }] }] }] },
   'ticket-updates': { received_at: at, weeks: [W1, W2], members: ['Dan', 'Vic'], rows: [{ engineer: 'Dan', total: 32, by_week: { [W1]: 20, [W2]: 12 } }], weekly_total: { [W1]: 20, [W2]: 12 } },
-  dialpad: { received_at: at, weeks: [{ week: W1, triage_inbound: 6, hours_on_call: 6, calls: 13 }], people: [{ engineer: 'Dan', calls: 12, hours: 5.5, by_week: {} }], engineers: ['Dan', 'Vic'] },
+  dialpad: { received_at: at, weeks: [{ week: W1, triage_inbound: 6, hours_on_call: 6, calls: 13 }], people: [{ engineer: 'Dan', calls: 12, hours: 5.5, by_week: { [W1]: { calls: 12, hours: 5.5 } } }], engineers: ['Dan', 'Vic'] },
   'staff-hours': { received_at: at, total_hours: 20.5, types: [{ type: 'Remote Support', hours: 15, share_percent: 73.2 }], people: [{ name: 'Dan Kemp', total: 18, by_type: { 'Remote Support': 15 } }] },
   scorecard: {
     received_at: at,
@@ -98,10 +98,10 @@ describe('the pure parts', () => {
 });
 
 const PAGES: [string, () => React.ReactElement, RegExp][] = [
-  ['Staff metrics', () => <StaffMetricsView />, /Staff metrics/],
-  ['Pods', () => <PodsView />, /Metrics by pod/],
-  ['Ticket updates', () => <TicketUpdatesView />, /Ticket updates by team member/],
-  ['DialPad', () => <DialpadView />, /DialPad metrics/],
+  ['Staff metrics', () => <StaffMetricsView />, /Weekly Team Metrics/],
+  ['Pods', () => <PodsView />, /Metrics by Pods/],
+  ['Ticket updates', () => <TicketUpdatesView />, /Ticket Updates by Team Member/],
+  ['DialPad', () => <DialpadView />, /DialPad Metrics/],
   ['Staff hours', () => <StaffHoursView />, /Staff hours distribution/],
   ['Scorecard', () => <ScorecardView />, /Service desk scorecard/],
   ['Ticket resolution', () => <TicketResolutionView />, /Ticket resolution time/],
@@ -136,7 +136,7 @@ describe('the pages with data', () => {
   it('Pods lists the pods and their weeks', async () => {
     render(<PodsView />);
     expect(within(await screen.findByTestId('pods-table')).getByText('Pod 1')).toBeTruthy();
-    expect(screen.getByText(/Pod 1, week by week/)).toBeTruthy();
+    expect(within(screen.getByTestId('pods-matrix')).getByText('Dan')).toBeTruthy();
   });
   it('Ticket updates picks members from a searchable list and asks for the ones picked', async () => {
     render(<TicketUpdatesView />);
@@ -184,7 +184,7 @@ describe('the pages with data', () => {
     expect(within(await screen.findByTestId('volume-by-type')).getByText('Incident')).toBeTruthy();
     expect(within(screen.getByTestId('stale-detail')).getByText('VPN')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Tech'), 'Dan');
-    await waitFor(() => expect(authFetch.mock.calls.some(([u]) => String(u).includes('tech=Dan'))).toBe(true));
+    expect(within(screen.getByTestId('stale-detail')).getByText('VPN')).toBeTruthy();
   });
   it('Monthly invoicing shows the total and each client line', async () => {
     render(<MonthlyInvoicingView />);

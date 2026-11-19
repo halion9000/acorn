@@ -69,16 +69,16 @@ def test_a_period_is_the_newest_weeks_and_a_year_is_fifty_two_at_most():
     assert ms.recent_weeks(STAFF, 1) == [W1, W2] and ms.recent_weeks(None, 3) == []
 
 
-def test_staff_metrics_averages_only_the_weeks_a_person_was_active_and_filters_by_team():
+def test_staff_metrics_utilization_is_logged_hours_over_available_hours_the_way_rewst_counts_it_and_filters_by_team():
     r = ms.staff_metrics(STAFF, 1)
-    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 45.0, 32), (W2, 40.0, 9)]
-    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [
-        ("Dan", 55.0, 40, 42.0),
-        ("Vic", 20.0, 1, 5.0),
-    ]
+    # a team's week is all its logged hours over all its available hours (40 each, less time off in hours): (30 + 5) / 80 and 12 / (38 + 40)
+    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 43.8, 32), (W2, 15.4, 9)]
+    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [("Dan", 53.8, 40, 42.0), ("Vic", 6.2, 1, 5.0)]
+    assert r["members"][0]["by_week"] == {W1: 75.0, W2: 31.58}, "30 / 40 and 12 / 38"
     assert r["teams"] == ["Pod 1", "Pod 2"]
     only = ms.staff_metrics(STAFF, 1, "Pod 2")
-    assert [m["engineer"] for m in only["members"]] == ["Vic"] and only["weeks"][0]["utilization"] == 20.0
+    assert [m["engineer"] for m in only["members"]] == ["Vic"] and only["weeks"][0]["utilization"] == 12.5
+    assert ms.week_util({"labor_hours": 5, "days_off": 40}) is None, "nothing available is no utilization, not a divide by zero"
 
 
 def test_pods_group_the_engineers_by_team_with_days_off_and_a_week_by_week_list():
@@ -287,3 +287,38 @@ def test_a_merged_row_sent_again_keeps_a_field_the_new_row_leaves_out():
     assert out["rows"] == [
         {"week": "a", "agent_id": "1", "closed": 5, "ticket_updates": 17}
     ], "the new closed count wins; the updates CORE did not read this time stay"
+
+
+def test_pods_give_one_row_per_engineer_per_week_for_the_matrix_with_clean_names_and_logged_hours():
+    rows = [row(W2, "Al  Ex", "Pod 1", labor_hours=30.456, closed=3, created=4, days_off=8, holidays=0)]
+    out = ms.pods({"weeks": [W2], "rows": rows}, 1)["rows"]
+    assert out == [{"week": W2, "pod": "Pod 1", "engineer": "Al Ex", "resolved": 3, "created": 4, "logged_hours": 30.46, "days_off": 8.0, "holidays": 0.0}]
+
+
+def test_the_scoring_template_shows_every_weight_bracket_and_grade_the_scorecard_really_uses():
+    t = ms.scoring_template()
+    assert [m["metric"] for m in t["metrics"]] == list(ms.METRIC_ORDER)
+    assert t["total_weight"] == sum(c["weight"] for c in ms.METRIC_CONFIG.values()) == 11.0
+    assert round(sum(m["share"] for m in t["metrics"]), 0) == 100
+    closed = t["metrics"][0]
+    assert closed["by_days_worked"] and list(closed["tables"]) == ["5", "4", "3", "2", "1"] and closed["tables"]["5"][0] == [30.0, 5]
+    csat = [m for m in t["metrics"] if m["metric"] == "CSAT"][0]
+    assert not csat["by_days_worked"] and csat["tables"]["any"] == [[5.0, 5], [4.0, 4], [3.0, 3], [2.0, 2], [1.0, 1]]
+    # the grades shown are the grades given
+    for g in t["grades"]:
+        assert ms.grade(g["from"] if g["from"] > 0 else 0.5) == g["grade"] or g["grade"] == "F"
+    assert [g["grade"] for g in t["grades"]] == ["S", "A", "B", "C", "D", "F"]
+    # a week at exactly each bracket edge earns the score the page shows
+    for m in t["metrics"]:
+        if m["by_days_worked"]:
+            for threshold, score in m["tables"]["5"]:
+                scale = ms.METRIC_CONFIG[m["metric"]].get("scale", 1)
+                row = {ms.METRIC_CONFIG[m["metric"]]["field"]: threshold / scale, "days_worked": 5}
+                assert ms.metric_score(m["metric"], row) == score
+
+
+def test_ticket_updates_also_give_comments_updates_and_resolved_per_person_per_week():
+    rows = [row(W1, "Dan", "Pod 1", ticket_updates=20, comments_added=7, closed=31), row(W2, "Dan", "Pod 1", ticket_updates=2, closed=1)]
+    r = ms.ticket_updates({"weeks": [W1, W2], "rows": rows}, 1)
+    assert r["rows"][0]["detail"] == {W1: {"comments": 7, "updated": 20, "resolved": 31}, W2: {"comments": 0, "updated": 2, "resolved": 1}}
+    assert r["rows"][0]["by_week"] == {W1: 20, W2: 2}

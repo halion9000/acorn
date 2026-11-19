@@ -4,7 +4,12 @@
  * Metrics > Staff (the Rewst metric dashboards, rebuilt): Staff Metrics, Pods, Ticket Updates, DialPad, Staff Hours Distribution and the Service Desk Scorecard. Each is worked out by A.C.O.R.N from the weekly
  * facts CORE sends about once a day (HaloPSA time and tickets, Dialpad calls), never read live.
  */
-import { useState } from 'react';
+import Link from 'next/link';
+import { Fragment, useState } from 'react';
+import { AreaChart } from './AreaChart';
+import { PodsMatrix, type PodRow } from './PodsMatrix';
+import { UtilBars, UtilMatrix } from './UtilCharts';
+import { UpdatesMatrix, type UpdateDetail } from './UpdatesMatrix';
 import { MetricPicker } from './MetricPicker';
 
 import { BarList, Cards, Columns, NothingYet, Page, Panel, PeriodPicker, Table, num, pctText, selectClass, useMetric, usePeriod, weekLabel } from './kit';
@@ -12,7 +17,7 @@ import { BarList, Cards, Columns, NothingYet, Page, Panel, PeriodPicker, Table, 
 interface StaffMetricsData {
   received_at: string | null;
   weeks: { week: string; utilization: number | null; closed: number }[];
-  members: { engineer: string; team: string; utilization: number | null; closed: number; labor_hours: number }[];
+  members: { engineer: string; team: string; utilization: number | null; closed: number; labor_hours: number; by_week?: Record<string, number | null> }[];
   teams: string[];
 }
 
@@ -21,12 +26,13 @@ export function StaffMetricsView() {
   const [team, setTeam] = useState('');
   const { data, denied, problem } = useMetric<StaffMetricsData>(`/api/v1/reports/metrics/staff-metrics?${period.query}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
   return (
-    <Page title="Staff metrics" subtitle="Weekly team metrics: utilization by week, tickets closed by week and utilization by team member." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Weekly Team Metrics" subtitle="Utilization (hours logged over hours available) and tickets closed, by week and by team member." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <div className="flex flex-wrap items-center gap-3">
+        <PeriodPicker period={period} options={[1, 3, 6]} />
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Team
           <select aria-label="Team" className={selectClass} value={team} onChange={(e) => setTeam(e.target.value)}>
-            <option value="">All teams</option>
+            <option value="">All Teams</option>
             {(data?.teams ?? []).map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -34,19 +40,20 @@ export function StaffMetricsView() {
             ))}
           </select>
         </label>
-        <PeriodPicker period={period} options={[1, 3, 6]} />
       </div>
       {data?.received_at && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Utilization % by week" testId="util-by-week">
-            <Columns points={data.weeks.map((w) => ({ label: weekLabel(w.week), value: w.utilization }))} unit="%" />
-          </Panel>
-          <Panel title="Tickets closed by week" testId="closed-by-week">
-            <Columns points={data.weeks.map((w) => ({ label: weekLabel(w.week), value: w.closed }))} />
-          </Panel>
-          <div className="lg:col-span-2" data-testid="util-by-member">
-            <Table head={['Team member', 'Team', 'Utilization', 'Tickets closed', 'Labor hours']} rows={data.members.map((m) => [m.engineer, m.team || '—', pctText(m.utilization), num(m.closed), num(m.labor_hours, 1)])} />
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="Utilization % by Week" testId="util-by-week">
+              <UtilBars points={data.weeks.map((w) => ({ label: w.week, value: w.utilization }))} />
+            </Panel>
+            <Panel title="Tickets Closed by Week" testId="closed-by-week">
+              <AreaChart points={data.weeks.map((w) => ({ label: w.week, value: w.closed }))} color="#00d4ff" testId="chart-closed" />
+            </Panel>
           </div>
+          <Panel title="Utilization By Team Member" testId="util-by-member">
+            <UtilMatrix weeks={data.weeks.map((w) => w.week)} rows={data.members.map((m) => ({ name: m.engineer, by_week: m.by_week ?? {} }))} />
+          </Panel>
         </div>
       )}
     </Page>
@@ -56,6 +63,7 @@ export function StaffMetricsView() {
 interface PodsData {
   received_at: string | null;
   weeks: string[];
+  rows?: PodRow[];
   pods: { pod: string; engineers: number; utilization: number | null; resolved: number; created: number; days_off: number; holidays: number; weekly: { week: string; engineers: { engineer: string; utilization: number; resolved: number; created: number; days_off: number; holidays: number }[] }[] }[];
 }
 
@@ -63,24 +71,12 @@ export function PodsView() {
   const period = usePeriod(3);
   const { data, denied, problem } = useMetric<PodsData>(`/api/v1/reports/metrics/pods?${period.query}`);
   return (
-    <Page title="Metrics by pod" subtitle="Each pod's engineers, average utilization, tickets resolved and created, days off and holidays." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Metrics by Pods" subtitle="Each pod and its engineers, week by week and by month: tickets resolved and created, available and logged hours, and utilization." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <PeriodPicker period={period} options={[1, 3, 6, 12]} />
       {data?.received_at && (
-        <>
-          <Table
-            testId="pods-table"
-            head={['Pod', 'Engineers', 'Utilization', 'Resolved', 'Created', 'Days off', 'Holidays']}
-            rows={data.pods.map((p) => [p.pod, num(p.engineers), pctText(p.utilization), num(p.resolved), num(p.created), num(p.days_off, 1), num(p.holidays, 1)])}
-          />
-          {data.pods.map((p) => (
-            <details key={p.pod} className="rounded-lg border border-gray-800 p-3">
-              <summary className="cursor-pointer text-sm text-gray-200">{p.pod}, week by week</summary>
-              <div className="mt-2">
-                <Table head={['Week', 'Engineer', 'Utilization', 'Resolved', 'Created', 'Days off']} firstWide rows={p.weekly.flatMap((w) => w.engineers.map((e) => [weekLabel(w.week), e.engineer, pctText(e.utilization), num(e.resolved), num(e.created), num(e.days_off, 1)]))} />
-              </div>
-            </details>
-          ))}
-        </>
+        <Panel title="Metrics by Pod" testId="pods-table">
+          <PodsMatrix rows={data.rows ?? []} weeks={data.weeks} />
+        </Panel>
       )}
     </Page>
   );
@@ -90,7 +86,7 @@ interface UpdatesData {
   received_at: string | null;
   weeks: string[];
   members: string[];
-  rows: { engineer: string; total: number; by_week: Record<string, number> }[];
+  rows: { engineer: string; total: number; by_week: Record<string, number>; detail?: Record<string, UpdateDetail> }[];
   weekly_total: Record<string, number>;
 }
 
@@ -101,7 +97,7 @@ export function TicketUpdatesView() {
   const query = (picked ?? []).map((m) => `&members=${encodeURIComponent(m)}`).join('');
   const { data, denied, problem } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?${period.query}${query}`);
   return (
-    <Page title="Ticket updates by team member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Ticket Updates by Team Member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <PeriodPicker period={period} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
@@ -116,11 +112,9 @@ export function TicketUpdatesView() {
               Every count here is zero. CORE reads these from HaloPSA's ticket actions about once a day; if they stay zero, HaloPSA is not returning the actions or not saying who made them. CORE's log says which.
             </p>
           )}
-          <Table
-            testId="updates-table"
-            head={['Team member', 'Total', ...data.weeks.map(weekLabel)]}
-            rows={[...data.rows.map((r) => [r.engineer, num(r.total), ...data.weeks.map((w) => num(r.by_week[w] ?? 0))]), ['All shown', num(Object.values(data.weekly_total).reduce((a, b) => a + b, 0)), ...data.weeks.map((w) => num(data.weekly_total[w] ?? 0))]]}
-          />
+          <Panel title="Ticket Updates by Team Member" testId="updates-table">
+            <UpdatesMatrix weeks={data.weeks} rows={data.rows} />
+          </Panel>
         </>
       )}
     </Page>
@@ -134,17 +128,29 @@ interface DialpadData {
   engineers: string[];
 }
 
+const WEEK_CELL = 'px-3 py-2 text-center tabular-nums';
+
+/** One row of the calls and hours table: the person's calls and hours in each week (zero when the week has none). */
+export function dialpadCells(by_week: DialpadData['people'][number]['by_week'], weeks: string[]): { calls: number; hours: number }[] {
+  return weeks.map((w) => by_week[w] ?? { calls: 0, hours: 0 });
+}
+
 export function DialpadView() {
   const period = usePeriod(3);
   const [engineer, setEngineer] = useState('');
   const { data, denied, problem } = useMetric<DialpadData>(`/api/v1/reports/metrics/dialpad?${period.query}${engineer ? `&engineer=${encodeURIComponent(engineer)}` : ''}`);
+  const weeks = (data?.weeks ?? []).map((w) => w.week);
+  const triage = (data?.weeks ?? []).some((w) => w.triage_inbound > 0);
+  const who = engineer || 'All Teams';
+  const people = [...(data?.people ?? [])].sort((a, b) => a.engineer.localeCompare(b.engineer));
   return (
-    <Page title="DialPad metrics" subtitle="Calls and time on the phone, from Dialpad." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Dialpad call facts" />}>
+    <Page title="DialPad Metrics" subtitle="Calls and time on the phone, from Dialpad." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Dialpad call facts" />}>
       <div className="flex flex-wrap items-center gap-3">
+        <PeriodPicker period={period} options={[1, 3, 6]} />
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Engineer
           <select aria-label="Engineer" className={selectClass} value={engineer} onChange={(e) => setEngineer(e.target.value)}>
-            <option value="">All engineers</option>
+            <option value="">All Teams</option>
             {(data?.engineers ?? []).map((e) => (
               <option key={e} value={e}>
                 {e}
@@ -152,19 +158,58 @@ export function DialpadView() {
             ))}
           </select>
         </label>
-        <PeriodPicker period={period} options={[1, 3, 6]} />
       </div>
       {data?.received_at && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Triage inbound by week" testId="triage-by-week">
-            <Columns points={data.weeks.map((w) => ({ label: weekLabel(w.week), value: w.triage_inbound }))} />
-          </Panel>
-          <Panel title="Hours on call by week" testId="hours-by-week">
-            <Columns points={data.weeks.map((w) => ({ label: weekLabel(w.week), value: w.hours_on_call }))} unit=" h" />
-          </Panel>
-          <div className="lg:col-span-2">
-            <Table head={['Team member', 'Calls', 'Hours on call']} rows={data.people.map((p) => [p.engineer, num(p.calls), num(p.hours, 2)])} testId="calls-by-person" />
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title={`${who} ${triage ? 'Triage Inbound' : 'Calls'} By Week`} testId="triage-by-week">
+              <AreaChart points={data.weeks.map((w) => ({ label: w.week, value: triage ? w.triage_inbound : w.calls }))} color="#8b5cf6" testId="chart-inbound" />
+            </Panel>
+            <Panel title={`${who} Hours On Call By Week`} testId="hours-by-week">
+              <AreaChart points={data.weeks.map((w) => ({ label: w.week, value: w.hours_on_call }))} color="#06b6d4" testId="chart-hours" />
+            </Panel>
           </div>
+          <Panel title="Call Count and Hours on Call by Week and Team Member" testId="calls-by-person">
+            <div className="max-h-[32rem] overflow-auto">
+              <table className="w-full min-w-max border-collapse text-sm">
+                <thead className="sticky top-0 z-10" style={{ background: 'var(--metrics-head, #1f2f33)' }}>
+                  <tr>
+                    <th rowSpan={2} className="sticky left-0 px-4 py-2 text-center font-semibold" style={{ background: 'inherit' }}>
+                      Engineer
+                    </th>
+                    {weeks.map((w) => (
+                      <th key={w} colSpan={2} className="border-l border-gray-700 px-3 py-2 text-center font-semibold">
+                        {w}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    {weeks.map((w) => (
+                      <Fragment key={w}>
+                        <th className="border-l border-gray-700 px-3 py-1.5 text-center text-xs font-semibold">{'# of Calls'}</th>
+                        <th className="px-3 py-1.5 text-center text-xs font-semibold">Hours</th>
+                      </Fragment>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {people.map((p, n) => (
+                    <tr key={p.engineer} style={n % 2 === 1 ? { background: 'rgba(255,255,255,0.04)' } : undefined}>
+                      <td className="sticky left-0 whitespace-nowrap px-4 py-2 text-center font-semibold" style={{ background: n % 2 === 1 ? '#2a3a3e' : '#243236' }}>
+                        {p.engineer}
+                      </td>
+                      {dialpadCells(p.by_week, weeks).map((c, i) => (
+                        <Fragment key={weeks[i]}>
+                          <td className={`${WEEK_CELL} border-l border-gray-800`}>{c.calls}</td>
+                          <td className={WEEK_CELL}>{c.hours.toFixed(2)}</td>
+                        </Fragment>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
         </div>
       )}
     </Page>
@@ -221,7 +266,12 @@ export function ScorecardView() {
   const d = data?.detail;
   return (
     <Page title="Service desk scorecard" subtitle="A score from 1 to 5 each week from tickets closed and updated, labor hours, calls, call time, customer satisfaction and utilization, weighted, with a grade." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
-      <PeriodPicker period={period} options={[1, 2, 3, 6, 12]} />
+      <div className="flex flex-wrap items-center gap-3">
+        <PeriodPicker period={period} options={[1, 2, 3, 6, 12]} />
+        <Link href="/settings/scorecard" className="text-sm text-blue-300 underline">
+          Scorecard settings (weights and brackets)
+        </Link>
+      </div>
       {data?.received_at && (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
           <Panel title="Team member" testId="score-people">

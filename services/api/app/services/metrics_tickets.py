@@ -154,6 +154,10 @@ def ticket_volume(detail: dict[str, Any] | None, months: int, tech: str | None =
                     "priority": str(s.get("priority") or ""),
                     "status": str(s.get("status") or ""),
                     "age_days": int(_num(s.get("age_days"))),
+                    "type": str(s.get("type") or ""),
+                    "opened": str(s.get("opened") or ""),
+                    "last_activity": str(s.get("last_activity") or ""),
+                    "idle_days": int(_num(s.get("idle_days"))) if s.get("idle_days") is not None else None,
                 }
                 for s in shown
             ),

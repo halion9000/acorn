@@ -4,9 +4,9 @@
  * Metrics > Tickets and Finance (the Rewst metric dashboards, rebuilt): Ticket Resolution, Ticket Volume Analysis, Ticket Summary's open-ticket breakdown and Monthly Invoicing. A.C.O.R.N works each out from the
  * weekly and monthly facts CORE sends about once a day (HaloPSA tickets and invoices), never read live.
  */
-import { useState } from 'react';
+import { StaleDetail, type StaleTicket } from './StaleTickets';
 
-import { BarList, Cards, Columns, LONG_PERIODS, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, moneyText, num, selectClass, showingText, useMetric, usePeriod } from './kit';
+import { BarList, Cards, Columns, LONG_PERIODS, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, moneyText, num, showingText, useMetric, usePeriod } from './kit';
 
 const LONG_PERIODS_WITH_ONE = [1, ...LONG_PERIODS] as const;
 
@@ -34,11 +34,11 @@ export function TicketResolutionView() {
             {showingText(data.months, data.available_months ?? data.months.length)}
           </p>
           <Panel title="# of resolved tickets by team member" testId="resolved-by-member">
-            <Table head={['User', 'Total', ...data.months.map(monthShort)]} rows={data.members.map((m) => [m.engineer, num(m.total), ...data.months.map((mo) => num(m.by_month[mo] ?? 0))])} />
+            <Table head={['User', ...data.months.map(monthShort)]} rows={data.members.map((m) => [m.engineer, ...data.months.map((mo) => num(m.by_month[mo] ?? 0))])} />
           </Panel>
           <Panel title="Resolution time by client (in hours)" testId="resolution-by-client">
             {data.clients ? (
-              <Table head={['Customer', 'Total', ...data.months.map(monthShort)]} rows={data.clients.map((c) => [c.client, num(c.total), ...data.months.map((mo) => num(c.by_month[mo] ?? 0))])} testId="resolution-clients-table" />
+              <Table head={['Customer', ...data.months.map(monthShort)]} rows={data.clients.map((c) => [c.client, ...data.months.map((mo) => num(c.by_month[mo] ?? 0))])} testId="resolution-clients-table" />
             ) : (
               <BarList rows={data.resolution_by_client.map((c) => ({ label: c.client, value: c.hours, text: `${num(c.hours, 1)} h (${c.tickets} tickets)` }))} limit={25} />
             )}
@@ -59,14 +59,13 @@ interface VolumeData {
   by_client: { client: string; created: number }[];
   priority_last_60_days: { priority: string; created: number }[];
   stale_by_tech: { tech: string; tickets: number }[];
-  stale: { ticket_id: string; client: string; agent: string; title: string; priority: string; status: string; age_days: number }[];
+  stale: StaleTicket[];
   techs: string[];
 }
 
 export function TicketVolumeView() {
   const period = usePeriod(6);
-  const [tech, setTech] = useState('');
-  const { data, denied, problem } = useMetric<VolumeData>(`/api/v1/reports/metrics/ticket-volume?${period.query}${tech ? `&tech=${encodeURIComponent(tech)}` : ''}`);
+    const { data, denied, problem } = useMetric<VolumeData>(`/api/v1/reports/metrics/ticket-volume?${period.query}`);
   const matrix = (rows: VolumeData['by_type'], label: string, testId: string) => (
     <Panel title={label} testId={testId}>
       <Table head={['Name', 'Total', ...(data?.months ?? []).map(monthShort)]} rows={rows.map((r) => [r.name, num(r.total), ...(data?.months ?? []).map((m) => num(r.by_month[m] ?? 0))])} />
@@ -94,19 +93,8 @@ export function TicketVolumeView() {
               <BarList rows={data.stale_by_tech.map((t) => ({ label: t.tech, value: t.tickets, text: num(t.tickets) }))} />
             </Panel>
           </div>
-          <Panel title="Stale ticket detail" testId="stale-detail">
-            <label className="mb-2 flex items-center gap-2 text-sm text-gray-300">
-              Tech
-              <select aria-label="Tech" className={selectClass} value={tech} onChange={(e) => setTech(e.target.value)}>
-                <option value="">All techs</option>
-                {data.techs.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Table head={['Ticket', 'Client', 'Tech', 'Title', 'Priority', 'Status', 'Days open']} rows={data.stale.map((s) => [s.ticket_id, s.client, s.agent, s.title, s.priority, s.status, num(s.age_days)])} />
+          <Panel title="Stale ticket detail by tech" testId="stale-detail">
+            <StaleDetail tickets={data.stale} />
           </Panel>
         </>
       )}
