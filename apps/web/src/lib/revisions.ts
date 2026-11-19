@@ -13,7 +13,7 @@ export const REVISIONS: Revision[] = [
     "version": "1.24",
     "weekOf": "2026-11-16",
     "lastChange": "2026-11-18",
-    "commits": 170,
+    "commits": 171,
     "changes": [
       "Roadmap: r7-ci-25, r7-ci-34, r7-ci-35 built in CORE and marked completed.",
       "No more group alerts for ThreatMate dark web and external exposure checks: they stay on the client page and keep their fix priority, the still-open group alerts are closed once (migration 199), and individual alerts repl",
@@ -22,13 +22,13 @@ export const REVISIONS: Revision[] = [
       "Scripts/check_contrast.py measures text contrast of every text token on every surface in both themes; it found 7 light-theme pairs under WCAG, so the light muted and subtle text colours are darkened to pass (roadmap r7-a",
       "Roadmap: r7-af-19 marked done.",
       "Roadmap: r7-af-24 marked done.",
-      "Alerts: the device filter (Show alerts on Devices) also matches a machine named only in the alert context (ThreatMate, RMM-style tools), the same place the Devices page counts alerts from. Mutation-checked.",
-      "Alerts: View case button once an alert has a case; a new case asks CORE for a HaloPSA ticket for each of its alerts with none; ticket rules now cover every device of a type (Addigy 'MDM is disabled on <device>' never mat",
-      "DMARC: an alert when a new sender starts sending as a client's domain, and a week-by-week history of each sender's SPF, DKIM and DMARC results (from the stored reports; no new table). Mutation-checked.",
-      "Software costs wording: included licenses still cost us, so the count to choose is the one the vendor charges us on (usually the tool own count), not only what we bill the client.",
-      "Roadmap: a question for Hal about which other version of Profitability in the finance workbook is meant, with the candidates listed.",
-      "Client posture: labels and help for three new CIPP checks (old guests, shared mailboxes with sign-in, mailboxes forwarding outside); roadmap r7-cf-08/09/10 built",
-      "A read-only Compliance sign-in for a client's people (roadmap r7-af-35, r7-af-37, client-facing-compliance): role compliance_viewer holds report reading only and is sealed to GET requests on the Compliance routes plus it"
+      "Access reviews start by themselves: a per-system repeat (default every 90 days), an hourly worker that opens due reviews with a fresh snapshot (named Qn YYYY, due +30 days), shared start helpers, migration 206, routes, U",
+      "Net income costs from QuickBooks: new core-feed route /books stores CORE's monthly QuickBooks costs as company-wide quickbooks cost entries (a month sent again replaces that month's, zero is no entry, negative overhead k",
+      "Risk register: a heat map over time. Each risk keeps a dated row of its levels (migration 216) on create, on a change of likelihood or impact (before or after treatment), on archive and on restore; a new heatmap route re",
+      "Platform health shows which CORE build is running: CORE adds its commit, uptime and number of feed passes to each status report, A.C.O.R.N keeps them 20 minutes (Redis, like the approvals) and serves them at /health/core",
+      "Roadmap: the other version of Profitability is QBO Profitability (Hal screenshots); marked done.",
+      "Say license, not licence, in the text the API produces for people (roadmap r7-ai-01, API side): billing table titles, the License waste CSV header and file name, NIST guidance, the data-retention list and the Sigma impor",
+      "Scheduled reports (roadmap r7-af-32): choose a report, who gets it, daily, weekly or monthly and the hour; an hourly worker e-mails what is due as plain text, records how it went, sends nothing when a report has nothing "
     ],
     "fixes": 1
   },

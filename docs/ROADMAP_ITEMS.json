@@ -1658,10 +1658,12 @@
     "key": "r7-cf-37",
     "title": "A first-run wizard that checks each connector and says what is missing",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes: first-run connector wizard. Approved: I build it (Hal does not need to act).",
-    "added": "2026-11-14"
+    "note": "Built: the connections window in CORE now starts with a setup check: which needed tools (NinjaOne, HaloPSA, Huntress, Slack) are connected, part set up (with what is missing) or missing, and how many optional tools are connected. NOT VERIFIED on screen: tested as logic only; open Connections in CORE and tell me if it reads well.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "CORE abd8d4b"
   },
   {
     "key": "r7-cf-38",
@@ -2005,10 +2007,12 @@
     "key": "r7-af-31",
     "title": "Reports: a quarterly business review pack per client",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): no finance info in the client pack; other items (tickets, hours, satisfaction, security, what we did) are fine. Approved: I build it (Hal does not need to act)."
+    "note": "Built: Metrics > Client summary, with one client chosen, now ends with Security and what we did (alerts received and handled, open alerts, open vulnerabilities, devices, cases closed). Print or save as PDF gives the pack. No finance. Matched to A.C.O.R.N clients by name. NOT VERIFIED with real numbers.",
+    "completed": "2026-11-18",
+    "completed_ref": "A.C.O.R.N this commit"
   },
   {
     "key": "r7-af-32",

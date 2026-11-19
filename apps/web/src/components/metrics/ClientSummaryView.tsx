@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { PageHeader, StatCard } from '@/components/ui/kit';
+import { QbrSecurity } from './QbrSecurity';
 import { hoursText, monthName } from './LaborHoursView';
 import { PERIODS, num, waitText } from './TicketMetricsView';
 
@@ -199,6 +200,7 @@ export function ClientSummaryView() {
         </div>
       </div>
       <ClientSummaryBody empty={Boolean(tickets && tickets.received_at === null)} t={t} l={l} sat={sat} />
+      {clientId && <QbrSecurity clientName={clientName} months={months} />}
     </div>
   );
 }
