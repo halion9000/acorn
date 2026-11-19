@@ -166,7 +166,11 @@ def get_resolver() -> Resolver:
 
 _PUBLISHED_CACHE: dict[tuple[str, str], tuple[float, bool | None]] = {}
 _PUBLISHED_TTL_SECONDS = 300
-MAX_PUBLICATION_CHECKS = 300
+MAX_PUBLICATION_CHECKS = 1000
+# How many DNS questions are open at once, and how long one pass may take. The page lists every client domain (an organization with 140 clients has over 400), and each unpublished line is
+# asked about twice, so 300 lines at 10 at a time took 47 seconds and the lines past the 300th were never checked at all.
+PUBLICATION_PARALLEL = 25
+PUBLICATION_BUDGET_SECONDS = 30.0
 
 
 def rua_names_alias(records: list[str], alias: str) -> bool:
@@ -184,7 +188,7 @@ async def check_publication(lines: list[SetupLine], resolver: Resolver, now: flo
     """Fill in ``rua_published`` and ``authorization_published`` from public DNS, for lines whose domain has mail. An empty answer is asked again once; a lookup that raises leaves the answer unknown.
     Answers are kept for five minutes so the page stays quick. At most MAX_PUBLICATION_CHECKS lines are asked about."""
     stamp = time.monotonic() if now is None else now
-    gate = asyncio.Semaphore(10)
+    gate = asyncio.Semaphore(PUBLICATION_PARALLEL)
 
     async def ask(name: str, kind: str, ok) -> bool | None:
         cached = _PUBLISHED_CACHE.get((name, kind))
@@ -204,7 +208,11 @@ async def check_publication(lines: list[SetupLine], resolver: Resolver, now: flo
         line.rua_published = await ask(f"_dmarc.{line.domain}", f"rua:{line.alias}", lambda records: rua_names_alias(records, line.alias))
         line.authorization_published = await ask(line.authorization_record_name, "authorization", is_authorization)
 
-    await asyncio.gather(*(one(ln) for ln in [x for x in lines if x.has_mx][:MAX_PUBLICATION_CHECKS]))
+    try:
+        # A line whose answer did not arrive in time stays "not checked" (None): never reported as "not published".
+        await asyncio.wait_for(asyncio.gather(*(one(ln) for ln in [x for x in lines if x.has_mx][:MAX_PUBLICATION_CHECKS])), PUBLICATION_BUDGET_SECONDS)
+    except TimeoutError:
+        pass
 
 
 async def mail_domains(domains: list[str], resolver: Resolver, now: float | None = None) -> dict[str, bool]:

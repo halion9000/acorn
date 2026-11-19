@@ -1195,8 +1195,14 @@ function Setup() {
                   <th className="px-3 py-2">Client</th>
                   <th className="px-3 py-2">Domain</th>
                   <th className="px-3 py-2">Alias</th>
-                  <th className="px-3 py-2">Add to the client&rsquo;s DMARC record</th>
-                  <th className="px-3 py-2">Add to your DNS (TXT)</th>
+                  <th className="px-3 py-2">
+                    Add to the client&rsquo;s DMARC record
+                    <span className="block font-normal text-gray-500">In the client&rsquo;s DNS, on the record at _dmarc.their-domain. One rua= tag only: if it already has one, join the addresses with a comma.</span>
+                  </th>
+                  <th className="px-3 py-2">
+                    Add to your DNS (TXT)
+                    <span className="block font-normal text-gray-500">In your own DNS, a new record for each client domain. Your own _dmarc record stays as it is.</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

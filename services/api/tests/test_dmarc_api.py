@@ -1128,3 +1128,36 @@ def test_a_senders_detail_carries_its_week_by_week_history_from_the_stored_repor
     assert len(weeks) == 2 and weeks[0].week < weeks[1].week
     assert (weeks[0].messages, weeks[0].failed) == (20, 0)
     assert (weeks[1].messages, weeks[1].failed, weeks[1].dkim_failed, weeks[1].spf_failed) == (20, 20, 20, 0), "the later week failed DKIM on all of its mail"
+
+
+def _lines(n: int, only_set_up: str):
+    return [
+        ep.SetupLine(
+            client_id=str(uuid.uuid4()), client_name=f"C{i}", domain=f"d{i}.com", alias=f"c{i}.dmarc@goliveoak.com", client_dmarc_rua=f"rua=mailto:c{i}.dmarc@goliveoak.com",
+            authorization_record_name=f"d{i}.com._report._dmarc.goliveoak.com", authorization_record_value="v=DMARC1", has_mx=True,
+        )
+        for i in range(n)
+    ] if only_set_up else []
+
+
+def test_every_line_is_checked_however_many_there_are_so_one_set_up_client_far_down_the_list_shows_as_published():
+    lines = _lines(450, "d420.com")  # the 421st line: past the old limit of 300
+    resolver = FakeResolver(txt={"_dmarc.d420.com": ["v=DMARC1; p=none; rua=mailto:c420.dmarc@goliveoak.com"], "d420.com._report._dmarc.goliveoak.com": ["v=DMARC1"]})
+    ep._PUBLISHED_CACHE.clear()
+    asyncio.run(ep.check_publication(lines, resolver))
+    assert [(ln.rua_published, ln.authorization_published) for ln in lines if ln.domain == "d420.com"] == [(True, True)]
+    assert sum(1 for ln in lines if ln.rua_published is None) == 0, "no line is left unchecked"
+    assert sum(1 for ln in lines if ln.rua_published is False) == 449, "the others are plainly not published yet"
+
+
+def test_a_pass_that_runs_out_of_time_leaves_the_unfinished_lines_unchecked_not_unpublished(monkeypatch):
+    class Slow(FakeResolver):
+        async def txt(self, name):
+            await asyncio.sleep(0.2)
+            return await super().txt(name)
+
+    monkeypatch.setattr(ep, "PUBLICATION_BUDGET_SECONDS", 0.05)
+    lines = _lines(5, "x")
+    ep._PUBLISHED_CACHE.clear()
+    asyncio.run(ep.check_publication(lines, Slow()))
+    assert all(ln.rua_published is None and ln.authorization_published is None for ln in lines)
