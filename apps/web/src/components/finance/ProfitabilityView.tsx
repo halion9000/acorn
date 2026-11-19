@@ -50,7 +50,12 @@ interface Profitability {
   note?: string;
 }
 
-export const money = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
+// The API sends money as exact decimal text ("29420.00"), so it is turned into a number before it is written with its dollar sign and separators; text that is not a number is shown as it came.
+export const money = (n: number | string | null | undefined): string => {
+  if (n === null || n === undefined || n === '') return '—';
+  const v = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(v) ? v.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : String(n);
+};
 export const pct = (v: number | null): string => (v === null ? '—' : `${v}%`);
 export const monthLabel = (m: string): string => {
   const [y, mo] = m.split('-').map(Number) as [number, number];
