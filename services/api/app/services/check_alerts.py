@@ -91,8 +91,17 @@ WATCHED.update(
 
 
 # Checks that stay watched (they count for fix priority) but raise NO group alert. Each is a count of separate things, and a single alert saying "N findings" cannot be worked or ticketed; ThreatMate's own
-# alerts and findings arrive one by one instead: a deep and dark web finding is one alert (CORE, acorn-threatmate.ts), and an internet-facing address or domain gets ThreatMate's alert for it with its issues.
-NOT_ALERTED = frozenset({"threatmate_deep_dark_web", "threatmate_external_exposure"})
+# alerts and findings arrive one by one instead: a deep and dark web finding is one alert (CORE, acorn-threatmate.ts), and an internet-facing address or domain gets ThreatMate's alert for it with its issues. The same holds for patching, firmware, end of life and the internal scans: ThreatMate raises an alert per finding type (CORE sends each one), and the machine-by-machine list is on the Vulnerabilities page.
+NOT_ALERTED = frozenset(
+    {
+        "threatmate_deep_dark_web",
+        "threatmate_external_exposure",
+        "threatmate_patching",
+        "threatmate_firmware",
+        "threatmate_end_of_life",
+        "threatmate_pentest",
+    }
+)
 
 
 def raises_alert(key: str) -> bool:

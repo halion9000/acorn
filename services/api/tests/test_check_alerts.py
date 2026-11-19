@@ -190,21 +190,19 @@ def test_liongard_losing_sight_of_a_client_raises_a_medium_alert_only_when_it_is
 
 def test_a_vulnerability_check_that_is_failing_when_first_seen_raises_one_standing_alert_in_the_vulnerability_category():
     new = [
-        check("threatmate_patching", "not_met", "10 of 40 devices are patch-compliant in ThreatMate (25%)"),
-        check("threatmate_end_of_life", "partly", "one app near end of life"),
+        check("ninjaone_patching", "not_met", "10 of 40 devices are patch-compliant (25%)"),
+        check("ninjaone_unsupported_os", "partly", "one machine near end of support"),
         check("threatmate_google_admins", "not_met", "x"),
     ]
     out = ca.standing_specs(new, "threatmate")
-    assert [s["key"] for s in out] == [
-        "threatmate_patching"
-    ], "only vulnerability checks at their alerting level or worse, and not the identity check"
+    assert [s["key"] for s in out] == ["ninjaone_patching"], "only vulnerability checks at their alerting level or worse, and not the identity check"
     assert (
-        out[0]["idempotency_key"] == "check:threatmate:threatmate_patching:standing"
+        out[0]["idempotency_key"] == "check:threatmate:ninjaone_patching:standing"
     ), "no date: raised once however long it stays failing"
     assert "10 of 40 devices" in out[0]["description"]
-    assert ca.standing_specs(None, "threatmate") == [] and ca.standing_specs([check("threatmate_patching", "met")], "threatmate") == []
+    assert ca.standing_specs(None, "threatmate") == [] and ca.standing_specs([check("ninjaone_patching", "met")], "threatmate") == []
     row = ca.build_alert(uuid.uuid4(), "threatmate", out[0], NOW)
-    assert row.category == "vulnerability" and "threatmate_patching" in row.tags
+    assert row.category == "vulnerability" and "ninjaone_patching" in row.tags
     assert (
         ca.build_alert(
             uuid.uuid4(),
@@ -221,8 +219,8 @@ def test_a_vulnerability_check_that_is_failing_when_first_seen_raises_one_standi
 
 
 def test_a_vulnerability_check_that_gets_worse_later_still_raises_its_dated_alert():
-    out = specs([check("threatmate_firmware", "met")], [check("threatmate_firmware", "not_met", "3 critical")], source="threatmate")
-    assert len(out) == 1 and out[0]["key"] == "threatmate_firmware" and out[0]["idempotency_key"].endswith(":not_met")
+    out = specs([check("addigy_unsupported_macos", "met")], [check("addigy_unsupported_macos", "not_met", "3 Macs")], source="threatmate")
+    assert len(out) == 1 and out[0]["key"] == "addigy_unsupported_macos" and out[0]["idempotency_key"].endswith(":not_met")
 
 
 def test_the_ninjaone_and_addigy_update_and_support_checks_are_vulnerability_checks_that_alert_when_not_met():
@@ -273,14 +271,17 @@ def test_a_history_row_is_named_added_worsened_improved_or_changed():
     assert change_label("odd", "met") == "changed"
 
 
-def test_the_two_threatmate_group_checks_raise_no_alert_on_a_change_or_when_standing_but_stay_watched():
+def test_the_threatmate_group_checks_raise_no_alert_on_a_change_or_when_standing_but_stay_watched():
     from app.services.check_alerts import NOT_ALERTED, WATCHED, standing_specs
 
-    assert NOT_ALERTED == {"threatmate_deep_dark_web", "threatmate_external_exposure"}
+    assert NOT_ALERTED == {"threatmate_deep_dark_web", "threatmate_external_exposure", "threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest"}
     assert all(k in WATCHED for k in NOT_ALERTED), "still watched, so they still count for fix priority"
     assert specs([check("threatmate_external_exposure", "met")], [check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
     assert standing_specs([check("threatmate_external_exposure", "not_met", "10 critical")], "threatmate") == []
-    assert standing_specs([check("threatmate_patching", "not_met", "many machines")], "threatmate"), "another vulnerability check still raises its standing alert"
+    for key in ("threatmate_patching", "threatmate_firmware", "threatmate_end_of_life", "threatmate_pentest"):
+        assert standing_specs([check(key, "not_met", "7 findings")], "threatmate") == [], key
+        assert specs([check(key, "met")], [check(key, "not_met", "7 findings")], "threatmate") == [], key
+    assert standing_specs([check("ninjaone_patching", "not_met", "many machines")], "ninjaone"), "another vulnerability check still raises its standing alert"
 
 
 def test_an_alert_for_a_device_check_lists_the_devices_and_names_them_as_the_alert_hosts():
@@ -298,5 +299,5 @@ def test_an_alert_for_a_device_check_lists_the_devices_and_names_them_as_the_ale
 
 
 def test_the_devices_of_a_standing_vulnerability_alert_are_listed_too():
-    c = [{**check("threatmate_patching", "not_met", "many machines"), "items": ["PC-1"]}]
+    c = [{**check("ninjaone_patching", "not_met", "many machines"), "items": ["PC-1"]}]
     assert "PC-1" in ca.standing_specs(c, "threatmate")[0]["description"]
