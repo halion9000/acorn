@@ -165,6 +165,22 @@ async def halo_finance(user: AuthUser, db: DBSession) -> dict[str, Any]:
     return {"received_at": row.received_at, "margin": fh.margin_from_halo(row.payload), "aging": fh.aging_from_halo(row.payload)}
 
 
+@router.get("/forecast", dependencies=[Depends(require_permission("finance:view")), Depends(require_permission("billing:view"))])
+async def margin_forecast(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Next invoice run's revenue and margin per client as the invoices stand and with every counted line set to what the tools count (see app.services.finance_forecast)."""
+    from app.api.v1.endpoints.billing import reconcile_billing  # noqa: PLC0415
+    from app.api.v1.endpoints.billing_sync import _halo_ids  # noqa: PLC0415
+    from app.services import finance_forecast as ff  # noqa: PLC0415
+
+    row = (await db.execute(select(FinanceHaloSnapshot).where(FinanceHaloSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "forecast": None}
+    rec = await reconcile_billing(user, db, include_matches=False, limit=5000, min_days=None)
+    halo = await _halo_ids(db, user.tenant_id, list({r.client_id for r in rec.rows}))
+    counted = {(halo[r.client_id][0], r.invoice_item): r.counted for r in rec.rows if r.difference != 0 and r.client_id in halo}
+    return {"received_at": row.received_at, "forecast": ff.forecast(row.payload, counted)}
+
+
 @router.get("/margin", dependencies=[Depends(require_permission("finance:view"))])
 async def margin(user: AuthUser, db: DBSession) -> dict[str, Any]:
     """Estimated revenue, cost and margin per client, lowest margin first, and what each estimate is missing (invoice lines billed but not priced)."""

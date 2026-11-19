@@ -2476,6 +2476,25 @@ paths:
                 title: Response Halo Finance Api V1 Finance Halo Get
       security:
       - HTTPBearer: []
+  /api/v1/finance/forecast:
+    get:
+      tags:
+      - finance
+      summary: Margin Forecast
+      description: Next invoice run's revenue and margin per client as the invoices
+        stand and with every counted line set to what the tools count (see app.services.finance_forecast).
+      operationId: margin_forecast_api_v1_finance_forecast_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Margin Forecast Api V1 Finance Forecast Get
+      security:
+      - HTTPBearer: []
   /api/v1/finance/margin:
     get:
       tags:

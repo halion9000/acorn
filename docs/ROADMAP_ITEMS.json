@@ -1392,9 +1392,9 @@
     "key": "r7-cf-11",
     "title": "Liongard: turn the disk and backup inspections into per-device lines with names",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): b: one Liongard alert per affected device instead of one per client. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built: an open Liongard alert that names several affected items (disks, backup systems) is now sent as one A.C.O.R.N alert per item; closing the alert in Liongard closes every child, and the single alert sent before is closed the first time it is split. Live after the next CORE update. NOT seen live.",
     "added": "2026-11-14"
   },
   {
@@ -1468,9 +1468,9 @@
     "key": "r7-cf-19",
     "title": "Slack: post the morning summary of new critical alerts to a channel",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): use the same acorn_core channel: morning summary of new critical alerts to Slack. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built: CORE posts the new critical alerts of the last day to the CORE Slack channel each morning after 08:00 (only when there are some, client names included). Live after the next CORE update. NOT seen live.",
     "added": "2026-11-14"
   },
   {
@@ -1606,10 +1606,10 @@
     "key": "r7-cf-33",
     "title": "Offline mode: queue feed posts while A.C.O.R.N is unreachable and send them in order",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): ok: offline queue (24 hours, newest state per route). Approved: I build it (Hal does not need to act)."
+    "note": "Built: while A.C.O.R.N cannot be reached CORE keeps its posts in a small file (newest per route and client, at most 24 hours, at most 500) and sends them in order when the next post gets through. NOT tested against a real outage: a way to see it is to stop A.C.O.R.N's web container for a minute and then start it again."
   },
   {
     "key": "r7-cf-34",
@@ -2062,10 +2062,10 @@
     "key": "r7-af-38",
     "title": "Billing: a margin forecast from the license counts",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): do what you recommend: per-client margin forecast from recurring lines and license counts. Approved: I build it (Hal does not need to act)."
+    "note": "Built: Net income has a new Forecast tab: per client, next invoice run's revenue and margin as the invoices stand and with every counted line set to the counted quantity, with the lines that change. Needs the finance and billing permissions. NOT seen live: compare a client you know with the Billing sync differences."
   },
   {
     "key": "r7-af-39",
