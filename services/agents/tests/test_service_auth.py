@@ -20,6 +20,10 @@ async def _ok(request):
     return PlainTextResponse("reached")
 
 
+async def _echo_auth(request):
+    return PlainTextResponse(request.headers.get("authorization", "none"))
+
+
 async def _ws(websocket):
     await websocket.accept()
     await websocket.send_text("reached")
@@ -32,6 +36,7 @@ def _client() -> TestClient:
             Route("/api/v1/playbooks", _ok, methods=["GET", "POST", "OPTIONS"]),
             Route("/api/v1/playbooks/{pid}/run", _ok, methods=["POST"]),
             Route(PLAIN, _ok),
+            Route("/api/v1/copilot/whoami", _echo_auth, methods=["GET", "POST"]),
             Route("/readyz", _ok),
             WebSocketRoute("/api/v1/investigations/x/stream", _ws),
         ]
@@ -187,3 +192,41 @@ def test_real_agents_app_is_protected_in_production():
     assert c.get("/api/v1/hunt/saved").status_code == 401
     assert c.post("/api/v1/contextual/action").status_code == 401
     assert c.get("/readyz").status_code != 401
+
+
+COOKIE = {"Cookie": "other=1; aisoc_access=cookietoken123; theme=dark"}
+WHOAMI = "/api/v1/copilot/whoami"
+
+
+@respx.mock
+def test_the_sign_in_cookie_is_checked_with_the_API_as_a_bearer_and_handlers_see_it():
+    route = respx.get(ME).mock(return_value=httpx.Response(200, json={"id": "u", "tenant_id": "t1"}))
+    r = _client().get(WHOAMI, headers=COOKIE)
+    assert r.status_code == 200 and r.text == "Bearer cookietoken123", "a handler that forwards the caller's credentials gets an ordinary bearer"
+    assert route.calls[0].request.headers["authorization"] == "Bearer cookietoken123"
+
+
+@respx.mock
+def test_a_cookie_may_not_change_anything_without_the_console_header_but_may_with_it():
+    route = respx.get(ME).mock(return_value=httpx.Response(200, json={"id": "u"}))
+    c = _client()
+    assert c.post(WHOAMI, headers=COOKIE).status_code == 401, "a page on another site cannot add the header"
+    assert route.call_count == 0, "refused before the API is asked"
+    assert c.post(WHOAMI, headers={**COOKIE, "X-Requested-With": "aisoc-console"}).status_code == 200
+    assert c.post(WHOAMI, headers={**COOKIE, "X-Requested-With": "something-else"}).status_code == 401
+
+
+@respx.mock
+def test_a_real_authorization_header_wins_over_the_cookie_and_a_rejected_cookie_is_401():
+    respx.get(ME).mock(return_value=httpx.Response(200, json={"id": "u"}))
+    r = _client().get(WHOAMI, headers={**COOKIE, "Authorization": "Bearer aisoc_key"})
+    assert r.text == "Bearer aisoc_key"
+    respx.get(ME).mock(return_value=httpx.Response(401))
+    service_auth.clear_cache()
+    assert _client().get(WHOAMI, headers=COOKIE).status_code == 401
+
+
+def test_no_cookie_token_means_no_credential():
+    assert service_auth.cookie_credential({"cookie": "aisoc_access=; a=b"}, "GET") is None
+    assert service_auth.cookie_credential({"cookie": "x=1"}, "GET") is None
+    assert service_auth.cookie_credential({"cookie": "aisoc_access=abc"}, "GET") == "Bearer abc"

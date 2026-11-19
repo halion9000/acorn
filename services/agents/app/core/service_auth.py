@@ -112,6 +112,25 @@ async def check_with_api(authorization: str, permission: str | None) -> str:
     return "unavailable"  # 5xx, 422 (we asked about a permission the API does not know) or anything unexpected: fail closed
 
 
+ACCESS_COOKIE = "aisoc_access"
+CSRF_HEADER = "x-requested-with"
+CSRF_VALUE = "aisoc-console"
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def cookie_credential(headers: dict[str, str], method: str) -> str | None:
+    """The sign-in cookie as an Authorization value, or None. Since sign-in tokens moved to httpOnly cookies (A15) the browser sends ``aisoc_access`` and no Authorization header, which the API accepts but
+    this service did not (every AI investigation answered 401). The API's own rule is kept: a request that changes data and is authenticated by the cookie alone must carry
+    ``X-Requested-With: aisoc-console``, which a page on another site cannot add. A real Authorization header always wins (the caller of this function checks)."""
+    if method.upper() not in SAFE_METHODS and headers.get(CSRF_HEADER, "") != CSRF_VALUE:
+        return None
+    for part in headers.get("cookie", "").split(";"):
+        name, _, value = part.strip().partition("=")
+        if name == ACCESS_COOKIE and value:
+            return f"Bearer {value}"
+    return None
+
+
 async def authorize(headers: dict[str, str], method: str = "GET", path: str = "") -> tuple[int, str]:
     """Return (0, "") to allow, or (status, reason) to deny. Headers lower-cased."""
     internal = _internal_token()
@@ -156,6 +175,12 @@ class ServiceAuthMiddleware:
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
         # WebSocket upgrades are GET requests as far as permissions go
         method = "GET" if scope["type"] == "websocket" else scope.get("method", "GET")
+        if not headers.get("authorization") and not headers.get("x-internal-token"):
+            lifted = cookie_credential(headers, method)
+            if lifted:
+                # Hand the cookie's token on as an Authorization header, so the permission check and every handler that forwards the caller's credentials see an ordinary bearer.
+                headers["authorization"] = lifted
+                scope["headers"] = [*scope["headers"], (b"authorization", lifted.encode("latin-1"))]
         status, reason = await authorize(headers, method, scope.get("path", ""))
         if status == 0:
             scope.setdefault("state", {})["caller"] = caller_for(headers)  # request.state.caller / websocket.state.caller
