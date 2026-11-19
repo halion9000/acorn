@@ -21,6 +21,20 @@ from app.services import device_reports as rep
 router = APIRouter(prefix="/device-reports", tags=["devices"])
 
 
+async def org_mismatch_rows(db: DBSession, owner: uuid.UUID, client_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
+    """The mismatch rows for the clients the caller can see (read across the clients, filtered by the caller's own scope)."""
+    scope, names = await _scope(db, owner, client_id)
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(DeviceSource.tenant_id, DeviceSource.vendor, Device.serial_number, Device.hostname)
+                .join(Device, Device.id == DeviceSource.device_id)
+                .where(DeviceSource.vendor.in_(("huntress", "ninjaone")), DeviceSource.tenant_id.in_(scope))
+            )
+        ).all()
+    return rep.org_mismatches([{"tenant": r[0], "client": names.get(r[0]) or "", "vendor": r[1], "serial": r[2], "hostname": r[3]} for r in rows])
+
+
 async def _rows(db: DBSession, owner: uuid.UUID, client_id: uuid.UUID | None, vendor: str) -> list[tuple[Any, ...]]:
     scope, names = await _scope(db, owner, client_id)
     async with cross_tenant_reads(db):
@@ -61,3 +75,11 @@ async def network_firmware(
     return rep.firmware_behind(
         [{"client": c, "hostname": n, "manufacturer": maker, "model": model, "device_type": d.get("device_type"), "firmware": d.get("firmware_version")} for c, n, d, _h, maker, model in rows]
     )
+
+
+@router.get("/org-mismatch", summary="Machines whose Huntress organization is not the client their NinjaOne device is filed under (matched on serial number)")
+async def org_mismatch(
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None
+) -> dict[str, Any]:
+    return {"machines": await org_mismatch_rows(db, user.tenant_id, client_id)}
+

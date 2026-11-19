@@ -94,3 +94,52 @@ def firmware_behind(devices: list[dict[str, Any]]) -> dict[str, Any]:
     rows.sort(key=lambda r: (r["manufacturer"].lower(), r["model"].lower(), r["client"].lower(), r["hostname"].lower()))
     models.sort(key=lambda m: (-m["behind"], m["manufacturer"].lower(), m["model"].lower()))
     return {"models": models, "devices": rows}
+
+
+MAX_MISMATCH_LINES = 80
+
+
+def org_mismatches(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Machines whose Huntress organization is not the client their NinjaOne device is filed under (pure). Each device has ``tenant``, ``client``, ``vendor`` (``huntress`` or ``ninjaone``), ``serial`` and ``hostname``.
+
+    A machine is matched across the two tools by its serial number (a placeholder, a MAC address or the machine's own name is not a serial: see ``device_identity.real_serial``). It is a mismatch only when
+    NO Huntress copy sits under a client that also holds a NinjaOne copy: a machine filed under the same client in both is fine, even if a second copy of it sits elsewhere. Sorted by the NinjaOne client, then name."""
+    from app.services.device_identity import normalize_serial  # noqa: PLC0415 - keeps this module's imports small
+
+    by_serial: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(lambda: {"huntress": [], "ninjaone": []})
+    for d in devices:
+        vendor = str(d.get("vendor") or "")
+        key = normalize_serial(d.get("serial"))
+        if key and vendor in ("huntress", "ninjaone"):
+            by_serial[key][vendor].append(d)
+    rows: list[dict[str, Any]] = []
+    for key, sides in by_serial.items():
+        h, n = sides["huntress"], sides["ninjaone"]
+        if not h or not n:
+            continue
+        if {x.get("tenant") for x in h} & {x.get("tenant") for x in n}:
+            continue
+        rows.append(
+            {
+                "serial": key,
+                "hostname": str(n[0].get("hostname") or h[0].get("hostname") or ""),
+                "ninjaone_client": str(n[0].get("client") or ""),
+                "huntress_client": str(h[0].get("client") or ""),
+            }
+        )
+    rows.sort(key=lambda r: (r["ninjaone_client"].lower(), r["hostname"].lower(), r["serial"]))
+    return rows
+
+
+def org_mismatch_text(rows: list[dict[str, Any]]) -> tuple[str, str] | None:
+    """The subject and text of the weekly mismatch report, or None when every machine is filed under the same client in both tools (pure)."""
+    if not rows:
+        return None
+    n = len(rows)
+    lines = [f"- {r['hostname'] or r['serial']}: NinjaOne says {r['ninjaone_client'] or 'no client'}, Huntress says {r['huntress_client'] or 'no client'} (serial {r['serial']})" for r in rows[:MAX_MISMATCH_LINES]]
+    more = f"\n...and {n - MAX_MISMATCH_LINES} more" if n > MAX_MISMATCH_LINES else ""
+    return (
+        f"{n} machine{'' if n == 1 else 's'} filed under different clients in Huntress and NinjaOne",
+        f"{n} machine{'s' if n != 1 else ''} whose Huntress organization is not the client of its NinjaOne device. Fix the one that is wrong so each tool's numbers (agents, patching, billing) land on the right client:\n" + "\n".join(lines) + more,
+    )
+

@@ -65,3 +65,40 @@ def test_devices_offline_for_more_than_a_week_are_listed_longest_first():
 
     out = r.offline_for_days([dev("new", "2026-11-14T00:00:00+00:00"), dev("old", "2026-10-01T00:00:00+00:00"), dev("mid", "2026-11-05T00:00:00Z", "Birch"), dev("none", None), dev("bad", "x"), dev("edge", "2026-11-11T00:00:00+00:00")], now)
     assert [(d["hostname"], d["days_offline"]) for d in out] == [("old", 48), ("mid", 13)], "exactly seven days is not more than a week; no usable time is left out"
+
+
+def dev(vendor, tenant, client, serial, host="PC"):
+    return {"vendor": vendor, "tenant": tenant, "client": client, "serial": serial, "hostname": host}
+
+
+def test_a_machine_filed_under_different_clients_in_huntress_and_ninjaone_is_a_mismatch():
+    out = r.org_mismatches(
+        [
+            dev("ninjaone", "t1", "Acme", "5CG1234567", "ACME-PC1"),
+            dev("huntress", "t2", "Birch", "5cg 1234567", "ACME-PC1"),
+            dev("ninjaone", "t1", "Acme", "5CG7654321", "ACME-PC2"),
+            dev("huntress", "t1", "Acme", "5CG7654321", "ACME-PC2"),
+        ]
+    )
+    assert out == [{"serial": "5CG1234567", "hostname": "ACME-PC1", "ninjaone_client": "Acme", "huntress_client": "Birch"}]
+
+
+def test_a_second_copy_elsewhere_is_not_a_mismatch_when_the_same_client_holds_both_tools_and_placeholders_never_match():
+    out = r.org_mismatches(
+        [
+            dev("ninjaone", "t1", "Acme", "5CG1234567"),
+            dev("huntress", "t1", "Acme", "5CG1234567"),
+            dev("huntress", "t9", "Stray", "5CG1234567"),
+            dev("ninjaone", "t1", "Acme", "To Be Filled By O.E.M."),
+            dev("huntress", "t2", "Birch", "To Be Filled By O.E.M."),
+            dev("ninjaone", "t1", "Acme", "9ZZ1111111"),
+        ]
+    )
+    assert out == []
+
+
+def test_the_mismatch_text_lists_machines_and_is_none_when_there_are_none():
+    assert r.org_mismatch_text([]) is None
+    subject, text = r.org_mismatch_text([{"serial": "S1234567", "hostname": "PC1", "ninjaone_client": "Acme", "huntress_client": "Birch"}])
+    assert subject.startswith("1 machine filed under different clients")
+    assert "PC1: NinjaOne says Acme, Huntress says Birch" in text

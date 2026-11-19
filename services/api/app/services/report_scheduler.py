@@ -126,7 +126,15 @@ async def _new_vulnerabilities(db: Any, tenant: uuid.UUID, now: datetime) -> tup
     return new_vulnerabilities_text(rows, now)
 
 
+async def _org_mismatch(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from app.api.v1.endpoints.device_reports import org_mismatch_rows  # noqa: PLC0415
+    from app.services import device_reports as dr  # noqa: PLC0415
+
+    return dr.org_mismatch_text(await org_mismatch_rows(db, tenant))
+
+
 KINDS: dict[str, tuple[str, Renderer]] = {
+    "org_mismatch": ("Machines filed under different clients in Huntress and NinjaOne", _org_mismatch),
     "new_vulnerabilities": ("New vulnerabilities in the last 7 days (all clients)", _new_vulnerabilities),
     "compliance_actions": ("Compliance action items (what needs doing now)", _compliance_actions),
     "open_audit_requests": ("Open audit requests with due dates", _open_audit_requests),
