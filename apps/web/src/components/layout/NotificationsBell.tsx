@@ -1,5 +1,6 @@
 'use client';
 
+import { PushToggle } from './PushToggle';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
@@ -289,6 +290,7 @@ export function NotificationsBell() {
               </p>
             </Link>
           ) : null}
+          <PushToggle />
           <Link href="/alerts" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800/50 border-t border-gray-800 rounded-b-xl">
             View all alerts
           </Link>

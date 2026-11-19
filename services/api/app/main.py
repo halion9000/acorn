@@ -49,6 +49,7 @@ from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.compliance_notice_worker import run_compliance_notices
 from app.workers.compliance_test_worker import run_compliance_tests
+from app.workers.push_alert_worker import run_push_alerts
 from app.workers.report_schedule_worker import run_report_schedules
 from app.workers.policy_reminder_worker import run_policy_reminders
 from app.workers.retention_sweeper import run_retention_sweeper
@@ -504,6 +505,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("compliance_tests worker failed to start", error=str(exc))
 
+    # Web push for each new critical alert (app/workers/push_alert_worker.py).
+    push_alerts_task: asyncio.Task | None = None
+    if settings.PUSH_ALERTS_ENABLED:
+        try:
+            push_alerts_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="push_alerts", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_push_alerts),
+                name="push_alerts_worker",
+            )
+            logger.info("push_alerts worker started")
+        except Exception as exc:
+            logger.warning("push_alerts worker failed to start", error=str(exc))
+
     # The scheduled reports e-mailed on their day and hour (app/workers/report_schedule_worker.py).
     report_schedules_task: asyncio.Task | None = None
     if settings.REPORT_SCHEDULES_ENABLED:
@@ -661,6 +674,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await compliance_notice_task
         except asyncio.CancelledError:
             logger.debug("compliance_notices worker cancelled during shutdown")
+    if push_alerts_task is not None and not push_alerts_task.done():
+        push_alerts_task.cancel()
+        try:
+            await push_alerts_task
+        except asyncio.CancelledError:
+            logger.debug("push_alerts worker cancelled during shutdown")
     if report_schedules_task is not None and not report_schedules_task.done():
         report_schedules_task.cancel()
         try:

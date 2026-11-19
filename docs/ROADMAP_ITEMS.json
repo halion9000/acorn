@@ -815,9 +815,9 @@
     "key": "r7-ci-33",
     "title": "Merge the duplicated connector descriptions into one source",
     "area": "Round 7: CORE improvement",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Approved (Hal: yes). Not started: the title does not say which duplicated descriptions are meant. My reading: the connector list, the generated docs and A.C.O.R.N's connector cards each hold their own wording. I will find the copies and merge them when I reach it.",
+    "status": "in_progress",
+    "needs": "signoff",
+    "note": "Looked for duplicated connector descriptions. In CORE the connector list (hud/src/connectors.ts) is already the one source: docs/INTEGRATIONS.md and the Jax knowledge copy are generated from it and a test fails when they are stale. In A.C.O.R.N the tool names come from one function (vendorLabel in lib/api.ts) and the descriptions on the Connectors page come from CORE. I found no second copy to merge. Question for Hal: which two places did you see saying the same thing in different words? Until named, nothing more to do.",
     "added": "2026-11-14"
   },
   {
@@ -2085,10 +2085,12 @@
     "key": "r7-af-39",
     "title": "Mobile: push notification for a critical alert",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): no app yet, web push is fine. Approved: I build it (Hal does not need to act).",
-    "added": "2026-11-14"
+    "note": "Built: the bell in the top bar has Push critical alerts to this device. Each new critical alert of your clients is pushed (encrypted, about a minute) and clicking it opens the alerts page. No phone app needed. NOT VERIFIED on a real device: the encryption and the sender are tested against a simulated browser; turn it on and see if a test arrives (the Send test route is POST /api/v1/push/test).",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "A.C.O.R.N this commit"
   },
   {
     "key": "r7-af-40",

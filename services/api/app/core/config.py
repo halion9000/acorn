@@ -320,6 +320,9 @@ class Settings(BaseSettings):
     COMPLIANCE_NOTICES_ENABLED: bool = True
     COMPLIANCE_NOTICE_INTERVAL_SECONDS: int = 3600
     COMPLIANCE_NOTICE_INITIAL_DELAY_SECONDS: int = 420
+    # Web push for each new critical alert (app/workers/push_alert_worker.py): looks every minute, sends only to browsers that turned notifications on.
+    PUSH_ALERTS_ENABLED: bool = True
+    PUSH_ALERTS_INTERVAL_SECONDS: int = 60
     REPORT_SCHEDULES_ENABLED: bool = True
     REPORT_SCHEDULES_INTERVAL_SECONDS: int = 3600
     REPORT_SCHEDULES_INITIAL_DELAY_SECONDS: int = 600

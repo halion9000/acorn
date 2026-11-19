@@ -65,6 +65,7 @@ from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
 from app.models.identity_history import IdentityHistory
 from app.models.remote_script import RemoteScript
 from app.models.client_family import ClientFamily, ClientFamilyMember
+from app.models.push import PushKey, PushSubscription
 from app.models.report_schedule import ReportSchedule
 from app.models.trust_audit import Audit, AuditAuditor, AuditFile, AuditRequest, TrustCenterSettings
 from app.models.vcio_risk_assessment import VcioRiskAssessment
@@ -162,6 +163,8 @@ __all__ = [
     "ReportSchedule",
     "ClientFamily",
     "ClientFamilyMember",
+    "PushKey",
+    "PushSubscription",
     "RemoteScript",
     "IdentityHistory",
     "AuditAuditor",
