@@ -2423,5 +2423,15 @@
     "completed": "2026-11-18",
     "completed_ref": "AiSOC 2026-11-18",
     "note": "Requested by Hal 2026-11-18. Tick clients on Alerts > Hidden: a client-scope rule with a prefix signature (alerts of the tool addigy whose title starts MDM is disabled on) hides them now and, through the sweep, new ones; GET/PUT /alert-suppressions/addigy-mdm-clients."
+  },
+  {
+    "key": "ui-modernization",
+    "title": "Modernize the look of A.C.O.R.N, starting with the pages full of numbers",
+    "area": "Platform",
+    "status": "not_started",
+    "needs": "signoff",
+    "note": "Plan written after clicking through the live site: docs/UI_MODERNIZATION_PLAN.md. Four phases: a small design system (tokens, tabular numbers, stat cards, tables, skeletons), then the number-heavy pages (Net income first, then Ticket and Client summary, Billing sync, Devices), then the sidebar and top bar, then a light theme and visual tests. Decisions: go ahead with Phase 1 and then Net income? Light theme wanted or dark only? OK to add one chart library (Recharts)? Reply 'go' to start.",
+    "detail": "Findings: every box has the same weight, numbers are not formatted or colored, labels are tiny uppercase grey, 12 pill tabs on Net income, long paragraphs above every page, blank boxes while loading, few charts, an 80-link sidebar, a crowded phone top bar.",
+    "added": "2026-11-18"
   }
 ]
