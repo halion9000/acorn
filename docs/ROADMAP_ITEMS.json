@@ -2156,13 +2156,13 @@
   },
   {
     "status": "in_progress",
-    "needs": "claude",
+    "needs": "hal",
     "area": "Security",
     "key": "rw-toolbox",
     "title": "Employee toolbox (from Rewst Tool Portal): client picker and Microsoft 365 action tiles",
     "detail": "User management (group membership, OneDrive permissions, attributes, onboarding, offboarding), password and security (change password, compromised user remediation, reset MFA), mail and permissions (out of office, mailbox permissions, forwarding, shared mailbox, litigation hold, calendar permissions), scheduled workflows. A launcher over A.C.O.R.N CIPP actions with the existing approval path.",
     "added": "2026-11-15",
-    "note": "Stage 1 built (Hal: build in stages, every press an approval): the Toolbox page lists 14 tools in 3 groups; a press creates a pending approval with the client, tool and every value; nothing runs. Standing approvals never auto-approve these. Next stages: run an approved request through CIPP under CORE's existing rules (opted-in clients, protected accounts, hourly cap, audit), onboarding and offboarding as multi-step runs, then the scheduled workflows tile. Stage 2 is not started: it needs the executor wired into CORE, which I will not do unattended because it changes live client tenants."
+    "note": "Stage 1 built and reworked 2026-11-19 (Hal: free text was useless, onboarding and offboarding missing): 14 tools, typed fields. Person fields are pickers over the client's Microsoft 365 user list, sign-in domain is one of the client's domains, choices are fixed lists, dates have a picker, onboarding and offboarding carry the full form; a press still only creates a pending approval and runs nothing. Still typed: the group name (A.C.O.R.N holds no group list yet) and the license is copied from a named person instead of picked from a list. QUESTION FOR HAL (Partner Center): Rewst most likely acts through the Microsoft partner link (GDAP) with its own app, not through CIPP. CIPP is itself that link (its app holds the GDAP roles), so running through CIPP stays the quickest way to stage 2 under CORE's rules. A direct route would need a new multi-tenant app registration in Live Oak's partner tenant, admin consent, GDAP roles for the partner security groups, and a secret or certificate stored in the credential store (r7-ci-15, waiting on Hal); it would also mean rebuilding CORE's CIPP rules (opted-in clients, protected accounts, hourly cap, audit) on a new path. Suggested: keep CIPP for running actions, and use the direct Graph read only for lists (groups, licenses, shared mailboxes) if CIPP's lists prove too slow. Say go if you want the direct route designed."
   },
   {
     "status": "completed",

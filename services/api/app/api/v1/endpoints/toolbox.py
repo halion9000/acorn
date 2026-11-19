@@ -12,14 +12,20 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.devices import _scope
+from app.db.rls_scope import cross_tenant_reads
 from app.models.responder import AgentApproval
+from app.models.signin import IdentityMfaUser
 from app.services import toolbox as tb
 from app.services.audit import emit_audit
+from app.services.identity_people import MICROSOFT
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
+
+MAX_LOOKUP_ROWS = 5000
 
 EXPIRES_AFTER = timedelta(days=7)
 
@@ -33,6 +39,23 @@ class RequestIn(BaseModel):
 @router.get("/tools", summary="The Microsoft 365 tools a technician can ask for, in groups")
 async def tools(user: Annotated[AuthUser, Depends(require_permission("alerts:read"))]) -> dict[str, Any]:
     return {"groups": list(tb.GROUPS), "tools": tb.catalog(), "stage": "Requests are recorded for approval. Running an approved request is the next stage."}
+
+
+@router.get("/lookups", summary="The people and sign-in domains of one client, for the pickers")
+async def lookups(client_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+    """Read from the client's latest Microsoft 365 user list (the one CORE reads through CIPP), so a form offers real people instead of a text box."""
+    scope, names = await _scope(db, user.tenant_id, client_id)
+    if client_id not in scope or client_id not in names:
+        raise HTTPException(status_code=404, detail="Client not found")
+    async with cross_tenant_reads(db):
+        rows = (
+            await db.execute(
+                select(IdentityMfaUser.upn, IdentityMfaUser.display_name, IdentityMfaUser.enabled, IdentityMfaUser.user_type)
+                .where(IdentityMfaUser.tenant_id == client_id, IdentityMfaUser.source == MICROSOFT)
+                .limit(MAX_LOOKUP_ROWS)
+            )
+        ).all()
+    return tb.people_and_domains([(r[0], r[1], r[2], r[3]) for r in rows])
 
 
 @router.post("/request", status_code=201, summary="Ask for a tool to be run for a client: creates an approval request, runs nothing")

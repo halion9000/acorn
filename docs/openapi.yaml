@@ -17066,7 +17066,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RequestIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__audits__RequestIn'
             example:
               title: Provide the list of terminated employees for the period
               control_id: CC6.2
@@ -18003,6 +18003,311 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/mssp/families:
+    get:
+      tags:
+      - mssp
+      summary: The client families
+      operationId: list_families_api_v1_mssp_families_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FamilyOut'
+                type: array
+                title: Response List Families Api V1 Mssp Families Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - mssp
+      summary: Create a family from a name and its clients
+      operationId: create_family_api_v1_mssp_families_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/mssp/families/{family_id}:
+    patch:
+      tags:
+      - mssp
+      summary: Rename a family or replace its clients
+      operationId: change_family_api_v1_mssp_families__family_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: family_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Family Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - mssp
+      summary: Delete a family (its clients are not touched)
+      operationId: delete_family_api_v1_mssp_families__family_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: family_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Family Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/qbr:
+    get:
+      tags:
+      - reports
+      summary: 'One client''s quarterly business review: security and what we did
+        over the last few months (no finance)'
+      operationId: qbr_api_v1_reports_qbr_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+          default: 3
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Qbr Api V1 Reports Qbr Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/alert-push/public-key:
+    get:
+      tags:
+      - push
+      summary: The key a browser needs to turn notifications on
+      operationId: public_key_api_v1_alert_push_public_key_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Public Key Api V1 Alert Push Public Key Get
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-push/subscribe:
+    post:
+      tags:
+      - push
+      summary: Turn notifications on for this browser
+      operationId: subscribe_api_v1_alert_push_subscribe_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeIn'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-push/unsubscribe:
+    post:
+      tags:
+      - push
+      summary: Turn notifications off for this browser
+      operationId: unsubscribe_api_v1_alert_push_unsubscribe_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeIn'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/alert-push/test:
+    post:
+      tags:
+      - push
+      summary: Send a test notification to the browsers you turned on
+      operationId: test_push_api_v1_alert_push_test_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Test Push Api V1 Alert Push Test Post
+      security:
+      - HTTPBearer: []
+  /api/v1/toolbox/tools:
+    get:
+      tags:
+      - toolbox
+      summary: The Microsoft 365 tools a technician can ask for, in groups
+      operationId: tools_api_v1_toolbox_tools_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Tools Api V1 Toolbox Tools Get
+      security:
+      - HTTPBearer: []
+  /api/v1/toolbox/lookups:
+    get:
+      tags:
+      - toolbox
+      summary: The people and sign-in domains of one client, for the pickers
+      description: Read from the client's latest Microsoft 365 user list (the one
+        CORE reads through CIPP), so a form offers real people instead of a text box.
+      operationId: lookups_api_v1_toolbox_lookups_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Lookups Api V1 Toolbox Lookups Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/toolbox/request:
+    post:
+      tags:
+      - toolbox
+      summary: 'Ask for a tool to be run for a client: creates an approval request,
+        runs nothing'
+      operationId: make_request_api_v1_toolbox_request_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__toolbox__RequestIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Make Request Api V1 Toolbox Request Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/compliance/trust-center:
     get:
       tags:
@@ -19285,6 +19590,40 @@ paths:
                 additionalProperties: true
                 title: Response Network Firmware Api V1 Device Reports Network Firmware
                   Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/device-reports/org-mismatch:
+    get:
+      tags:
+      - devices
+      summary: Machines whose Huntress organization is not the client their NinjaOne
+        device is filed under (matched on serial number)
+      operationId: org_mismatch_api_v1_device_reports_org_mismatch_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Org Mismatch Api V1 Device Reports Org Mismatch Get
         '422':
           description: Validation Error
           content:
@@ -46400,6 +46739,10 @@ components:
         same_client:
           type: boolean
           title: Same Client
+        sibling:
+          type: boolean
+          title: Sibling
+          default: false
         serial_number:
           anyOf:
           - type: string
@@ -47290,6 +47633,71 @@ components:
       - dkim
       - spf
       title: FailureRates
+    FamilyIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 2
+          title: Name
+        client_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 200
+          title: Client Ids
+      type: object
+      required:
+      - name
+      title: FamilyIn
+    FamilyOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        client_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Client Ids
+        clients:
+          items:
+            type: string
+          type: array
+          title: Clients
+      type: object
+      required:
+      - id
+      - name
+      - client_ids
+      - clients
+      title: FamilyOut
+    FamilyPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 120
+            minLength: 2
+          - type: 'null'
+          title: Name
+        client_ids:
+          anyOf:
+          - items:
+              type: string
+              format: uuid
+            type: array
+            maxItems: 200
+          - type: 'null'
+          title: Client Ids
+      type: object
+      title: FamilyPatch
     FanoutResult:
       properties:
         connector_id:
@@ -50610,6 +51018,23 @@ components:
       - created_at
       - created_by
       title: KBDocResponse
+    Keys:
+      properties:
+        p256dh:
+          type: string
+          maxLength: 200
+          minLength: 20
+          title: P256Dh
+        auth:
+          type: string
+          maxLength: 100
+          minLength: 8
+          title: Auth
+      type: object
+      required:
+      - p256dh
+      - auth
+      title: Keys
     KpiBarTargetsOut:
       properties:
         false_positive_rate_max_pct:
@@ -57601,35 +58026,6 @@ components:
       - text
       - tone
       title: ReputationFact
-    RequestIn:
-      properties:
-        title:
-          type: string
-          maxLength: 300
-          minLength: 3
-          title: Title
-        control_id:
-          anyOf:
-          - type: string
-            maxLength: 60
-          - type: 'null'
-          title: Control Id
-        owner:
-          anyOf:
-          - type: string
-            maxLength: 200
-          - type: 'null'
-          title: Owner
-        due_date:
-          anyOf:
-          - type: string
-            format: date
-          - type: 'null'
-          title: Due Date
-      type: object
-      required:
-      - title
-      title: RequestIn
     RequestOut:
       properties:
         id:
@@ -63345,6 +63741,20 @@ components:
           title: Urls
       type: object
       title: SubmitRequest
+    SubscribeIn:
+      properties:
+        endpoint:
+          type: string
+          maxLength: 2000
+          minLength: 10
+          title: Endpoint
+        keys:
+          $ref: '#/components/schemas/Keys'
+      type: object
+      required:
+      - endpoint
+      - keys
+      title: SubscribeIn
     SuggestRequest:
       properties:
         alert_id:
@@ -66260,6 +66670,17 @@ components:
       description: Devices a tool reports for one of its clients that is not mapped
         to a client here yet. They are not stored until it is, so this is where to
         find them.
+    UnsubscribeIn:
+      properties:
+        endpoint:
+          type: string
+          maxLength: 2000
+          minLength: 10
+          title: Endpoint
+      type: object
+      required:
+      - endpoint
+      title: UnsubscribeIn
     UpdateApiKeyRequest:
       properties:
         name:
@@ -69274,6 +69695,35 @@ components:
       - remediated_at
       title: VulnerabilityOut
       description: 'What the API returns: the stored values as they are.'
+    app__api__v1__endpoints__audits__RequestIn:
+      properties:
+        title:
+          type: string
+          maxLength: 300
+          minLength: 3
+          title: Title
+        control_id:
+          anyOf:
+          - type: string
+            maxLength: 60
+          - type: 'null'
+          title: Control Id
+        owner:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Owner
+        due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Due Date
+      type: object
+      required:
+      - title
+      title: RequestIn
     app__api__v1__endpoints__billing__ChangeRow:
       properties:
         client_id:
@@ -72617,6 +73067,26 @@ components:
       required:
       - report
       title: ReportIn
+    app__api__v1__endpoints__toolbox__RequestIn:
+      properties:
+        tool:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Tool
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        args:
+          additionalProperties: true
+          type: object
+          title: Args
+      type: object
+      required:
+      - tool
+      - client_id
+      title: RequestIn
     app__api__v1__endpoints__trust_center__DocumentIn:
       properties:
         name:

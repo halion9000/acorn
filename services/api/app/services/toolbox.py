@@ -2,14 +2,34 @@
 
 STAGE 1: a press only creates an approval request. Nothing runs against a client's tenant here; running an approved request through CIPP is a later stage, built with the rules CORE already holds for CIPP
 actions (opted-in clients, protected accounts, an hourly cap, an audit file). The catalog says what each tool needs and how risky it is, so the approver sees the same words the technician pressed.
+
+Every field has a kind, so the page offers the right control and the server checks the same thing: ``user`` and ``email`` are picked from the client's own Microsoft 365 people (``email`` also takes an address
+that is not on the list, for example an outside forwarding address), ``users`` is several of those, ``choice`` is one of a fixed list, ``domain`` is one of the client's own sign-in domains, ``datetime`` is a date
+and time, ``text`` and ``longtext`` are the few things only a person can say (a reason, a message).
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-USER = ("user", "User (email address)")
+MAX_VALUE = 500
+MAX_PEOPLE = 20
+EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
+PERSON_KINDS = ("user", "email")
+KINDS = ("user", "email", "users", "choice", "domain", "datetime", "text", "longtext")
+
+
+@dataclass(frozen=True)
+class Field:
+    key: str
+    label: str
+    kind: str = "text"
+    options: tuple[str, ...] = ()
+    required: bool = True
+    hint: str = ""
 
 
 @dataclass(frozen=True)
@@ -20,63 +40,157 @@ class Tool:
     risk: str  # low, medium, high
     reversible: bool
     summary: str
-    fields: tuple[tuple[str, str], ...] = field(default_factory=lambda: (USER,))
+    fields: tuple[Field, ...] = field(default_factory=tuple)
 
 
+USER = Field("user", "Person", "user")
+YES_NO = ("Yes", "No")
 GROUPS = ("User management", "Password and security", "Mail and permissions")
 
 TOOLS: tuple[Tool, ...] = (
-    Tool("group_membership", "User management", "Change group membership", "medium", True, "Add a person to a group, or take them out.", (USER, ("group", "Group name"), ("change", "add or remove"))),
-    Tool("onedrive_permissions", "User management", "Give access to someone's OneDrive", "medium", True, "Let another person open this person's OneDrive.", (USER, ("grantee", "Who gets access (email address)"))),
-    Tool("user_attributes", "User management", "Change a person's details", "low", True, "Change job title, department, manager or phone number.", (USER, ("attribute", "Which detail"), ("value", "New value"))),
-    Tool("onboard_user", "User management", "Onboard a new person", "medium", True, "Create the account, set the license, add the groups and mailbox for a new hire.", (USER, ("name", "Full name"), ("license", "License to assign"), ("groups", "Groups to join, separated by commas"))),
-    Tool("offboard_user", "User management", "Offboard a person", "high", False, "Block sign-in, remove sessions, convert the mailbox, remove licenses and groups, and pass the data on.", (USER, ("manager", "Who receives the mailbox and files (email address)"), ("when", "Date and time to do it"))),
+    Tool("group_membership", "User management", "Change group membership", "medium", True, "Add a person to a group, or take them out.", (USER, Field("change", "What to do", "choice", ("Add to the group", "Remove from the group")), Field("group", "Group name", "text", hint="Exactly as it shows in Microsoft Entra."))),
+    Tool("onedrive_permissions", "User management", "Give access to someone's OneDrive", "medium", True, "Let another person open this person's OneDrive.", (Field("user", "Whose OneDrive", "user"), Field("grantee", "Who gets access", "user"))),
+    Tool(
+        "user_attributes",
+        "User management",
+        "Change a person's details",
+        "low",
+        True,
+        "Change job title, department, manager, office or phone number.",
+        (USER, Field("attribute", "Which detail", "choice", ("Job title", "Department", "Manager", "Office location", "Mobile phone", "Business phone", "Company name")), Field("value", "New value", "text", hint="For Manager, give the manager's email address.")),
+    ),
+    Tool(
+        "onboard_user",
+        "User management",
+        "Onboard a new person",
+        "medium",
+        True,
+        "Create the account with a generated temporary password, then give the new hire the same license and groups as a person already doing the job.",
+        (
+            Field("first_name", "First name", "text"),
+            Field("last_name", "Last name", "text"),
+            Field("domain", "Sign-in domain", "domain"),
+            Field("job_title", "Job title", "text"),
+            Field("department", "Department", "text", required=False),
+            Field("manager", "Manager", "user", required=False),
+            Field("copy_from", "Same license and groups as", "user", hint="Pick someone with the same job. Their license and groups are copied."),
+            Field("start_date", "Start date and time", "datetime"),
+            Field("also_mailbox_access", "Also give access to the mailboxes of", "users", required=False),
+        ),
+    ),
+    Tool(
+        "offboard_user",
+        "User management",
+        "Offboard a person",
+        "high",
+        False,
+        "Block sign-in, end sessions, then handle the mailbox, files, license and groups as chosen below.",
+        (
+            USER,
+            Field("when", "Do it at", "datetime"),
+            Field("mailbox", "Mailbox", "choice", ("Convert to a shared mailbox", "Keep as it is", "Delete with the account")),
+            Field("mailbox_access", "Who gets access to the mailbox", "users", required=False),
+            Field("forward_to", "Forward new mail to", "email", required=False),
+            Field("onedrive_to", "Hand the OneDrive files to", "user", required=False),
+            Field("remove_licenses", "Remove licenses", "choice", YES_NO),
+            Field("remove_groups", "Remove from all groups", "choice", YES_NO),
+            Field("auto_reply", "Automatic reply text", "longtext", required=False),
+        ),
+    ),
     Tool("change_password", "Password and security", "Change a password", "medium", False, "Set a new temporary password and require a change at next sign-in.", (USER,)),
-    Tool("compromised_user", "Password and security", "Remediate a compromised user", "high", False, "Reset the password, end all sessions, reset MFA and remove inbox rules and forwarding.", (USER, ("reason", "What happened"))),
-    Tool("reset_mfa", "Password and security", "Reset a person's MFA", "high", False, "Remove their registered methods so they set MFA up again.", (USER, ("reason", "Why"))),
-    Tool("out_of_office", "Mail and permissions", "Set an out of office reply", "low", True, "Turn the automatic reply on or off with the text to send.", (USER, ("message", "Reply text"), ("until", "Until when"))),
-    Tool("mailbox_permissions", "Mail and permissions", "Give access to a mailbox", "medium", True, "Full access or send-as on a mailbox.", (USER, ("grantee", "Who gets access (email address)"), ("level", "Full access or send as"))),
-    Tool("mail_forwarding", "Mail and permissions", "Forward a person's mail", "high", True, "Forward their mail to another address.", (USER, ("to", "Forward to (email address)"), ("keep_copy", "Keep a copy: yes or no"))),
-    Tool("shared_mailbox", "Mail and permissions", "Create or change a shared mailbox", "medium", True, "Create a shared mailbox or change who can use it.", (("mailbox", "Shared mailbox (email address)"), ("members", "Members, separated by commas"))),
-    Tool("litigation_hold", "Mail and permissions", "Put a mailbox on litigation hold", "high", True, "Keep everything in the mailbox, including deleted items.", (USER, ("reason", "Why"))),
-    Tool("calendar_permissions", "Mail and permissions", "Give access to a calendar", "low", True, "Let another person see or edit a calendar.", (USER, ("grantee", "Who gets access (email address)"), ("level", "Viewer or editor"))),
+    Tool("compromised_user", "Password and security", "Remediate a compromised user", "high", False, "Reset the password, end all sessions, reset MFA and remove inbox rules and forwarding.", (USER, Field("reason", "What happened", "longtext"))),
+    Tool("reset_mfa", "Password and security", "Reset a person's MFA", "high", False, "Remove their registered methods so they set MFA up again.", (USER, Field("reason", "Why", "text"))),
+    Tool("out_of_office", "Mail and permissions", "Set an out of office reply", "low", True, "Turn the automatic reply on with the text to send.", (USER, Field("message", "Reply text", "longtext"), Field("until", "Until", "datetime"))),
+    Tool("mailbox_permissions", "Mail and permissions", "Give access to a mailbox", "medium", True, "Full access, send as or send on behalf on a mailbox.", (Field("user", "Mailbox", "user"), Field("grantee", "Who gets access", "user"), Field("level", "Kind of access", "choice", ("Full access", "Send as", "Send on behalf")))),
+    Tool("mail_forwarding", "Mail and permissions", "Forward a person's mail", "high", True, "Forward their mail to another address.", (USER, Field("to", "Forward to", "email", hint="Pick a person, or type an outside address."), Field("keep_copy", "Keep a copy in the mailbox", "choice", YES_NO))),
+    Tool("shared_mailbox", "Mail and permissions", "Convert a mailbox to a shared mailbox", "medium", True, "Make the mailbox shared (no license needed) and say who can use it.", (Field("user", "Mailbox", "user"), Field("members", "Who can use it", "users", required=False))),
+    Tool("litigation_hold", "Mail and permissions", "Put a mailbox on litigation hold", "high", True, "Keep everything in the mailbox, including deleted items.", (Field("user", "Mailbox", "user"), Field("length", "For how long", "choice", ("Until released", "90 days", "180 days", "1 year", "7 years")), Field("reason", "Why", "text"))),
+    Tool("calendar_permissions", "Mail and permissions", "Give access to a calendar", "low", True, "Let another person see or edit a calendar.", (Field("user", "Whose calendar", "user"), Field("grantee", "Who gets access", "user"), Field("level", "Kind of access", "choice", ("Free and busy times only", "Reviewer (see details)", "Editor (change items)")))),
 )
 
 BY_ID = {t.id: t for t in TOOLS}
-MAX_VALUE = 500
 
 
 def catalog() -> list[dict[str, Any]]:
     """The tools as plain data for the page, in groups."""
     return [
-        {"id": t.id, "group": t.group, "label": t.label, "risk": t.risk, "reversible": t.reversible, "summary": t.summary, "fields": [{"key": k, "label": lbl} for k, lbl in t.fields]}
+        {
+            "id": t.id,
+            "group": t.group,
+            "label": t.label,
+            "risk": t.risk,
+            "reversible": t.reversible,
+            "summary": t.summary,
+            "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "options": list(f.options), "required": f.required, "hint": f.hint} for f in t.fields],
+        }
         for t in TOOLS
     ]
 
 
+def _check_value(f: Field, value: str) -> str | None:
+    """Why this value does not fit its field's kind, or None when it does."""
+    if f.kind in PERSON_KINDS and not EMAIL.match(value):
+        return f"{f.label} must be an email address."
+    if f.kind == "users":
+        people = [p.strip() for p in re.split(r"[,;]", value) if p.strip()]
+        if len(people) > MAX_PEOPLE:
+            return f"{f.label} has too many people (at most {MAX_PEOPLE})."
+        if not people or not all(EMAIL.match(p) for p in people):
+            return f"{f.label} must be email addresses."
+    if f.kind == "choice" and value not in f.options:
+        return f"{f.label} must be one of: {', '.join(f.options)}."
+    if f.kind == "domain" and not re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", value):
+        return f"{f.label} must be a domain name."
+    if f.kind == "datetime":
+        try:
+            datetime.fromisoformat(value)
+        except ValueError:
+            return f"{f.label} must be a date and time."
+    return None
+
+
 def check_request(tool_id: str, args: dict[str, Any]) -> tuple[Tool | None, dict[str, str], str | None]:
-    """The tool, the cleaned arguments and a reason the request cannot be made (pure). Every field the tool asks for must be given; a value is text of at most ``MAX_VALUE`` characters; an email field must look like one; nothing extra is kept."""
+    """The tool, the cleaned arguments and a reason the request cannot be made (pure). A required field must be given; a value is text of at most ``MAX_VALUE`` characters that fits its kind (an email address,
+    one of the listed choices, a date and time); an optional field left empty is dropped; nothing extra is kept."""
     tool = BY_ID.get(tool_id)
     if tool is None:
         return None, {}, "That tool does not exist."
     clean: dict[str, str] = {}
-    for key, label in tool.fields:
-        raw = args.get(key)
+    for f in tool.fields:
+        raw = args.get(f.key)
         value = str(raw).strip() if raw is not None else ""
         if not value:
-            return tool, {}, f"{label} is needed."
+            if f.required:
+                return tool, {}, f"{f.label} is needed."
+            continue
         if len(value) > MAX_VALUE:
-            return tool, {}, f"{label} is too long."
-        if key in ("user", "grantee", "manager", "to", "mailbox") and ("@" not in value or " " in value):
-            return tool, {}, f"{label} must be an email address."
-        clean[key] = value
+            return tool, {}, f"{f.label} is too long."
+        why = _check_value(f, value)
+        if why:
+            return tool, {}, why
+        clean[f.key] = value
     return tool, clean, None
 
 
 def approval_text(tool: Tool, client: str, args: dict[str, str]) -> tuple[str, str]:
     """The title and summary of the approval card: what is asked, for whom, with every value shown (the approver decides on exactly this)."""
-    who = args.get("user") or args.get("mailbox") or ""
+    who = args.get("user") or (f"{args['first_name']} {args['last_name']}" if "first_name" in args else "")
     title = f"{tool.label}: {who}" if who else tool.label
-    lines = [f"{tool.summary} Client: {client}."] + [f"{label}: {args[key]}" for key, label in tool.fields if key in args]
+    lines = [f"{tool.summary} Client: {client}."] + [f"{f.label}: {args[f.key]}" for f in tool.fields if f.key in args]
     lines.append("Reversible." if tool.reversible else "Not easily reversed.")
     return title[:200], "\n".join(lines)
+
+
+def people_and_domains(rows: list[tuple[str, str | None, bool, str | None]]) -> dict[str, Any]:
+    """The picker lists from a client's Microsoft 365 user rows ``(upn, display name, enabled, user type)`` (pure): people sorted by name with members before guests, and the sign-in domains of the members, most used first."""
+    people = sorted(
+        ({"email": upn, "name": name or upn, "enabled": bool(enabled), "guest": (kind or "").lower() == "guest"} for upn, name, enabled, kind in rows if upn and "@" in upn),
+        key=lambda p: (p["guest"], not p["enabled"], p["name"].lower()),
+    )
+    counts: dict[str, int] = {}
+    for p in people:
+        if not p["guest"]:
+            d = p["email"].rsplit("@", 1)[1].lower()
+            counts[d] = counts.get(d, 0) + 1
+    domains = [d for d, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return {"people": people, "domains": domains}

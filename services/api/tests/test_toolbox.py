@@ -7,25 +7,77 @@ def test_every_tool_has_a_group_a_risk_and_fields_and_ids_are_unique():
     assert len({x.id for x in t.TOOLS}) == len(t.TOOLS)
     for x in t.TOOLS:
         assert x.group in t.GROUPS and x.risk in ("low", "medium", "high") and x.fields
+        assert all(f.kind in t.KINDS for f in x.fields)
+        assert all(f.options for f in x.fields if f.kind == "choice"), "a choice field lists its choices"
     ids = {x.id for x in t.TOOLS}
     assert {"onboard_user", "offboard_user", "reset_mfa", "compromised_user", "litigation_hold"} <= ids
     assert all(x.risk == "high" for x in t.TOOLS if x.id in ("offboard_user", "compromised_user", "reset_mfa"))
 
 
-def test_a_request_needs_every_field_and_a_real_email_where_one_is_asked_for():
+def test_free_text_is_left_only_for_what_a_person_must_say():
+    free = {(x.id, f.key) for x in t.TOOLS for f in x.fields if f.kind in ("text", "longtext")}
+    assert not any(k in ("user", "grantee", "manager", "to", "mailbox", "members") for _, k in free), "people are picked, never typed"
+    onboard = {f.key: f.kind for f in t.BY_ID["onboard_user"].fields}
+    assert onboard["domain"] == "domain" and onboard["manager"] == "user" and onboard["copy_from"] == "user" and onboard["start_date"] == "datetime"
+    offboard = {f.key: f.kind for f in t.BY_ID["offboard_user"].fields}
+    assert offboard["mailbox"] == "choice" and offboard["onedrive_to"] == "user" and offboard["when"] == "datetime"
+
+
+def test_a_request_needs_every_required_field_and_a_real_email_where_one_is_asked_for():
     tool, args, why = t.check_request("reset_mfa", {"user": "ann@acme.com", "reason": "lost phone", "extra": "ignored"})
     assert tool and why is None and args == {"user": "ann@acme.com", "reason": "lost phone"}, "extra values are not kept"
     assert t.check_request("reset_mfa", {"user": "ann@acme.com"})[2] == "Why is needed."
     assert "email address" in t.check_request("reset_mfa", {"user": "ann", "reason": "x"})[2]
-    assert "email address" in t.check_request("mail_forwarding", {"user": "a@b.co", "to": "not an address", "keep_copy": "yes"})[2]
+    assert "email address" in t.check_request("mail_forwarding", {"user": "a@b.co", "to": "not an address", "keep_copy": "Yes"})[2]
     assert t.check_request("nope", {})[2] == "That tool does not exist."
-    assert "too long" in t.check_request("out_of_office", {"user": "a@b.co", "message": "x" * 501, "until": "Monday"})[2]
+    assert "too long" in t.check_request("out_of_office", {"user": "a@b.co", "message": "x" * 501, "until": "2026-12-01T09:00"})[2]
+
+
+def test_a_choice_a_date_and_a_list_of_people_must_fit_their_kind():
+    base = {"user": "a@b.co", "to": "out@side.org", "keep_copy": "Yes"}
+    assert t.check_request("mail_forwarding", base)[2] is None, "an outside address is allowed where the kind is email"
+    assert "one of: Yes, No" in t.check_request("mail_forwarding", {**base, "keep_copy": "maybe"})[2]
+    assert "date and time" in t.check_request("out_of_office", {"user": "a@b.co", "message": "away", "until": "Monday"})[2]
+    shared = {"user": "sales@acme.com", "members": "ann@acme.com, bob@acme.com"}
+    assert t.check_request("shared_mailbox", shared)[1]["members"] == "ann@acme.com, bob@acme.com"
+    assert "email addresses" in t.check_request("shared_mailbox", {**shared, "members": "ann@acme.com, bob"})[2]
+    assert "too many" in t.check_request("shared_mailbox", {**shared, "members": ",".join(f"p{i}@a.co" for i in range(21))})[2]
+    assert t.check_request("shared_mailbox", {"user": "sales@acme.com"})[1] == {"user": "sales@acme.com"}, "an empty optional field is dropped"
+
+
+def test_onboarding_and_offboarding_take_the_whole_form():
+    onboard = {"first_name": "Ann", "last_name": "Lee", "domain": "acme.com", "job_title": "Bookkeeper", "copy_from": "bob@acme.com", "start_date": "2026-12-01T08:00"}
+    tool, args, why = t.check_request("onboard_user", onboard)
+    assert why is None and "department" not in args and args["copy_from"] == "bob@acme.com"
+    title, text = t.approval_text(tool, "Acme", args)
+    assert title == "Onboard a new person: Ann Lee" and "Same license and groups as: bob@acme.com" in text
+    assert t.check_request("onboard_user", {**onboard, "domain": "not a domain"})[2] == "Sign-in domain must be a domain name."
+    off = {"user": "bob@acme.com", "when": "2026-12-05T17:00", "mailbox": "Convert to a shared mailbox", "remove_licenses": "Yes", "remove_groups": "Yes"}
+    assert t.check_request("offboard_user", off)[2] is None
+    assert "Mailbox must be one of" in t.check_request("offboard_user", {**off, "mailbox": "Throw away"})[2]
 
 
 def test_the_approval_card_shows_every_value_and_whether_it_can_be_undone():
-    tool, args, _ = t.check_request("offboard_user", {"user": "bob@acme.com", "manager": "ann@acme.com", "when": "Friday 5pm"})
+    off = {"user": "bob@acme.com", "when": "2026-12-05T17:00", "mailbox": "Keep as it is", "remove_licenses": "No", "remove_groups": "No", "onedrive_to": "ann@acme.com"}
+    tool, args, _ = t.check_request("offboard_user", off)
     title, text = t.approval_text(tool, "Acme", args)
     assert title == "Offboard a person: bob@acme.com"
-    assert "Client: Acme" in text and "Who receives the mailbox and files (email address): ann@acme.com" in text and "Date and time to do it: Friday 5pm" in text
+    assert "Client: Acme" in text and "Hand the OneDrive files to: ann@acme.com" in text and "Do it at: 2026-12-05T17:00" in text
     assert text.endswith("Not easily reversed.")
-    assert len(t.catalog()) == len(t.TOOLS) and t.catalog()[0]["fields"][0]["key"] == "user"
+    assert len(t.catalog()) == len(t.TOOLS) and t.catalog()[0]["fields"][0]["key"] == "user" and t.catalog()[0]["fields"][0]["kind"] == "user"
+
+
+def test_the_pickers_list_members_first_and_the_domains_by_use():
+    rows = [
+        ("zed@acme.com", "Zed", True, "Member"),
+        ("ann@acme.com", "Ann", True, "Member"),
+        ("old@acme.com", "Old", False, "Member"),
+        ("ext@other.org", "Ext", True, "Guest"),
+        ("bob@acme.net", None, True, "Member"),
+        ("", "No address", True, None),
+        ("cy@acme.com", "Cy", True, None),
+    ]
+    out = t.people_and_domains(rows)
+    assert [p["email"] for p in out["people"]] == ["ann@acme.com", "bob@acme.net", "cy@acme.com", "zed@acme.com", "old@acme.com", "ext@other.org"]
+    assert out["people"][1]["name"] == "bob@acme.net", "a missing name falls back to the address"
+    assert out["domains"] == ["acme.com", "acme.net"], "guests do not add a domain; the most used comes first"

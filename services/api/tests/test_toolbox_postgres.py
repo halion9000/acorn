@@ -83,3 +83,41 @@ async def test_a_bad_request_or_a_foreign_client_creates_nothing(world):
         await call(world, world.stranger, "reset_mfa", {"user": "a@b.co", "reason": "x"})
     assert e2.value.status_code == 404
     assert await approvals(world) == []
+
+
+async def lookups_for(w, client):
+    engine = create_async_engine(APP_URL, poolclass=NullPool)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+            await set_rls_context(db, w.owner)
+            user = SimpleNamespace(tenant_id=w.owner, user_id=None, email="tech@liveoakit.com")
+            return await ep.lookups(client, user, db)
+    finally:
+        await engine.dispose()
+
+
+async def put_users(w, client, rows):
+    engine = create_async_engine(PG_URL)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            for upn, name, kind in rows:
+                await conn.execute(
+                    text(
+                        "insert into identity_mfa_users (tenant_id, source, user_id, upn, display_name, enabled, user_type, admin, licensed, registered, capable, ca_enforced, security_defaults, snapshot_id)"
+                        " values (:t, 'cipp', :u, :upn, :n, true, :k, false, false, false, false, false, false, :s)"
+                    ),
+                    {"t": client, "u": upn, "upn": upn, "n": name, "k": kind, "s": uuid.uuid4()},
+                )
+    finally:
+        await engine.dispose()
+
+
+async def test_the_pickers_hold_only_the_chosen_clients_own_people_and_a_foreign_client_is_refused(world):
+    await put_users(world, world.acme, [("ann@acme.com", "Ann", "Member"), ("bob@acme.com", "Bob", "Member")])
+    await put_users(world, world.stranger, [("spy@stranger.com", "Spy", "Member")])
+    out = await lookups_for(world, world.acme)
+    assert [p["email"] for p in out["people"]] == ["ann@acme.com", "bob@acme.com"] and out["domains"] == ["acme.com"]
+    with pytest.raises(HTTPException) as e:
+        await lookups_for(world, world.stranger)
+    assert e.value.status_code == 404

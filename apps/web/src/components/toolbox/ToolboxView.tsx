@@ -16,12 +16,120 @@ export interface ToolInfo {
   risk: 'low' | 'medium' | 'high';
   reversible: boolean;
   summary: string;
-  fields: { key: string; label: string }[];
+  fields: FieldInfo[];
+}
+export interface FieldInfo {
+  key: string;
+  label: string;
+  kind: 'user' | 'email' | 'users' | 'choice' | 'domain' | 'datetime' | 'text' | 'longtext';
+  options: string[];
+  required: boolean;
+  hint: string;
+}
+export interface Person {
+  email: string;
+  name: string;
+  enabled: boolean;
+  guest: boolean;
+}
+interface Lookups {
+  people: Person[];
+  domains: string[];
 }
 interface Catalog {
   groups: string[];
   tools: ToolInfo[];
   stage: string;
+}
+
+const INPUT = 'mt-1 block w-full max-w-md rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
+
+/** The text a person sees for one entry in a picker: the name, with a note when the account is switched off or is a guest. */
+export function personLabel(p: Person): string {
+  return `${p.name}${p.name === p.email ? '' : ` (${p.email})`}${p.enabled ? '' : ' - sign-in off'}${p.guest ? ' - guest' : ''}`;
+}
+
+/** Add one address to a comma list without repeating it. */
+export function addToList(list: string, email: string): string {
+  const have = list.split(',').map((x) => x.trim()).filter(Boolean);
+  return have.includes(email) ? list : [...have, email].join(', ');
+}
+
+/** Take one address out of a comma list. */
+export function removeFromList(list: string, email: string): string {
+  return list.split(',').map((x) => x.trim()).filter((x) => x && x !== email).join(', ');
+}
+
+/** Whether a form is ready to send: a client is chosen and every required field has a value. */
+export function isComplete(tool: ToolInfo | null, clientId: string, values: Record<string, string>): boolean {
+  return tool !== null && clientId !== '' && tool.fields.every((f) => !f.required || (values[f.key] ?? '').trim() !== '');
+}
+
+function PeopleField({ f, value, onChange, people, listId }: { f: FieldInfo; value: string; onChange: (v: string) => void; people: Person[]; listId: string }) {
+  const [draft, setDraft] = useState('');
+  const chosen = value.split(',').map((x) => x.trim()).filter(Boolean);
+  const add = () => {
+    if (draft.trim()) onChange(addToList(value, draft.trim()));
+    setDraft('');
+  };
+  return (
+    <div className="mt-1 max-w-md">
+      <div className="flex gap-2">
+        <input aria-label={f.label} list={listId} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type a name, then pick" className={INPUT.replace('mt-1 ', '')} />
+        <button type="button" onClick={add} disabled={!draft.trim()} className="rounded-md border border-gray-700 px-2 text-sm text-gray-200 disabled:opacity-50">
+          Add
+        </button>
+      </div>
+      <ul className="mt-1 flex flex-wrap gap-1">
+        {chosen.map((c) => (
+          <li key={c} className="rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-200">
+            {c}{' '}
+            <button type="button" aria-label={`Remove ${c}`} onClick={() => onChange(removeFromList(value, c))}>
+              x
+            </button>
+          </li>
+        ))}
+      </ul>
+      <datalist id={listId}>
+        {people.map((p) => (
+          <option key={p.email} value={p.email} label={personLabel(p)} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
+function FieldControl({ f, value, onChange, lookups }: { f: FieldInfo; value: string; onChange: (v: string) => void; lookups: Lookups }) {
+  const listId = `people-${f.key}`;
+  if (f.kind === 'user' || f.kind === 'email') {
+    return (
+      <>
+        <input aria-label={f.label} list={listId} value={value} onChange={(e) => onChange(e.target.value)} placeholder={lookups.people.length ? 'Type a name, then pick' : 'Pick a client first'} className={INPUT} />
+        <datalist id={listId}>
+          {lookups.people.map((p) => (
+            <option key={p.email} value={p.email} label={personLabel(p)} />
+          ))}
+        </datalist>
+      </>
+    );
+  }
+  if (f.kind === 'users') return <PeopleField f={f} value={value} onChange={onChange} people={lookups.people} listId={listId} />;
+  if (f.kind === 'choice' || f.kind === 'domain') {
+    const options = f.kind === 'domain' ? lookups.domains : f.options;
+    return (
+      <select aria-label={f.label} value={value} onChange={(e) => onChange(e.target.value)} className={INPUT}>
+        <option value="">{options.length || f.kind === 'choice' ? 'Choose' : 'Pick a client first'}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (f.kind === 'datetime') return <input aria-label={f.label} type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className={INPUT} />;
+  if (f.kind === 'longtext') return <textarea aria-label={f.label} rows={3} value={value} onChange={(e) => onChange(e.target.value)} className={INPUT} />;
+  return <input aria-label={f.label} value={value} onChange={(e) => onChange(e.target.value)} className={INPUT} />;
 }
 
 const RISK_TEXT: Record<ToolInfo['risk'], string> = { low: 'low risk', medium: 'medium risk', high: 'high risk' };
@@ -36,6 +144,8 @@ export function ToolboxView() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ id: string; data: Lookups } | null>(null);
+  const lookups: Lookups = loaded && loaded.id === clientId ? loaded.data : { people: [], domains: [] };
 
   useEffect(() => {
     void (async () => {
@@ -49,6 +159,22 @@ export function ToolboxView() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!clientId) return;
+    let live = true;
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/v1/toolbox/lookups?client_id=${encodeURIComponent(clientId)}`);
+        if (res.ok && live) setLoaded({ id: clientId, data: (await res.json()) as Lookups });
+      } catch {
+        /* the pickers stay empty; the form still works with typed addresses */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [clientId]);
 
   const choose = (t: ToolInfo) => {
     setTool(t);
@@ -75,7 +201,7 @@ export function ToolboxView() {
     }
   };
 
-  const complete = tool !== null && clientId !== '' && tool.fields.every((f) => (values[f.key] ?? '').trim() !== '');
+  const complete = isComplete(tool, clientId, values);
 
   return (
     <div className="space-y-6 p-6" data-testid="toolbox">
@@ -87,7 +213,10 @@ export function ToolboxView() {
       )}
       <label className="block text-sm text-gray-300">
         Client
-        <select aria-label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)} className="ml-2 rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100">
+        <select aria-label="Client" value={clientId} onChange={(e) => {
+            setClientId(e.target.value);
+            setValues({});
+          }} className="ml-2 rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100">
           <option value="">Pick a client</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
@@ -124,10 +253,14 @@ export function ToolboxView() {
         <section className="space-y-3 rounded-xl border border-gray-800 bg-gray-900 p-4" aria-label={`Ask for: ${tool.label}`}>
           <h2 className="text-sm font-semibold text-white">{tool.label}</h2>
           {tool.fields.map((f) => (
-            <label key={f.key} className="block text-sm text-gray-300">
-              {f.label}
-              <input aria-label={f.label} value={values[f.key] ?? ''} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} className="mt-1 block w-full max-w-md rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100" />
-            </label>
+            <div key={f.key} className="block text-sm text-gray-300">
+              <span>
+                {f.label}
+                {f.required ? '' : ' (optional)'}
+              </span>
+              <FieldControl f={f} value={values[f.key] ?? ''} onChange={(v) => setValues((cur) => ({ ...cur, [f.key]: v }))} lookups={lookups} />
+              {f.hint && <p className="mt-0.5 text-xs text-gray-500">{f.hint}</p>}
+            </div>
           ))}
           <button type="button" disabled={!complete || busy} onClick={() => void send()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
             Ask for approval
