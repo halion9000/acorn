@@ -46,9 +46,11 @@
           "client_name": "Acme Dental",
           "agent": "Dan Kemp",
           "title": "Printer",
+          "type": "Other",
           "priority": "High",
           "status": "In Progress",
-          "age_days": 74
+          "age_days": 74,
+          "opened": "2026-09-01"
         }
       ]
     }

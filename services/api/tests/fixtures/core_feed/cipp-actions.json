@@ -62,6 +62,54 @@
         "risk": "high",
         "reversible": false,
         "summary": "Contain a compromised account: block sign-in, sign out everywhere, switch off its inbox rules"
+      },
+      {
+        "action": "reset_password",
+        "risk": "medium",
+        "reversible": false,
+        "summary": "Reset the password (CIPP makes a new one; it is written into the ticket)"
+      },
+      {
+        "action": "reset_mfa",
+        "risk": "high",
+        "reversible": false,
+        "summary": "Remove every registered sign-in method so the person sets MFA up again"
+      },
+      {
+        "action": "set_out_of_office",
+        "risk": "low",
+        "reversible": true,
+        "summary": "Turn on the automatic reply for a period"
+      },
+      {
+        "action": "forward_mail",
+        "risk": "high",
+        "reversible": true,
+        "summary": "Forward the person's mail to another address"
+      },
+      {
+        "action": "set_litigation_hold",
+        "risk": "high",
+        "reversible": true,
+        "summary": "Keep everything in the mailbox, including deleted items"
+      },
+      {
+        "action": "convert_mailbox",
+        "risk": "medium",
+        "reversible": true,
+        "summary": "Make the mailbox a shared mailbox"
+      },
+      {
+        "action": "mailbox_access",
+        "risk": "medium",
+        "reversible": true,
+        "summary": "Give another person full access, send as or send on behalf on the mailbox"
+      },
+      {
+        "action": "calendar_access",
+        "risk": "low",
+        "reversible": true,
+        "summary": "Let another person see or edit the calendar"
       }
     ],
     "audit": [
