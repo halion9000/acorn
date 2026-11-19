@@ -39,7 +39,7 @@ from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals, core_heartbeat
 from app.services import vcio_risk_tickets as vcio_tickets
-from app.services.alert_settle import closed_in_tool, has_open_ticket, tickets_all_closed
+from app.services.alert_settle import case_has_no_other_open_alert, closed_in_tool, has_open_ticket, tickets_all_closed
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_ticket_rules import link_created_ticket
 from app.services.client_mapping import IncomingClient, upsert_clients
@@ -1042,6 +1042,19 @@ async def apply_tickets(db: Any, tenant_id: Any, report: TicketsReport) -> int:
                 updated_at=now,
                 tags=Alert.tags.op("||")(literal([f"closed-in-{report.vendor}"], type_=JSONB)),
             )
+        )
+        # A closed ticket also resolves an alert its tool has NOT closed, when every ticket on it is closed and every other alert of its case is already finished (a case still open keeps it open).
+        await db.execute(
+            update(Alert)
+            .where(
+                Alert.tenant_id == tenant_id,
+                Alert.raw_event["finding"]["uid"].astext.in_(uids),
+                Alert.status.notin_(FINISHED_ALERT_STATUSES),
+                ~closed_in_tool(),
+                tickets_all_closed(),
+                case_has_no_other_open_alert(),
+            )
+            .values(status="resolved", resolved_at=now, updated_at=now, tags=Alert.tags.op("||")(literal(["ticket-closed"], type_=JSONB)))
         )
     return updated
 

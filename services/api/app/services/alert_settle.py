@@ -1,7 +1,7 @@
 """When an alert may be closed for good: its tool has closed it AND every HaloPSA ticket on it is closed.
 
 A tool closing an incident used to resolve the alert whatever its tickets said. Now a ticket still open keeps the alert open (with a note that the tool closed it), and the alert closes when its last ticket does.
-An alert whose tool has NOT closed it is never closed by its tickets: it is only flagged on the alert page ("ticket closed, still open in <tool>").
+An alert whose tool has NOT closed it is closed by its tickets too (Hal, 2026-11-18), but only when every ticket on it is closed and every other alert of its case is already finished (``case_has_no_other_open_alert``); otherwise it is only flagged on the alert page ("ticket closed, still open in <tool>").
 
 The checks are SQL conditions on ``enrichment_data`` (``tickets`` from CORE and ``manual_tickets`` by hand), so they run inside the same UPDATE that closes the alert.
 """
@@ -33,6 +33,14 @@ def has_closed_ticket() -> Any:
 def tickets_all_closed() -> Any:
     """SQL: at least one ticket is closed and none is open."""
     return and_(has_closed_ticket(), ~has_open_ticket())
+
+
+def case_has_no_other_open_alert() -> Any:
+    """SQL: the alert is in no case, or every OTHER alert of its case is already finished (resolved, closed or a false positive). Hal 2026-11-18: a closed ticket may resolve an alert only when everything else in its case is handled."""
+    return literal_column(
+        "(alerts.case_id is null or not exists (select 1 from alerts o where o.case_id = alerts.case_id and o.id <> alerts.id "
+        "and o.tenant_id = alerts.tenant_id and o.status not in ('resolved', 'closed', 'false_positive', 'fp')))"
+    )
 
 
 def closed_in_tool() -> Any:

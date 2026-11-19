@@ -1450,9 +1450,9 @@
     "key": "r7-cf-17",
     "title": "HaloPSA: ticket-to-alert round trip: closing the ticket resolves the alert",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): ok: closing the Halo ticket resolves the alert only when every alert in the case is handled. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built on the A.C.O.R.N side: an alert is now resolved when every HaloPSA ticket on it is closed and every other alert of its case is already finished (no case counts as nothing else open), even if its tool has not closed it; tagged ticket-closed. An older rule meant only a tool closing the incident could close an alert, and its test was changed to this. NOT seen live. Tell me if a real alert closes that should not have.",
     "added": "2026-11-14"
   },
   {

@@ -74,8 +74,10 @@ async def world():
         await alert("unknown_status", "new", [{"system": "halopsa", "id": "9"}])
         await s.commit()
         yield s, tenant, ids
+        await s.rollback()
         await off(s)
         await s.execute(text("delete from alerts where tenant_id = :t"), {"t": tenant})
+        await s.execute(text("delete from cases where tenant_id = :t"), {"t": tenant})
         await s.execute(text("delete from tenants where id = :t"), {"t": tenant})
         await s.commit()
     await engine.dispose()
@@ -127,4 +129,26 @@ async def test_the_last_ticket_closing_closes_an_alert_the_tool_already_closed_a
     await s.commit()
     got = await state(s, ids)
     assert got["open_ticket"][0] == "resolved", "the tool closed it and now its ticket is closed"
-    assert got["unknown_status"][0] == "new", "the tool has not closed this one, so a closed ticket does not close it"
+    assert got["unknown_status"][0] == "resolved", "the tool has not closed this one, but its only ticket is closed and it is in no case: the ticket closes it"
+
+
+async def test_a_closed_ticket_resolves_an_alert_in_a_case_only_when_every_other_alert_of_the_case_is_finished(world):
+    s, tenant, ids = world
+    await off(s)
+    case = uuid.uuid4()
+    await s.execute(text("insert into cases (id, tenant_id, case_number, title, status, priority, created_at, updated_at) values (:c, :t, 'CASE-T-1', 'c', 'open', 'medium', now(), now())"), {"c": case, "t": tenant})
+    await s.execute(text("update alerts set case_id = :c where id = any(:i)"), {"c": case, "i": [ids["closed_ticket"], ids["no_ticket"]]})
+    await s.commit()
+    report = TicketsReport(vendor="huntress", items=[TicketsItem(uid="huntress:closed_ticket", tickets=[LinkedTicket(id="1", status="Closed")])])
+    await apply_tickets(s, tenant, report)
+    await s.commit()
+    assert (await state(s, ids))["closed_ticket"][0] == "new", "another alert of its case is still open, so the closed ticket does not resolve it"
+    await off(s)
+    await s.execute(text("update alerts set status = 'resolved' where id = :i"), {"i": ids["no_ticket"]})
+    await s.commit()
+    await apply_tickets(s, tenant, report)
+    await s.commit()
+    assert (await state(s, ids))["closed_ticket"][0] == "resolved", "the rest of its case is finished: now it is resolved"
+    await off(s)
+    tags = (await s.execute(text("select tags from alerts where id = :i"), {"i": ids["closed_ticket"]})).scalar_one()
+    assert "ticket-closed" in tags
