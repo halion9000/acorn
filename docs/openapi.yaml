@@ -3263,9 +3263,9 @@ paths:
       tags:
       - reports
       summary: Ticket Metrics
-      description: The summary for the newest ``months`` months, for one HaloPSA client
-        (``client_id``) or all. ``received_at`` is None until CORE has sent the first
-        one.
+      description: The summary for the newest ``months`` months (up to 36), for one
+        HaloPSA client (``client_id``) or all. ``received_at`` is None until CORE
+        has sent the first one.
       operationId: ticket_metrics_api_v1_reports_ticket_metrics_get
       security:
       - HTTPBearer: []
@@ -3275,7 +3275,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 12
+          maximum: 36
           minimum: 1
           default: 3
           title: Months
@@ -65777,7 +65777,7 @@ components:
           items:
             type: string
           type: array
-          maxItems: 24
+          maxItems: 40
           title: Months
         rows:
           items:
