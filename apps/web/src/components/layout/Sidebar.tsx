@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -491,11 +491,41 @@ export function isPathHidden(hidden: ReadonlySet<string>, pathname: string): boo
   return pathIsHidden(navSections, hidden, pathname);
 }
 
+const COLLAPSED_KEY = 'acorn.nav.collapsed.v1';
+
+/** The sections' items that match what was typed in the menu filter (pure): a section with no match is dropped; an empty filter keeps everything. */
+export function filterSections(sections: NavSection[], text: string): NavSection[] {
+  const q = text.trim().toLowerCase();
+  if (!q) return sections;
+  return sections.map((s) => ({ ...s, items: s.items.filter((i) => i.label.toLowerCase().includes(q)) })).filter((s) => s.items.length > 0);
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const hidden = useHiddenNav();
-  const sections = shownSections(hidden);
+  const allSections = shownSections(hidden);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  // Groups the person closed stay closed on the next visit; the group holding the current page and any group while filtering are always open.
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_KEY);
+      if (raw) setCollapsed((JSON.parse(raw) as unknown[]).filter((x): x is string => typeof x === 'string'));
+    } catch {
+      /* storage unavailable: every group starts open */
+    }
+  }, []);
+  const toggleGroup = (title: string) =>
+    setCollapsed((c) => {
+      const next = c.includes(title) ? c.filter((x) => x !== title) : [...c, title];
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+      } catch {
+        /* the choice lasts until the page is closed */
+      }
+      return next;
+    });
 
   // A link is active when it is the most specific one that matches: /detection/vendor-detections must not also light up /detection.
   const isActive = (href: string) => {
@@ -506,6 +536,8 @@ export function Sidebar() {
     const better = navSections.some((sec) => sec.items.some((it) => it.href.length > href.length && pathname.startsWith(it.href)));
     return !better;
   };
+
+  const sections = filterSections(allSections, filter);
 
   return (
     <>
@@ -553,14 +585,32 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-5">
-        {sections.map((section, si) => (
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-4">
+        <input
+          type="search"
+          aria-label="Filter the menu"
+          placeholder="Filter the menu"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="mb-1 w-full rounded-lg border border-surface-border bg-surface-base px-3 py-1.5 text-sm text-fg-primary placeholder:text-fg-subtle"
+        />
+        {sections.map((section, si) => {
+          const holdsCurrent = section.items.some((i) => isActive(i.href));
+          const open = !section.title || filter.trim() !== '' || holdsCurrent || !collapsed.includes(section.title);
+          return (
           <div key={si}>
             {section.title && (
-              <p className="px-3 mb-1.5 text-xs font-semibold text-fg-subtle uppercase tracking-wider">
-                {section.title}
-              </p>
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => toggleGroup(section.title as string)}
+                className="mb-1.5 flex w-full items-center justify-between px-3 text-xs font-semibold text-fg-subtle uppercase tracking-wider hover:text-fg-secondary"
+              >
+                <span>{section.title}</span>
+                <span aria-hidden="true">{open ? '\u2212' : '+'}</span>
+              </button>
             )}
+            {open && (
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.href);
@@ -568,6 +618,7 @@ export function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch={false} // eighty links each prefetched made thousands of requests per page load
                       onClick={() => setMobileOpen(false)}
                       className={clsx(
                         'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
@@ -592,8 +643,11 @@ export function Sidebar() {
                 );
               })}
             </ul>
+            )}
           </div>
-        ))}
+          );
+        })}
+        {sections.length === 0 && <p className="px-3 text-sm text-fg-subtle">Nothing in the menu matches.</p>}
       </nav>
 
       {/* Footer */}

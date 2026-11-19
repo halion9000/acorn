@@ -2428,10 +2428,20 @@
     "key": "ui-modernization",
     "title": "Modernize the look of A.C.O.R.N, starting with the pages full of numbers",
     "area": "Platform",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Started (Hal 2026-11-18: do the plan, light and dark both). Built so far: whole-site light theme (the gray scale and accent text colors flip, so every page follows), menu no longer prefetches 80 pages, the client list cached for the session, design system pieces (format helpers, PageHeader, StatCard with sparkline, BarCell, Segmented, Skeleton, EmptyState; shown at /guide/ui), Net income regrouped with summary cards, margin bars, sticky header and name column, the Metrics pages on the new cards, skeleton and period control, the menu filter and collapsible groups. Next: the remaining pages one at a time (Devices, Identities, Alerts, Billing, Compliance), then a screenshot test of key pages in both themes. Please look at light mode and tell me any page where something is hard to read.",
+    "detail": "Findings: every box has the same weight, numbers are not formatted or colored, labels are tiny uppercase grey, 12 pill tabs on Net income, long paragraphs above every page, blank boxes while loading, few charts, an 80-link sidebar, a crowded phone top bar.",
+    "added": "2026-11-18"
+  },
+  {
+    "key": "api-workers",
+    "title": "Run the A.C.O.R.N API with more than one worker so one slow request does not stall every page",
+    "area": "Platform",
     "status": "not_started",
     "needs": "signoff",
-    "note": "Full review done: every sidebar page, the settings hub and every tab, filter and period button on them: docs/UI_REVIEW_2026-11-18.md (findings) and docs/UI_MODERNIZATION_PLAN.md (plan). Bugs to fix first: the sidebar prefetches all 80 pages (6,000+ requests per page load), the client list (6.6 s) blocks every Compliance and finance page, about 25 pages show no skeleton or empty message, nine pages scroll sideways, Investigate duplicates Hunt, Attack Graph shows an error, and three pages are 20,000 to 170,000 characters long. Decisions: go ahead with the bug fixes now (small, no look change) and then the design system and Net income? Light theme or dark only? OK to add one chart library? Reply 'go' to start.",
-    "detail": "Findings: every box has the same weight, numbers are not formatted or colored, labels are tiny uppercase grey, 12 pill tabs on Net income, long paragraphs above every page, blank boxes while loading, few charts, an 80-link sidebar, a crowded phone top bar.",
+    "note": "Found while reviewing the pages: the API runs as ONE process (python -m app.scripts.serve starts one uvicorn) and was at 100% CPU while CORE's feed posts took 5 to 34 s each, so every page's API calls took about 6 s. The VM has 4 CPUs. Proposal: start uvicorn with 3 workers (it supports a shared socket), after checking the places that keep state in the process (worker heartbeat, in-memory caches) and with the deploy script's health check as the safety net; and make the heaviest feed posts (identities, devices, vulnerabilities) do their database work in smaller batches. Reply 'go' to do it, or say 'later'.",
+    "detail": "Evidence: API log slow_request lines for POST /inbox/core-feed/{token}/... of 4.9 to 34 s; docker stats aisoc-api 104% CPU; page API calls 5 to 6.8 s while health answers in 0.1 ms locally.",
     "added": "2026-11-18"
   }
 ]

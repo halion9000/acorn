@@ -21,7 +21,7 @@ export function StaffMetricsView() {
   const [team, setTeam] = useState('');
   const { data, denied, problem } = useMetric<StaffMetricsData>(`/api/v1/reports/metrics/staff-metrics?months=${months}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
   return (
-    <Page title="Staff metrics" subtitle="Weekly team metrics: utilization by week, tickets closed by week and utilization by team member." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Staff metrics" subtitle="Weekly team metrics: utilization by week, tickets closed by week and utilization by team member." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Team
@@ -63,7 +63,7 @@ export function PodsView() {
   const [months, setMonths] = useState(3);
   const { data, denied, problem } = useMetric<PodsData>(`/api/v1/reports/metrics/pods?months=${months}`);
   return (
-    <Page title="Metrics by pod" subtitle="Each pod's engineers, average utilization, tickets resolved and created, days off and holidays." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Metrics by pod" subtitle="Each pod's engineers, average utilization, tickets resolved and created, days off and holidays." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
@@ -101,7 +101,7 @@ export function TicketUpdatesView() {
   const query = (picked ?? []).map((m) => `&members=${encodeURIComponent(m)}`).join('');
   const { data, denied, problem } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?months=${months}${query}`);
   return (
-    <Page title="Ticket updates by team member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Ticket updates by team member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
@@ -139,7 +139,7 @@ export function DialpadView() {
   const [engineer, setEngineer] = useState('');
   const { data, denied, problem } = useMetric<DialpadData>(`/api/v1/reports/metrics/dialpad?months=${months}${engineer ? `&engineer=${encodeURIComponent(engineer)}` : ''}`);
   return (
-    <Page title="DialPad metrics" subtitle="Calls and time on the phone, from Dialpad." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the Dialpad call facts" />}>
+    <Page title="DialPad metrics" subtitle="Calls and time on the phone, from Dialpad." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Dialpad call facts" />}>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Engineer
@@ -182,7 +182,7 @@ export function StaffHoursView() {
   const [months, setMonths] = useState(3);
   const { data, denied, problem } = useMetric<HoursData>(`/api/v1/reports/metrics/staff-hours?months=${months}`);
   return (
-    <Page title="Staff hours distribution" subtitle="Where each person's hours went, by ticket type. Hours only." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the HaloPSA hours" />}>
+    <Page title="Staff hours distribution" subtitle="Where each person's hours went, by ticket type. Hours only." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the HaloPSA hours" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
@@ -220,7 +220,7 @@ export function ScorecardView() {
   const { data, denied, problem } = useMetric<ScoreData>(`/api/v1/reports/metrics/scorecard?months=${months}${member ? `&member=${encodeURIComponent(member)}` : ''}`);
   const d = data?.detail;
   return (
-    <Page title="Service desk scorecard" subtitle="A score from 1 to 5 each week from tickets closed and updated, labor hours, calls, call time, customer satisfaction and utilization, weighted, with a grade." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
+    <Page title="Service desk scorecard" subtitle="A score from 1 to 5 each week from tickets closed and updated, labor hours, calls, call time, customer satisfaction and utilization, weighted, with a grade." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <Periods value={months} onChange={setMonths} options={[1, 2, 3, 6, 12]} />
       {data?.received_at && (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">

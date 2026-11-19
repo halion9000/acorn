@@ -1,0 +1,22 @@
+/* Shared interface rules (design system, Phase 1). */
+
+/* Figures line up in columns and do not jump as values change. */
+td, th, .tabular-nums, [data-testid="stat-value"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A visible keyboard focus on everything that can be pressed, in both themes. */
+:where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* No motion for people who ask for none. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

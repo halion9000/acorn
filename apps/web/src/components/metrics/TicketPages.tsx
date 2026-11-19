@@ -19,7 +19,7 @@ export function TicketResolutionView() {
   const [months, setMonths] = useState(12);
   const { data, denied, problem } = useMetric<ResolutionData>(`/api/v1/reports/metrics/ticket-resolution?months=${months}`);
   return (
-    <Page title="Ticket resolution time" subtitle="Tickets resolved by each team member each month, and how long tickets take to resolve for each client." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
+    <Page title="Ticket resolution time" subtitle="Tickets resolved by each team member each month, and how long tickets take to resolve for each client." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
       <Periods value={months} onChange={setMonths} options={LONG_PERIODS} />
       {data?.received_at && (
         <>
@@ -59,7 +59,7 @@ export function TicketVolumeView() {
     </Panel>
   );
   return (
-    <Page title="Ticket volume analysis" subtitle="Where tickets come from: by type, category, month and client, the priority mix, and tickets that have been open too long." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
+    <Page title="Ticket volume analysis" subtitle="Where tickets come from: by type, category, month and client, the priority mix, and tickets that have been open too long." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
       <Periods value={months} onChange={setMonths} options={LONG_PERIODS} />
       {data?.received_at && (
         <>
@@ -113,7 +113,7 @@ export function MonthlyInvoicingView() {
   const [months, setMonths] = useState(12);
   const { data, denied, problem } = useMetric<InvoicingData>(`/api/v1/reports/metrics/monthly-invoicing?months=${months}`);
   return (
-    <Page title="Monthly invoicing analysis" subtitle="What was billed, by month, by billing category and by client and invoice line. Amounts before tax." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the invoiced lines" />}>
+    <Page title="Monthly invoicing analysis" subtitle="What was billed, by month, by billing category and by client and invoice line. Amounts before tax." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the invoiced lines" />}>
       <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>

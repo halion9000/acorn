@@ -42,7 +42,7 @@ export function CustomerExperienceView() {
   const cells = (b: Bucket): string[] => [num(b.responses), pctText(b.csat), String(b.positive), String(b.neutral), String(b.negative), pctText(b.neutral_percent), pctText(b.negative_percent)];
   const head = ['Responses', 'CSAT', 'Positive', 'Neutral', 'Negative', 'Neutral %', 'Negative %'];
   return (
-    <Page title="Customer experience" subtitle="How customers rate the help they got, from SimpleSat surveys." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the SimpleSat summary" />}>
+    <Page title="Customer experience" subtitle="How customers rate the help they got, from SimpleSat surveys." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the SimpleSat summary" />}>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Filter by
@@ -111,7 +111,7 @@ export function MonthlyLicensingView() {
   const { data, denied, problem } = useMetric<LicensingData>(`/api/v1/reports/metrics/monthly-licensing?month=${month}`);
   const shown = (data?.items ?? []).filter((i) => !hidden.has(i.key));
   return (
-    <Page title="Monthly licensing" subtitle="What each client had of each license and counted item, as of the end of the month chosen (this month is what is counted now)." denied={denied} problem={problem} empty={null}>
+    <Page title="Monthly licensing" subtitle="What each client had of each license and counted item, as of the end of the month chosen (this month is what is counted now)." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={null}>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Month
@@ -160,7 +160,7 @@ export function UserRolesView() {
   const { data, denied, problem } = useMetric<RolesData>('/api/v1/reports/metrics/user-roles');
   const shown = (data?.roles ?? []).filter((r) => !hidden.has(r.role));
   return (
-    <Page title="User roles" subtitle="How many people hold each Microsoft 365 administrator role at each client, and who." denied={denied} problem={problem} empty={<NothingYet show={data?.received_at === null} what="the Microsoft 365 roles" />}>
+    <Page title="User roles" subtitle="How many people hold each Microsoft 365 administrator role at each client, and who." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Microsoft 365 roles" />}>
       {data?.received_at && (
         <>
           <MetricPicker

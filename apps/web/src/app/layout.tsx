@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
+import './light-theme.css';
+import './ui.css';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { themeBootstrapScript } from '@/components/theme/themeScript';
 import { docs } from '@/lib/docs';

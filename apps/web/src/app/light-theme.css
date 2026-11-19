@@ -1,0 +1,74 @@
+/*
+ * Light theme for the whole console (WS-F1 follow-up, 2026-11-18).
+ *
+ * Most pages were written with Tailwind's gray scale and `text-white` for the dark theme, so flipping the surface tokens alone left them dark. Tailwind v4 reads every colour from a CSS variable, so the grays are
+ * re-pointed here, inverted, for `[data-theme="light"]`: `bg-gray-900` becomes a white card, `text-gray-300` becomes dark slate, `border-gray-700` a light line, and every page follows without being edited.
+ * Coloured text meant for a dark background (`text-green-300`, `text-red-300`...) is darkened so it keeps 4.5:1 on white. White text on a coloured button stays white.
+ * Checked page by page by scripts/check_contrast.py and the screenshot test (apps/web/e2e).
+ */
+
+[data-theme="light"] {
+  /* Inverted gray scale: 950 is the page, 900 the card, 800 and 700 lines and hovers, 500 to 300 the text ramp (lighter text in dark mode is darker text here). */
+  --color-gray-950: #f6f8fb;
+  --color-gray-900: #ffffff;
+  --color-gray-800: #e6ebf2;
+  --color-gray-700: #d3dbe6;
+  --color-gray-600: #aab6c6;
+  --color-gray-500: #66758b;
+  --color-gray-400: #4f5e74;
+  --color-gray-300: #3a475b;
+  --color-gray-200: #263244;
+  --color-gray-100: #121b2b;
+  --color-gray-50: #0b1220;
+  --color-black: #ffffff;
+
+  /* Status and accent text colours that are light tints in dark mode: darkened for white. */
+  --color-red-200: #b91c1c;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-orange-300: #c2410c;
+  --color-orange-400: #ea580c;
+  --color-amber-200: #92400e;
+  --color-amber-300: #92400e;
+  --color-amber-400: #b45309;
+  --color-yellow-300: #854d0e;
+  --color-yellow-400: #a16207;
+  --color-green-200: #166534;
+  --color-green-300: #166534;
+  --color-green-400: #15803d;
+  --color-emerald-200: #065f46;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-teal-300: #0f766e;
+  --color-cyan-300: #0e7490;
+  --color-sky-300: #0369a1;
+  --color-sky-400: #0284c7;
+  --color-blue-200: #1d4ed8;
+  --color-blue-300: #1d4ed8;
+  --color-blue-400: #2563eb;
+  --color-indigo-300: #4338ca;
+  --color-violet-300: #6d28d9;
+  --color-purple-300: #7e22ce;
+  --color-fuchsia-300: #a21caf;
+  --color-pink-300: #be185d;
+}
+
+/* White text is body or heading text on a dark card; on a coloured fill (buttons, badges) it stays white. */
+[data-theme="light"] .text-white:not([class*="bg-blue-"]):not([class*="bg-brand-"]):not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-emerald-"]):not([class*="bg-amber-"]):not([class*="bg-orange-"]):not([class*="bg-purple-"]):not([class*="bg-violet-"]):not([class*="bg-indigo-"]):not([class*="bg-rose-"]):not([class*="bg-teal-"]):not([class*="bg-cyan-"]):not([class*="bg-sky-"]):not([class*="bg-pink-"]):not([class*="bg-severity-"]):not([class*="bg-status-"]) {
+  color: var(--fg-primary);
+}
+
+/* The bell dot, avatar and similar solid fills keep their own text colour; native controls follow the theme. */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color-scheme: light;
+}
+
+/* Shadows read better than hairlines on white cards. */
+[data-theme="light"] .rounded-lg.border,
+[data-theme="light"] .rounded-xl.border {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}

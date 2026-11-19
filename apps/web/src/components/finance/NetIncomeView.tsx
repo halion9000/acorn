@@ -15,6 +15,8 @@ import { HistoryPanel, PnlPanel, QboProfitPanel } from './QboSections';
 import { ClientSummaryPanel } from './ClientSummaryPanel';
 import { ForecastPanel } from './ForecastPanel';
 import { CostTransactionsPanel } from './CostTransactionsPanel';
+import { BarCell, PageHeader, StatCard } from '@/components/ui/kit';
+import { marginTone } from '@/components/ui/format';
 
 export interface FullRow {
   client_key: string;
@@ -144,6 +146,12 @@ export function parseMasterCsv(text: string): { client_name: string; industry: s
 }
 
 type Tab = 'net' | 'new' | 'industry' | 'hours' | 'rank' | 'summary' | 'pnl' | 'qbo' | 'history' | 'travel' | 'hardware' | 'forecast' | 'inputs';
+const TAB_GROUPS: { label: string; tabs: Tab[] }[] = [
+  { label: 'Profitability', tabs: ['net', 'new', 'industry', 'rank', 'summary'] },
+  { label: 'Books', tabs: ['pnl', 'qbo', 'history', 'travel', 'hardware', 'forecast'] },
+  { label: 'Workforce', tabs: ['hours'] },
+  { label: 'Setup', tabs: ['inputs'] },
+];
 const TABS: [Tab, string][] = [
   ['net', 'Revenue to net income'],
   ['new', 'New clients'],
@@ -226,12 +234,15 @@ export function NetIncomeView() {
   const report = data?.report ?? null;
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Net income</h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Each client from revenue to net income, after finance&apos;s workbook. Revenue and hours come from HaloPSA about once a day; the company-wide cost lines come from QuickBooks (read only) about once a day, and anything you type on the Inputs tab for a client is added on top. A typed company-wide line is not used for a month and category QuickBooks has filled.
-        </p>
-      </div>
+      <PageHeader
+        title="Net income"
+        subtitle="Each client from revenue to net income, by month."
+        about={
+          <p>
+            Each client from revenue to net income, after finance&apos;s workbook. Revenue and hours come from HaloPSA about once a day; the company-wide cost lines come from QuickBooks (read only) about once a day, and anything you type on the Inputs tab for a client is added on top. A typed company-wide line is not used for a month and category QuickBooks has filled.
+          </p>
+        }
+      />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       {data && data.received_at === null && (
         <p className="text-sm text-gray-400" data-testid="net-empty">
@@ -251,11 +262,23 @@ export function NetIncomeView() {
             </select>
           </label>
         )}
-        <div className="flex flex-wrap gap-1" role="tablist">
-          {TABS.map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`rounded px-2.5 py-1 text-xs ${tab === id ? 'bg-blue-600 text-white' : 'border border-gray-700 text-gray-300 hover:bg-gray-800'}`}>
-              {label}
-            </button>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist" data-testid="net-tabs">
+          {TAB_GROUPS.map((g) => (
+            <div key={g.label} className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-xs font-medium text-gray-500">{g.label}</span>
+              {g.tabs.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={`rounded-md px-2.5 py-1 text-sm transition ${tab === id ? 'bg-blue-600 font-medium text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+                >
+                  {TABS.find(([x]) => x === id)?.[1]}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>
@@ -270,11 +293,17 @@ export function NetIncomeView() {
               No client could carry: {Object.entries(report.unplaced).map(([c, v]) => `${CATEGORY_LABELS[c] ?? c} ${money(v)}`).join(', ')}.
             </p>
           )}
-          <div className="overflow-x-auto rounded-lg border border-gray-800">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="net-cards">
+            <StatCard label="Revenue" value={money(report.totals.revenue as number)} note={`${report.rows.length} clients`} />
+            <StatCard label="Gross profit" value={money(report.totals.gross_profit as number)} note={pct(report.totals.gross_margin as number | null) + ' margin'} />
+            <StatCard label="Net income" value={money(report.totals.net_income as number)} note={pct(report.totals.net_margin as number | null) + ' margin'} />
+            <StatCard label="Clients under a 20% net margin" value={String(report.rows.filter((r) => r.net_margin !== null && r.net_margin < 20).length)} note="of the clients with revenue" />
+          </div>
+          <div className="max-h-[70vh] overflow-auto rounded-lg border border-gray-800">
             <table className="w-full text-sm" data-testid="net-table">
-              <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
+              <thead className="sticky top-0 z-10 bg-gray-900 text-xs text-gray-400">
                 <tr>
-                  <SortHeader label="Client" field="client_name" sort={netSort} onSort={setNetSort} text className="px-3 py-2 text-left" />
+                  <SortHeader label="Client" field="client_name" sort={netSort} onSort={setNetSort} text className="sticky left-0 bg-gray-900 px-3 py-2 text-left" />
                   {(
                     [['Revenue', 'revenue'], ['Direct labor', 'direct_labor'], ['True-up', 'labor_trueup'], ['Add-on sw', 'addon_software'], ['Support sw', 'support_software'], ['Travel', 'travel'], ['Equipment', 'equipment'], ['Gross profit', 'gross_profit'], ['Gross %', 'gross_margin'], ['Sales/mktg', 'sales_marketing'], ['Overhead', 'overhead'], ['Net income', 'net_income'], ['Net %', 'net_margin']] as const
                   ).map(([h, f]) => (
@@ -285,7 +314,7 @@ export function NetIncomeView() {
               <tbody className="divide-y divide-gray-800 text-gray-200">
                 {ordered(report.rows, netSort).map((r) => (
                   <tr key={r.client_key}>
-                    <td className="px-3 py-1.5 text-left">
+                    <td className="sticky left-0 bg-gray-900 px-3 py-1.5 text-left">
                       {r.client_name}
                       {r.new_client && <span className="ml-2 rounded bg-emerald-900/50 px-1.5 text-xs text-emerald-200">new</span>}
                     </td>
@@ -297,17 +326,21 @@ export function NetIncomeView() {
                     <td className={td}>{money(r.travel)}</td>
                     <td className={td}>{money(r.equipment)}</td>
                     <td className={td}>{money(r.gross_profit)}</td>
-                    <td className={td}>{pct(r.gross_margin)}</td>
+                    <td className={td}>
+                      <BarCell value={r.gross_margin} max={100} text={pct(r.gross_margin)} tone={marginTone(r.gross_margin, 60, 40)} />
+                    </td>
                     <td className={td}>{money(r.sales_marketing)}</td>
                     <td className={td}>{money(r.overhead)}</td>
                     <td className={`${td} font-medium ${r.net_income < 0 ? 'text-red-300' : 'text-white'}`}>{money(r.net_income)}</td>
-                    <td className={td}>{pct(r.net_margin)}</td>
+                    <td className={td}>
+                      <BarCell value={r.net_margin} max={100} text={pct(r.net_margin)} tone={marginTone(r.net_margin)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-gray-700 text-gray-100">
+              <tfoot className="sticky bottom-0 border-t border-gray-700 bg-gray-900 text-gray-100">
                 <tr>
-                  <td className="px-3 py-2 text-left font-medium">Total</td>
+                  <td className="sticky left-0 bg-gray-900 px-3 py-2 text-left font-medium">Total</td>
                   {(['revenue', 'direct_labor', 'labor_trueup', 'addon_software', 'support_software', 'travel', 'equipment', 'gross_profit'] as const).map((k) => (
                     <td key={k} className={td}>{money(report.totals[k] as number)}</td>
                   ))}

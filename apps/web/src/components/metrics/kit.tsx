@@ -7,6 +7,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader, Segmented, SkeletonRows, StatCard } from '@/components/ui/kit';
 
 export interface MetricState<T> {
   data: T | null;
@@ -60,17 +61,27 @@ export function barWidth(value: number, max: number): number {
 const pill = (on: boolean) => `rounded border px-2.5 py-1 text-xs ${on ? 'border-blue-500 bg-blue-500/20 text-blue-200' : 'border-gray-700 text-gray-300 hover:bg-gray-800'}`;
 export const selectClass = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
 
-export function Page({ title, subtitle, denied, problem, empty, children }: { title: string; subtitle: string; denied: boolean; problem: string | null; empty: ReactNode; children: ReactNode }) {
+export function Page({ title, subtitle, denied, problem, empty, loading, children }: { title: string; subtitle: string; denied: boolean; problem: string | null; empty: ReactNode; loading?: boolean; children: ReactNode }) {
   if (denied) return <p className="p-6 text-sm text-amber-300">{title} needs the metrics permission. Ask the owner to add it to your role.</p>;
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
-        <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
-      </div>
+      <PageHeader title={title} subtitle={subtitle} />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
-      {empty}
-      {children}
+      {loading && !problem ? (
+        <div className="space-y-4" data-testid="metrics-loading">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((n) => (
+              <StatCard key={n} label="" value="" loading />
+            ))}
+          </div>
+          <SkeletonRows rows={5} cols={4} />
+        </div>
+      ) : (
+        <>
+          {empty}
+          {children}
+        </>
+      )}
     </div>
   );
 }
@@ -85,21 +96,13 @@ export function NothingYet({ show, what }: { show: boolean; what: string }) {
 }
 
 export function Periods({ value, onChange, options = PERIODS }: { value: number; onChange: (n: number) => void; options?: readonly number[] }) {
-  return (
-    <div role="group" aria-label="Period" className="flex flex-wrap gap-1">
-      {options.map((p) => (
-        <button key={p} type="button" aria-pressed={value === p} className={pill(value === p)} onClick={() => onChange(p)}>
-          {p === 1 ? 'Last month' : `Last ${p} months`}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented label="Period" value={value} onChange={onChange} options={options.map((p) => ({ value: p, label: p === 1 ? 'Last month' : `Last ${p} months` }))} />;
 }
 
 export function Panel({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
   return (
-    <section className="rounded-lg border border-gray-700 bg-gray-800 p-3" data-testid={testId}>
-      <h2 className="mb-2 text-sm font-semibold text-white">{title}</h2>
+    <section className="rounded-xl border border-gray-800 bg-gray-900 p-4" data-testid={testId}>
+      <h2 className="mb-3 text-sm font-semibold text-white">{title}</h2>
       {children}
     </section>
   );
@@ -109,10 +112,7 @@ export function Cards({ items }: { items: [string, string][] }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="cards">
       {items.map(([label, value]) => (
-        <div key={label} className="rounded-lg border border-gray-700 bg-gray-800 p-3">
-          <p className="text-xl font-semibold text-white">{value}</p>
-          <p className="text-xs text-gray-400">{label}</p>
-        </div>
+        <StatCard key={label} label={label} value={value} />
       ))}
     </div>
   );

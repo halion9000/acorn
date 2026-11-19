@@ -262,6 +262,7 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 
 
 export { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY } from './auth-session';
+import { createSwrCache } from './swrCache';
 import { AUTH_TOKEN_KEY, AUTH_REFRESH_KEY, AUTH_USER_KEY, authFetch, clearSession, establishSession, isSignedIn } from './auth-session';
 import { rangeToInstants, type AlertDateRange } from './alert-date-range';
 import { getViewedTenantId, homeTenantId, setViewedTenantId, VIEW_AS_ERROR_HEADER } from './tenant-view';
@@ -353,6 +354,7 @@ export const authApi = {
   },
 
   logout(): void {
+    clearChildrenCache();
     if (typeof window === 'undefined') return;
     clearSession();
   },
@@ -1435,10 +1437,19 @@ export function sortClientsByName<T extends { name: string }>(clients: T[]): T[]
   return [...clients].sort((x, y) => x.name.localeCompare(y.name, undefined, { sensitivity: 'base', numeric: true }));
 }
 
+// The client list answers slowly (6.6 s measured with 400 clients) and every Compliance, finance and metrics page waits for it, so it is kept for two minutes and, across page loads in one browser session, served at once while a
+// fresh copy is read in the background (see swrCache.ts). Sign-out and any change to the clients clear it.
+const childrenCache = createSwrCache<ChildTenant[]>(async () => sortClientsByName(await request<ChildTenant[]>('/api/v1/mssp/children')), {
+  key: 'acorn.children.v1',
+  ttlMs: 2 * 60 * 1000,
+  storage: typeof window !== 'undefined' ? window.sessionStorage : null,
+});
+export const clearChildrenCache = (): void => childrenCache.clear();
+
 export const msspApi = {
   async listChildren(): Promise<ChildTenant[]> {
     // Every client list in the console comes from here, so it is sorted once: by name, ignoring case, numbers in their natural order.
-    return sortClientsByName(await request<ChildTenant[]>('/api/v1/mssp/children'));
+    return childrenCache.get();
   },
   async overview(): Promise<MsspOverview> {
     return request<MsspOverview>('/api/v1/mssp/overview');
