@@ -167,3 +167,27 @@ async def test_a_send_that_cannot_go_is_not_marked_as_run_so_the_next_pass_tries
     mailer = FakeMailer()
     await worker.send_once(now=now + timedelta(hours=1), factory=factory, mailer=mailer)
     assert len(mailer.sent) == 1
+
+
+def vuln(client, cve, severity, days_ago, devices=1, exploited=False, software="Chrome"):
+    now = U(2026, 11, 18, 9)
+    return {"client": client, "cve": cve, "software": software, "severity": severity, "devices": devices, "exploited": exploited, "first_seen": now - timedelta(days=days_ago)}
+
+
+def test_the_new_vulnerabilities_report_lists_only_the_last_week_worst_first_and_cuts_a_long_list():
+    now = U(2026, 11, 18, 9)
+    out = rs.new_vulnerabilities_text(
+        [vuln("Acme", "CVE-1", "medium", 2), vuln("Birch", "CVE-2", "critical", 1, devices=3, exploited=True), vuln("Acme", "CVE-3", "critical", 20), vuln("Acme", "CVE-4", "high", 6), vuln("", "CVE-5", "critical", 3)],
+        now,
+    )
+    assert out is not None
+    subject, body = out
+    assert subject == "4 new vulnerabilities in the last 7 days"
+    lines = [x for x in body.split("\n") if x.startswith("- ")]
+    assert lines[0].startswith("- Birch: CVE-2 (critical, exploited) in Chrome, 3 devices"), "critical and exploited first"
+    assert lines[1].startswith("- Live Oak: CVE-5 (critical)") and "CVE-3" not in body, "an older one is not new"
+    assert lines[-1].startswith("- Acme: CVE-1 (medium)")
+    many = rs.new_vulnerabilities_text([vuln("A", f"CVE-{i}", "low", 1) for i in range(70)], now)
+    assert many is not None and "...and 10 more" in many[1] and many[0].startswith("70 new vulnerabilities")
+    assert rs.new_vulnerabilities_text([vuln("A", "CVE-1", "low", 30)], now) is None
+    assert rs.new_vulnerabilities_text([vuln("A", "CVE-1", "low", 1)], now)[0] == "1 new vulnerability in the last 7 days"

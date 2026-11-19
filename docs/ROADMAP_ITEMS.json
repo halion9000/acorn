@@ -1432,10 +1432,10 @@
     "key": "r7-cf-15",
     "title": "ThreatMate: weekly change report (new exposed services and vulnerabilities)",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: ThreatMate weekly change report; A.C.O.R.N starts keeping a weekly copy now. Approved: I build it (Hal does not need to act)."
+    "note": "Built a simpler way than a weekly copy: A.C.O.R.N already records when each vulnerability was first seen, so the weekly change report is a scheduled report 'New vulnerabilities in the last 7 days (all clients)' (Reports > Executive digest > Scheduled reports; pick it, set Monday and who gets it). It lists new ones by client, worst first. It does not list ones that went away (A.C.O.R.N keeps only what is open now) and does not cover exposed services. Question: is that enough, or do you also want exposed services and fixed ones (that needs A.C.O.R.N to start keeping a weekly copy, so the first full report is a week away)? NOT seen live."
   },
   {
     "key": "r7-cf-16",

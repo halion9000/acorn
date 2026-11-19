@@ -7,6 +7,7 @@ here. Sending needs the mail credentials; a report with nothing to say is not se
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
@@ -86,7 +87,47 @@ async def _open_audit_requests(db: Any, tenant: uuid.UUID, now: datetime) -> tup
     return f"Open audit requests: {len(lines)}", "\n".join([f"{len(lines)} audit request{'s' if len(lines) != 1 else ''} still open:"] + [x[2] for x in lines[:200]])
 
 
+SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+MAX_VULN_LINES = 60
+
+
+def new_vulnerabilities_text(rows: list[dict[str, Any]], now: datetime, days: int = 7) -> tuple[str, str] | None:
+    """The vulnerabilities first seen in the last ``days`` days, by client, worst first (pure). Each row has ``client``, ``cve``, ``software``, ``severity``, ``devices``, ``exploited`` and ``first_seen``.
+    None when there are none. Vulnerabilities that went away are not listed: A.C.O.R.N keeps only what is open now, so a fixed one leaves no trace to compare."""
+    since = now - timedelta(days=days)
+    fresh = [r for r in rows if r["first_seen"] >= since]
+    if not fresh:
+        return None
+    fresh.sort(key=lambda r: (SEVERITY_ORDER.get(str(r["severity"]).lower(), 9), not r.get("exploited"), str(r["client"]).lower(), str(r["cve"])))
+    lines = [
+        f"- {r['client'] or 'Live Oak'}: {r['cve']} ({str(r['severity']).lower()}{', exploited' if r.get('exploited') else ''}) in {r['software']}, {r['devices']} device{'' if r['devices'] == 1 else 's'}"
+        for r in fresh[:MAX_VULN_LINES]
+    ]
+    more = f"\n...and {len(fresh) - MAX_VULN_LINES} more" if len(fresh) > MAX_VULN_LINES else ""
+    n = len(fresh)
+    return f"{n} new vulnerabilit{'y' if n == 1 else 'ies'} in the last {days} days", f"{n} vulnerabilit{'y' if n == 1 else 'ies'} first seen in the last {days} days:\n" + "\n".join(lines) + more
+
+
+async def _new_vulnerabilities(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from app.db.rls_scope import acting_as_tenant  # noqa: PLC0415
+    from app.models.client_vulnerability import ClientVulnerability  # noqa: PLC0415
+    from app.models.tenant import Tenant  # noqa: PLC0415
+
+    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == tenant))).all()}
+    rows: list[dict[str, Any]] = []
+    since = now - timedelta(days=7)
+    for tid in [tenant, *names]:
+        async with contextlib.nullcontext() if tid == tenant else acting_as_tenant(db, tid):
+            found = (await db.execute(select(ClientVulnerability).where(ClientVulnerability.tenant_id == tid, ClientVulnerability.first_seen >= since))).scalars().all()
+        rows += [
+            {"client": names.get(tid) or "", "cve": v.cve_id, "software": v.software, "severity": v.severity, "devices": v.devices, "exploited": v.exploited, "first_seen": v.first_seen}
+            for v in found
+        ]
+    return new_vulnerabilities_text(rows, now)
+
+
 KINDS: dict[str, tuple[str, Renderer]] = {
+    "new_vulnerabilities": ("New vulnerabilities in the last 7 days (all clients)", _new_vulnerabilities),
     "compliance_actions": ("Compliance action items (what needs doing now)", _compliance_actions),
     "open_audit_requests": ("Open audit requests with due dates", _open_audit_requests),
 }
