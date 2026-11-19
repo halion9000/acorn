@@ -78,7 +78,7 @@ class WasteReport(BaseModel):
 @router.get(
     "/licence-waste",
     response_model=WasteReport,
-    summary="Licences bought but not assigned to anyone, per client and licence (quantities, never prices)",
+    summary="Licenses bought but not assigned to anyone, per client and license (quantities, never prices)",
 )
 async def licence_waste(
     current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
@@ -101,7 +101,7 @@ async def licence_waste(
     )
 
 
-@router.get("/licence-waste.csv", summary="The unassigned licences as a CSV file (quantities, never prices)")
+@router.get("/licence-waste.csv", summary="The unassigned licenses as a CSV file (quantities, never prices)")
 async def licence_waste_csv(
     current_user: Annotated[AuthUser, Depends(require_permission("billing:view"))],
     db: DBSession,
@@ -113,7 +113,7 @@ async def licence_waste_csv(
     ids, names = await _scope(db, current_user.tenant_id, None)
     rows = waste_rows(await _all_count_rows(db, ids[1:]), names, datetime.now(UTC), minimum)
     return Response(
-        content=waste_csv(rows), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="licence-waste.csv"'}
+        content=waste_csv(rows), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="license-waste.csv"'}
     )
 
 

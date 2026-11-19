@@ -51,7 +51,7 @@ def test_when_the_cleaner_is_off_or_only_counting_nothing_that_it_would_delete_i
             "Copilot conversations",
             "Detection suggestions",
             "Finished response actions",
-            "Check and count history (security checks, licence counts, scores)",
+            "Check and count history (security checks, license counts, scores)",
         ):
             assert words in by(lines, what)["ends"], (what, over)
 
@@ -60,7 +60,7 @@ def test_things_nothing_deletes_say_so():
     lines = retention_lines(settings())
     for what in ("Cases and investigations", "Audit trail"):
         assert "deleted by hand" in by(lines, what)["kept"]
-    assert by(lines, "Check and count history (security checks, licence counts, scores)")["kept"] == "Kept for ever"
+    assert by(lines, "Check and count history (security checks, license counts, scores)")["kept"] == "Kept for ever"
 
 
 def test_the_route_needs_alerts_read():

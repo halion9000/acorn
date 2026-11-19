@@ -118,7 +118,7 @@ def test_the_csv_lists_quantities_only_and_a_name_that_starts_with_equals_is_mad
 
     rows = waste_rows([count(A, "Business Premium", 50, 5, days=9), count(B, "=E3", 20, 12)], {A: "Acme", B: "=Zed"}, NOW)
     table = list(csv.reader(io.StringIO(waste_csv(rows))))
-    assert table[0] == ["Client", "Tool", "Licence", "Bought", "Unassigned", "Percent unassigned", "Number is old"]
+    assert table[0] == ["Client", "Tool", "License", "Bought", "Unassigned", "Percent unassigned", "Number is old"]
     assert table[1] == ["'=Zed", "m365", "'=E3", "20", "12", "60", "no"]
     assert table[2] == ["Acme", "m365", "Business Premium", "50", "5", "10", "yes"]
     assert not any("price" in h.lower() or "cost" in h.lower() for h in table[0]), "quantities, never prices"

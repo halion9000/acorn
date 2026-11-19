@@ -58,7 +58,7 @@ def waste_csv(rows: list[WasteRow]) -> str:
 
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(["Client", "Tool", "Licence", "Bought", "Unassigned", "Percent unassigned", "Number is old"])
+    writer.writerow(["Client", "Tool", "License", "Bought", "Unassigned", "Percent unassigned", "Number is old"])
     for r in rows:
         writer.writerow(
             [csv_cell(r.client_name), csv_cell(r.source), csv_cell(r.item), r.bought, r.unassigned, r.percent, "yes" if r.stale else "no"]

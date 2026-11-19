@@ -298,9 +298,9 @@ ENTRIES: dict[str, tuple[str, list[str], list[str]]] = {
         ],
     ),
     "PR.IR-04": (
-        "You keep enough computing, storage, network and licence capacity so services stay available as demand changes.",
+        "You keep enough computing, storage, network and license capacity so services stay available as demand changes.",
         [
-            "Monitoring of disk, memory, processor, bandwidth and licence usage",
+            "Monitoring of disk, memory, processor, bandwidth and license usage",
             "Alerts when usage nears set limits",
             "Capacity reviewed regularly and planned ahead of growth",
             "Protection against traffic floods that could exhaust capacity",

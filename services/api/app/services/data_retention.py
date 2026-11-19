@@ -49,7 +49,7 @@ def retention_lines(settings: Any) -> list[dict[str, str]]:
         ),
         line("Cases and investigations", "Kept until deleted by hand", "Nothing deletes cases automatically."),
         line(
-            "Check and count history (security checks, licence counts, scores)",
+            "Check and count history (security checks, license counts, scores)",
             "Kept for ever" if posture_days <= 0 else f"{_days(posture_days)}",
             "The current checks and counts are never deleted; only the history of how they changed is." + sweeper_note
             if posture_days > 0

@@ -817,7 +817,7 @@ export function LicenceWaste() {
     try {
       const res = await authFetch("/api/v1/billing/licence-waste.csv");
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      download("licence-waste.csv", await res.text());
+      download("license-waste.csv", await res.text());
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Could not export.");
     }

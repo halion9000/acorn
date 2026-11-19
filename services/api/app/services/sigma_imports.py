@@ -42,7 +42,7 @@ def entry_for(raw_text: str, rel_path: str) -> dict[str, Any] | None:
     prov = doc.get("provenance") if isinstance(doc.get("provenance"), dict) else {}
     author = str(prov.get("source") or "SigmaHQ/sigma")
     if prov.get("license"):
-        author = f"{author} (licence {prov['license']})"
+        author = f"{author} (license {prov['license']})"
     return {
         "id": rule_id.strip(),
         "name": name.strip()[:255],
