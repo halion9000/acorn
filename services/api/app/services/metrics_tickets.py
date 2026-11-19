@@ -16,6 +16,7 @@ A period counts whole weeks (or months) back from the newest one in the data; a 
 from __future__ import annotations
 
 from typing import Any
+from app.services.month_window import pick_months
 
 from app.services.metrics_staff import recent_weeks
 
@@ -68,6 +69,37 @@ def ticket_resolution(detail: dict[str, Any] | None, staff: dict[str, Any] | Non
             if sum(v.values()) > 0
         ],
         "resolution_by_client": by_client,
+    }
+
+
+def resolution_from_report(resolution: dict[str, Any] | None, months: int) -> dict[str, Any] | None:
+    """The Ticket Resolution page from the statistics CORE read through the HaloPSA report call (the Rewst way), or None when CORE has not sent them (then the older weekly facts are used).
+
+    Resolved tickets per team member per month, and the hours from opened to closed added up per client per month, both counted by the month a ticket was opened, for the months chosen (the newest ``months``
+    or a custom range). People and clients are listed biggest total first, with the months they have nothing in as zero.
+    """
+    if not resolution:
+        return None
+    all_months = sorted({str(r["month"]) for r in resolution.get("agents") or []} | {str(r["month"]) for r in resolution.get("clients") or []})
+    chosen = pick_months(all_months, months)
+    want = set(chosen)
+    people: dict[str, dict[str, int]] = {}
+    for r in resolution.get("agents") or []:
+        if str(r["month"]) in want:
+            row = people.setdefault(str(r["agent_name"]), {})
+            row[str(r["month"])] = row.get(str(r["month"]), 0) + int(r["n"])
+    clients: dict[str, dict[str, float]] = {}
+    for r in resolution.get("clients") or []:
+        if str(r["month"]) in want:
+            row = clients.setdefault(str(r["client"]), {})
+            row[str(r["month"])] = round(row.get(str(r["month"]), 0.0) + float(r["hours"]), 1)
+    return {
+        "source": "report",
+        "months": chosen,
+        "available_months": len(all_months),
+        "members": [{"engineer": n, "total": sum(v.values()), "by_month": v} for n, v in sorted(people.items(), key=lambda kv: (-sum(kv[1].values()), kv[0].lower())) if sum(v.values()) > 0],
+        "clients": [{"client": c, "total": round(sum(v.values()), 1), "by_month": v} for c, v in sorted(clients.items(), key=lambda kv: (-sum(kv[1].values()), kv[0].lower())) if sum(v.values()) > 0],
+        "resolution_by_client": [],
     }
 
 
@@ -153,7 +185,7 @@ def monthly_invoicing(payload: dict[str, Any] | None, months: int) -> dict[str, 
     all_months = sorted(
         {str(m) for m in (payload or {}).get("months") or []} | {str(r.get("month")) for r in (payload or {}).get("rows") or []}
     )
-    chosen = all_months[-months:] if months > 0 else []
+    chosen = pick_months(all_months, months)
     want = set(chosen)
     rows = [r for r in (payload or {}).get("rows") or [] if str(r.get("month")) in want]
     trend = {m: 0.0 for m in chosen}

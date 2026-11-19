@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.month_window import chosen_window, pick_months
+
 WEEKS_PER_MONTH = 4.345
 
 ZERO_ROW: dict[str, float] = {
@@ -46,6 +48,9 @@ def weeks_of(payload: dict[str, Any] | None) -> list[str]:
 def recent_weeks(payload: dict[str, Any] | None, months: int) -> list[str]:
     """The newest weeks that make up ``months`` months (rounded up), oldest first."""
     weeks = weeks_of(payload)
+    window = chosen_window()
+    if window is not None:  # a custom range: the weeks that start inside it
+        return [w for w in weeks if window[0] <= w[:7] <= window[1]]
     keep = max(1, round(months * WEEKS_PER_MONTH))
     return weeks[-keep:]
 
@@ -206,7 +211,7 @@ def dialpad(payload: dict[str, Any] | None, months: int, engineer: str | None = 
 def hours_distribution(profit_payload: dict[str, Any] | None, months: int) -> dict[str, Any]:
     """Hours worked per person by ticket type (the charge type) for the newest ``months`` months of the HaloPSA hours summary, with each person's total and each type's share of all hours."""
     all_months = sorted({str(m) for m in (profit_payload or {}).get("months") or []})
-    chosen = set(all_months[-months:] if months > 0 else [])
+    chosen = set(pick_months(all_months, months))
     agents = {str(a.get("id")): str(a.get("name") or "") for a in (profit_payload or {}).get("agents") or []}
     cell: dict[str, dict[str, float]] = {}
     types: dict[str, float] = {}

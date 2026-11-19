@@ -8,7 +8,7 @@ import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useState } from 'react';
 import { MetricPicker } from './MetricPicker';
 
-import { Cards, NothingYet, Page, Panel, Periods, Table, monthShort, num, pctText, selectClass, useMetric } from './kit';
+import { Cards, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, num, pctText, selectClass, useMetric, usePeriod } from './kit';
 
 interface Bucket {
   responses: number;
@@ -37,9 +37,9 @@ const SENTIMENTS: [string, string][] = [
 ];
 
 export function CustomerExperienceView() {
-  const [months, setMonths] = useState(12);
+  const period = usePeriod(12);
   const [sentiment, setSentiment] = useState('all');
-  const { data, denied, problem } = useMetric<ExperienceData>(`/api/v1/reports/metrics/customer-experience?months=${months}&sentiment=${sentiment}`);
+  const { data, denied, problem } = useMetric<ExperienceData>(`/api/v1/reports/metrics/customer-experience?${period.query}&sentiment=${sentiment}`);
   const cells = (b: Bucket): string[] => [num(b.responses), pctText(b.csat), String(b.positive), String(b.neutral), String(b.negative), pctText(b.neutral_percent), pctText(b.negative_percent)];
   const head = ['Responses', 'CSAT', 'Positive', 'Neutral', 'Negative', 'Neutral %', 'Negative %'];
   return (
@@ -55,7 +55,7 @@ export function CustomerExperienceView() {
             ))}
           </select>
         </label>
-        <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
+        <PeriodPicker period={period} options={[1, 3, 6, 12]} />
       </div>
       {data?.received_at && (
         <>

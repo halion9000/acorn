@@ -1557,10 +1557,32 @@ class TicketOpenIn(BaseModel):
     high: int = Field(ge=0, le=1000000)
 
 
+class ResolutionAgentIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    agent_name: str = Field(min_length=1, max_length=120)
+    n: int = Field(ge=0, le=10000000)
+
+
+class ResolutionClientIn(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    client: str = Field(min_length=1, max_length=200)
+    hours: float = Field(ge=0, le=1000000000)
+    n: int = Field(ge=0, le=10000000)
+
+
+class ResolutionIn(BaseModel):
+    """The Ticket Resolution page's data as the Rewst dashboard counts it: by the month a ticket was opened (see CORE's acorn-ticket-stats-sql.ts)."""
+
+    agents: list[ResolutionAgentIn] = Field(max_length=60000)
+    clients: list[ResolutionClientIn] = Field(max_length=200000)
+
+
 class TicketStatsIn(BaseModel):
     months: list[str] = Field(max_length=40)
     rows: list[TicketMonthIn] = Field(max_length=60000)
     open_now: list[TicketOpenIn] = Field(max_length=5000)
+    # Absent from an older CORE, or when that part could not be read: the resolution held from before stays.
+    resolution: ResolutionIn | None = None
 
 
 class TicketStatsOut(BaseModel):
@@ -1579,6 +1601,8 @@ async def report_core_feed_ticket_stats(tenant_token: str, body: TicketStatsIn, 
     if row is None:
         db.add(TicketStatsSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
     else:
+        if payload.get("resolution") is None and (row.payload or {}).get("resolution") is not None:
+            payload["resolution"] = row.payload["resolution"]  # this pass could not read it: keep the last one
         row.payload, row.received_at = payload, now
     await db.commit()
     return TicketStatsOut(rows=len(body.rows), open_clients=len(body.open_now))

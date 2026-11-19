@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PeriodPicker, periodQuery, usePeriod, type CustomRange } from './kit';
 import { PageHeader, StatCard } from '@/components/ui/kit';
 
 interface Summary {
@@ -24,7 +25,7 @@ interface LaborData {
   summary: Summary | null;
 }
 
-export const PERIODS = [1, 3, 6, 12] as const;
+export const PERIODS = [1, 3, 6, 12, 24, 36] as const;
 export const hoursText = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })} h`);
 export const monthName = (m: string): string => {
   const [y, mo] = m.split('-').map(Number) as [number, number];
@@ -64,13 +65,13 @@ function Bars({ title, rows, total, testId }: { title: string; rows: { label: st
 export function LaborHoursView() {
   const [denied, setDenied] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [months, setMonths] = useState<number>(3);
+  const period = usePeriod(3);
   const [client, setClient] = useState('');
   const [data, setData] = useState<LaborData | null>(null);
 
-  const load = useCallback(async (m: number, c: string) => {
+  const load = useCallback(async (m: number, range: CustomRange | null, c: string) => {
     try {
-      const res = await authFetch(`/api/v1/reports/ticket-metrics/labor-hours?months=${m}${c ? `&client=${encodeURIComponent(c)}` : ''}`);
+      const res = await authFetch(`/api/v1/reports/ticket-metrics/labor-hours?${periodQuery(m, range)}${c ? `&client=${encodeURIComponent(c)}` : ''}`);
       if (res.status === 403) {
         setDenied(true);
         return;
@@ -83,8 +84,8 @@ export function LaborHoursView() {
     }
   }, []);
   useEffect(() => {
-    void load(months, client);
-  }, [load, months, client]);
+    void load(period.months, period.range, client);
+  }, [load, period.months, period.range, client]);
 
   if (denied) return <p className="p-6 text-sm text-amber-300">Labor hours need the metrics permission. Ask the owner to add it to your role.</p>;
   const s = data?.summary;
@@ -104,13 +105,7 @@ export function LaborHoursView() {
             ))}
           </select>
         </label>
-        <div role="group" aria-label="Period" className="flex gap-1">
-          {PERIODS.map((p) => (
-            <button key={p} type="button" aria-pressed={months === p} className={pill(months === p)} onClick={() => setMonths(p)}>
-              {p === 1 ? 'Last month' : `Last ${p} months`}
-            </button>
-          ))}
-        </div>
+        <PeriodPicker period={period} options={PERIODS} />
       </div>
       {data && data.received_at === null && (
         <p className="text-sm text-gray-400" data-testid="labor-empty">

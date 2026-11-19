@@ -6,28 +6,42 @@
  */
 import { useState } from 'react';
 
-import { BarList, Cards, Columns, LONG_PERIODS, NothingYet, Page, Panel, Periods, Table, monthShort, moneyText, num, selectClass, useMetric } from './kit';
+import { BarList, Cards, Columns, LONG_PERIODS, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, moneyText, num, selectClass, showingText, useMetric, usePeriod } from './kit';
+
+const LONG_PERIODS_WITH_ONE = [1, ...LONG_PERIODS] as const;
 
 interface ResolutionData {
   received_at: string | null;
+  source?: 'report' | 'weekly';
   months: string[];
+  available_months?: number;
   members: { engineer: string; total: number; by_month: Record<string, number> }[];
+  /** Hours from opened to closed added up per client per month (from the report call). */
+  clients?: { client: string; total: number; by_month: Record<string, number> }[];
+  /** The older average hours per client, used until CORE sends the new data. */
   resolution_by_client: { client: string; hours: number; tickets: number }[];
 }
 
 export function TicketResolutionView() {
-  const [months, setMonths] = useState(12);
-  const { data, denied, problem } = useMetric<ResolutionData>(`/api/v1/reports/metrics/ticket-resolution?months=${months}`);
+  const period = usePeriod(12);
+  const { data, denied, problem } = useMetric<ResolutionData>(`/api/v1/reports/metrics/ticket-resolution?${period.query}`);
   return (
-    <Page title="Ticket resolution time" subtitle="Tickets resolved by each team member each month, and how long tickets take to resolve for each client." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
-      <Periods value={months} onChange={setMonths} options={LONG_PERIODS} />
+    <Page title="Ticket resolution time" subtitle="Tickets resolved by each team member each month, and how long tickets take to resolve for each client." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data !== null && data.received_at === null} what="the ticket facts" />}>
+      <PeriodPicker period={period} options={LONG_PERIODS_WITH_ONE} />
       {data?.received_at && (
         <>
+          <p className="text-xs" style={{ color: 'var(--metrics-soft)' }} data-testid="resolution-showing">
+            {showingText(data.months, data.available_months ?? data.months.length)}
+          </p>
           <Panel title="# of resolved tickets by team member" testId="resolved-by-member">
             <Table head={['User', 'Total', ...data.months.map(monthShort)]} rows={data.members.map((m) => [m.engineer, num(m.total), ...data.months.map((mo) => num(m.by_month[mo] ?? 0))])} />
           </Panel>
           <Panel title="Resolution time by client (in hours)" testId="resolution-by-client">
-            <BarList rows={data.resolution_by_client.map((c) => ({ label: c.client, value: c.hours, text: `${num(c.hours, 1)} h (${c.tickets} tickets)` }))} limit={25} />
+            {data.clients ? (
+              <Table head={['Customer', 'Total', ...data.months.map(monthShort)]} rows={data.clients.map((c) => [c.client, num(c.total), ...data.months.map((mo) => num(c.by_month[mo] ?? 0))])} testId="resolution-clients-table" />
+            ) : (
+              <BarList rows={data.resolution_by_client.map((c) => ({ label: c.client, value: c.hours, text: `${num(c.hours, 1)} h (${c.tickets} tickets)` }))} limit={25} />
+            )}
           </Panel>
         </>
       )}
@@ -50,9 +64,9 @@ interface VolumeData {
 }
 
 export function TicketVolumeView() {
-  const [months, setMonths] = useState(6);
+  const period = usePeriod(6);
   const [tech, setTech] = useState('');
-  const { data, denied, problem } = useMetric<VolumeData>(`/api/v1/reports/metrics/ticket-volume?months=${months}${tech ? `&tech=${encodeURIComponent(tech)}` : ''}`);
+  const { data, denied, problem } = useMetric<VolumeData>(`/api/v1/reports/metrics/ticket-volume?${period.query}${tech ? `&tech=${encodeURIComponent(tech)}` : ''}`);
   const matrix = (rows: VolumeData['by_type'], label: string, testId: string) => (
     <Panel title={label} testId={testId}>
       <Table head={['Name', 'Total', ...(data?.months ?? []).map(monthShort)]} rows={rows.map((r) => [r.name, num(r.total), ...(data?.months ?? []).map((m) => num(r.by_month[m] ?? 0))])} />
@@ -60,7 +74,7 @@ export function TicketVolumeView() {
   );
   return (
     <Page title="Ticket volume analysis" subtitle="Where tickets come from: by type, category, month and client, the priority mix, and tickets that have been open too long." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the ticket facts" />}>
-      <Periods value={months} onChange={setMonths} options={LONG_PERIODS} />
+      <PeriodPicker period={period} options={LONG_PERIODS} />
       {data?.received_at && (
         <>
           <Cards items={[['Tickets created', num(data.total_created)], ['Stale tickets (over 30 days)', num(data.stale_by_tech.reduce((a, b) => a + b.tickets, 0))]]} />
@@ -110,11 +124,11 @@ interface InvoicingData {
 }
 
 export function MonthlyInvoicingView() {
-  const [months, setMonths] = useState(12);
-  const { data, denied, problem } = useMetric<InvoicingData>(`/api/v1/reports/metrics/monthly-invoicing?months=${months}`);
+  const period = usePeriod(12);
+  const { data, denied, problem } = useMetric<InvoicingData>(`/api/v1/reports/metrics/monthly-invoicing?${period.query}`);
   return (
     <Page title="Monthly invoicing analysis" subtitle="What was billed, by month, by billing category and by client and invoice line. Amounts before tax." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the invoiced lines" />}>
-      <Periods value={months} onChange={setMonths} options={[1, 3, 6, 12]} />
+      <PeriodPicker period={period} options={[1, 3, 6, 12]} />
       {data?.received_at && (
         <>
           <Cards items={[['Billed', moneyText(data.total)], ['Clients', String(data.clients.length)]]} />

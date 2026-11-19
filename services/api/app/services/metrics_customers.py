@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from app.services.month_window import pick_months
 
 from app.services.metrics_staff import recent_weeks
 
@@ -30,7 +31,7 @@ def customer_experience(csat: dict[str, Any] | None, staff: dict[str, Any] | Non
     """CSAT by company, by team member and by month for the newest ``months`` months, and the newest responses (only those of the sentiment chosen unless "all")."""
     s = sentiment if sentiment in SENTIMENTS else "all"
     all_months = sorted({str(m) for m in (csat or {}).get("months") or []})
-    chosen = all_months[-months:] if months > 0 else []
+    chosen = pick_months(all_months, months)
     want = set(chosen)
     rows = [r for r in (csat or {}).get("rows") or [] if str(r.get("month")) in want]
 

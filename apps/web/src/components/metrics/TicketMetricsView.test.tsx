@@ -89,6 +89,28 @@ describe('TicketMetricsView', () => {
     await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/reports/ticket-metrics?months=6&client_id=5'));
   });
 
+  it('shows the first response time by month as a line chart, with the month that has none left blank', async () => {
+    authFetch.mockImplementation((url: string) =>
+      answer(
+        String(url).includes('/csat')
+          ? csat()
+          : tickets({ summary: { ...tickets().summary, series: [{ month: '2026-09', created: 20, resolved: 18, first_response_minutes: 7.78 }, { month: '2026-10', created: 30, resolved: 33, first_response_minutes: null }] } }),
+      ),
+    );
+    render(<TicketMetricsView />);
+    const panel = await screen.findByTestId('first-response');
+    expect(within(panel).getByText('First Response Time (in minutes)')).toBeInTheDocument();
+    expect(within(panel).getByText('7.78m')).toBeInTheDocument();
+    expect(within(panel).getByText('Oct 26')).toBeInTheDocument();
+  });
+
+  it('can be asked for a custom range of months', async () => {
+    render(<TicketMetricsView />);
+    await screen.findByTestId('ticket-cards');
+    await userEvent.click(screen.getByRole('button', { name: 'Custom range' }));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => /ticket-metrics\?months=3&start=\d{4}-\d{2}&end=\d{4}-\d{2}$/.test(String(c[0])))).toBe(true));
+  });
+
   it('offers 24 and 36 months for tickets and asks for the satisfaction side no more than 12', async () => {
     render(<TicketMetricsView />);
     await screen.findByTestId('ticket-cards');

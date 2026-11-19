@@ -8,12 +8,12 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { PageHeader } from '@/components/ui/kit';
-import { MetricStat, PairedColumns, showingText } from './kit';
+import { LineChart, MetricStat, PairedColumns, PeriodPicker, periodQuery, showingText, usePeriod, type CustomRange } from './kit';
 import { OpenTicketsPanel } from './TicketPages';
 
 interface Summary {
   months: string[];
-  series: { month: string; created: number; resolved: number }[];
+  series: { month: string; created: number; resolved: number; first_response_minutes?: number | null }[];
   created: number;
   resolved: number;
   created_per_month: number | null;
@@ -71,14 +71,14 @@ const pill = (on: boolean) => `rounded border px-2.5 py-1 text-xs ${on ? 'border
 export function TicketMetricsView() {
   const [denied, setDenied] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [months, setMonths] = useState<number>(3);
+  const period = usePeriod(3);
   const [clientId, setClientId] = useState('');
   const [tickets, setTickets] = useState<TicketData | null>(null);
   const [csat, setCsat] = useState<CsatData | null>(null);
 
-  const load = useCallback(async (m: number, client: string, companyName: string | null) => {
+  const load = useCallback(async (m: number, range: CustomRange | null, client: string, companyName: string | null) => {
     try {
-      const t = await authFetch(`/api/v1/reports/ticket-metrics?months=${m}${client ? `&client_id=${encodeURIComponent(client)}` : ''}`);
+      const t = await authFetch(`/api/v1/reports/ticket-metrics?${periodQuery(m, range)}${client ? `&client_id=${encodeURIComponent(client)}` : ''}`);
       if (t.status === 403) {
         setDenied(true);
         return;
@@ -87,7 +87,7 @@ export function TicketMetricsView() {
       const body = (await t.json()) as TicketData;
       setTickets(body);
       const chosenName = client ? (body.clients.find((c) => c.client_id === client)?.client_name ?? '') : '';
-      const sat = await authFetch(`/api/v1/reports/ticket-metrics/csat?months=${Math.min(m, 12)}${client && (companyName ?? chosenName) ? `&company=${encodeURIComponent(companyName ?? chosenName)}` : ''}`);
+      const sat = await authFetch(`/api/v1/reports/ticket-metrics/csat?${periodQuery(Math.min(m, 12), range)}${client && (companyName ?? chosenName) ? `&company=${encodeURIComponent(companyName ?? chosenName)}` : ''}`);
       if (sat.ok) setCsat((await sat.json()) as CsatData);
       setProblem(null);
     } catch (e) {
@@ -95,8 +95,8 @@ export function TicketMetricsView() {
     }
   }, []);
   useEffect(() => {
-    void load(months, clientId, null);
-  }, [load, months, clientId]);
+    void load(period.months, period.range, clientId, null);
+  }, [load, period.months, period.range, clientId]);
 
   if (denied) return <p className="p-6 text-sm text-amber-300">Ticket metrics need the report permission. Ask the owner to add it to your role.</p>;
   const s = tickets?.summary;
@@ -119,13 +119,7 @@ export function TicketMetricsView() {
             ))}
           </select>
         </label>
-        <div role="group" aria-label="Period" className="flex gap-1">
-          {PERIODS.map((p) => (
-            <button key={p} type="button" aria-pressed={months === p} className={pill(months === p)} onClick={() => setMonths(p)}>
-              {p === 1 ? 'Last month' : `Last ${p} months`}
-            </button>
-          ))}
-        </div>
+        <PeriodPicker period={period} options={PERIODS} />
       </div>
       {s && tickets?.received_at ? (
         <p className="text-xs" style={{ color: 'var(--metrics-soft)' }} data-testid="ticket-showing">
@@ -157,6 +151,10 @@ export function TicketMetricsView() {
                 <MetricStat key={label} label={label} value={value} note={note || undefined} />
               ))}
             </div>
+          </section>
+          <section className="metrics-card" aria-label="First response time" data-testid="first-response">
+            <h2 className="text-base">First Response Time (in minutes)</h2>
+            <LineChart points={s.series.map((r) => ({ label: monthName(r.month), value: r.first_response_minutes ?? null }))} unit="m" />
           </section>
           <OpenTicketsPanel clientId={clientId} />
           <div className="grid gap-4 lg:grid-cols-2">

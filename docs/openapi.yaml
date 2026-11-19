@@ -3288,6 +3288,28 @@ paths:
             maxLength: 20
           - type: 'null'
           title: Client Id
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -3320,7 +3342,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 12
+          maximum: 36
           minimum: 1
           default: 3
           title: Months
@@ -3333,6 +3355,28 @@ paths:
             maxLength: 200
           - type: 'null'
           title: Company
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -3366,7 +3410,7 @@ paths:
         required: false
         schema:
           type: integer
-          maximum: 12
+          maximum: 36
           minimum: 1
           default: 3
           title: Months
@@ -3379,6 +3423,28 @@ paths:
             maxLength: 200
           - type: 'null'
           title: Client
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25217,6 +25283,28 @@ paths:
             maxLength: 120
           - type: 'null'
           title: Team
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25253,6 +25341,28 @@ paths:
           minimum: 1
           default: 3
           title: Months
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25299,6 +25409,28 @@ paths:
             maxItems: 200
           - type: 'null'
           title: Members
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25344,6 +25476,28 @@ paths:
             maxLength: 120
           - type: 'null'
           title: Engineer
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25379,6 +25533,28 @@ paths:
           minimum: 1
           default: 3
           title: Months
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25423,6 +25599,28 @@ paths:
             maxLength: 120
           - type: 'null'
           title: Member
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25458,6 +25656,28 @@ paths:
           minimum: 1
           default: 12
           title: Months
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25503,6 +25723,28 @@ paths:
             maxLength: 120
           - type: 'null'
           title: Tech
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25539,6 +25781,28 @@ paths:
             maxLength: 20
           - type: 'null'
           title: Client Id
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25574,6 +25838,28 @@ paths:
           minimum: 1
           default: 12
           title: Months
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25618,6 +25904,28 @@ paths:
           pattern: ^(all|positive|neutral|negative)$
           default: all
           title: Sentiment
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -25642,17 +25950,46 @@ paths:
       description: 'A client by Microsoft 365 directory role table: how many people
         hold each role, and who.'
       operationId: user_roles_api_v1_reports_metrics_user_roles_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                additionalProperties: true
                 type: object
+                additionalProperties: true
                 title: Response User Roles Api V1 Reports Metrics User Roles Get
-      security:
-      - HTTPBearer: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/reports/metrics/monthly-licensing:
     get:
       tags:
@@ -25674,6 +26011,28 @@ paths:
             pattern: ^\d{4}-\d{2}$
           - type: 'null'
           title: Month
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
       responses:
         '200':
           description: Successful Response
@@ -58554,6 +58913,77 @@ components:
       required:
       - new_password
       title: ResetPasswordRequest
+    ResolutionAgentIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        agent_name:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Agent Name
+        n:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: N
+      type: object
+      required:
+      - month
+      - agent_name
+      - n
+      title: ResolutionAgentIn
+    ResolutionClientIn:
+      properties:
+        month:
+          type: string
+          pattern: ^\d{4}-\d{2}$
+          title: Month
+        client:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Client
+        hours:
+          type: number
+          maximum: 1000000000.0
+          minimum: 0.0
+          title: Hours
+        n:
+          type: integer
+          maximum: 10000000.0
+          minimum: 0.0
+          title: N
+      type: object
+      required:
+      - month
+      - client
+      - hours
+      - n
+      title: ResolutionClientIn
+    ResolutionIn:
+      properties:
+        agents:
+          items:
+            $ref: '#/components/schemas/ResolutionAgentIn'
+          type: array
+          maxItems: 60000
+          title: Agents
+        clients:
+          items:
+            $ref: '#/components/schemas/ResolutionClientIn'
+          type: array
+          maxItems: 200000
+          title: Clients
+      type: object
+      required:
+      - agents
+      - clients
+      title: ResolutionIn
+      description: 'The Ticket Resolution page''s data as the Rewst dashboard counts
+        it: by the month a ticket was opened (see CORE''s acorn-ticket-stats-sql.ts).'
     RetentionLine:
       properties:
         what:
@@ -65833,6 +66263,10 @@ components:
           type: array
           maxItems: 5000
           title: Open Now
+        resolution:
+          anyOf:
+          - $ref: '#/components/schemas/ResolutionIn'
+          - type: 'null'
       type: object
       required:
       - months

@@ -21,12 +21,13 @@ from app.db.rls_scope import cross_tenant_reads
 from app.models.finance_profit import FinanceProfitSnapshot
 from app.models.metric_dataset import MetricDataset
 from app.models.signin import ClientLicenseHistory
-from app.models.ticket_stats import CsatSnapshot
+from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.services import metrics_customers as mc
 from app.services import metrics_staff as ms
 from app.services import metrics_tickets as mt
+from app.services.month_window import month_window
 
-router = APIRouter(prefix="/reports/metrics", tags=["reports"])
+router = APIRouter(prefix="/reports/metrics", tags=["reports"], dependencies=[Depends(month_window)])
 
 Months = Annotated[int, Query(ge=1, le=36)]
 
@@ -91,9 +92,14 @@ async def scorecard(
 @router.get("/ticket-resolution", dependencies=[Depends(require_permission("metrics:view"))])
 async def ticket_resolution(user: AuthUser, db: DBSession, months: Months = 12) -> dict[str, Any]:
     """Resolved tickets per team member per month, and the average hours to resolve by client."""
+    stats = (await db.execute(select(TicketStatsSnapshot).where(TicketStatsSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    # From the statistics CORE reads through the HaloPSA report call when it has sent them (counted as the Rewst dashboard counts, back to May 2023); otherwise from the older weekly facts.
+    held = mt.resolution_from_report((stats.payload if stats else {}).get("resolution"), months)
+    if held is not None:
+        return {"received_at": stats.received_at, **held}
     detail, at = await _dataset(db, user, "ticket-detail")
     staff, _ = await _dataset(db, user, "staff-weekly")
-    return {"received_at": at, **mt.ticket_resolution(detail, staff, months)}
+    return {"received_at": at, "source": "weekly", **mt.ticket_resolution(detail, staff, months)}
 
 
 @router.get("/ticket-volume", dependencies=[Depends(require_permission("metrics:view"))])

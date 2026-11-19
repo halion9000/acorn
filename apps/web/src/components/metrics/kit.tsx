@@ -7,6 +7,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { PageHeader, Segmented, SkeletonRows, StatCard } from '@/components/ui/kit';
 
 export interface MetricState<T> {
@@ -99,6 +100,79 @@ export function NothingYet({ show, what }: { show: boolean; what: string }) {
 
 export function Periods({ value, onChange, options = PERIODS }: { value: number; onChange: (n: number) => void; options?: readonly number[] }) {
   return <Segmented label="Period" value={value} onChange={onChange} options={options.map((p) => ({ value: p, label: p === 1 ? 'Last month' : `Last ${p} months` }))} />;
+}
+
+export interface CustomRange {
+  start: string;
+  end: string;
+}
+export interface PeriodState {
+  months: number;
+  range: CustomRange | null;
+  setMonths: (n: number) => void;
+  setRange: (r: CustomRange | null) => void;
+  /** What goes in the address: the newest N months, or N plus a custom range (the range wins on the server). */
+  query: string;
+}
+
+/** The address part for a period: "months=6", or "months=6&start=2025-01&end=2025-06" for a custom range (pure). */
+export function periodQuery(months: number, range: CustomRange | null): string {
+  return range ? `months=${months}&start=${range.start}&end=${range.end}` : `months=${months}`;
+}
+
+/** The newest N months, or a custom range of months. Choosing a number of months clears the range. */
+export function usePeriod(initial: number): PeriodState {
+  const [months, setMonthsState] = useState<number>(initial);
+  const [range, setRange] = useState<CustomRange | null>(null);
+  return {
+    months,
+    range,
+    setMonths: (n) => {
+      setMonthsState(n);
+      setRange(null);
+    },
+    setRange,
+    query: periodQuery(months, range),
+  };
+}
+
+/** The months from this one back ``count`` months, newest first, as YYYY-MM (pure). */
+export function monthsBack(now: Date, count: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** The period buttons (Last 1, 3, 6 ... months) and a Custom range with a From and a To month, each a Month and a Year dropdown. */
+export function PeriodPicker({ period, options = PERIODS }: { period: PeriodState; options?: readonly number[] }) {
+  const list = options.includes(1) ? options : [1, ...options];
+  const all = monthsBack(new Date(), 60);
+  const custom = period.range !== null;
+  return (
+    <div className="flex flex-wrap items-center gap-3" data-testid="period-picker">
+      <div role="group" aria-label="Period" className="flex gap-1">
+        {list.map((n) => (
+          <button key={n} type="button" aria-pressed={!custom && period.months === n} className={pill(!custom && period.months === n)} onClick={() => period.setMonths(n)}>
+            {n === 1 ? 'Last month' : `Last ${n} months`}
+          </button>
+        ))}
+        <button type="button" aria-pressed={custom} className={pill(custom)} onClick={() => period.setRange(custom ? null : { start: all[5]!, end: all[0]! })}>
+          Custom range
+        </button>
+      </div>
+      {period.range ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+          <span>From</span>
+          <MonthYearPicker name="From" months={all} value={period.range.start} onChange={(m) => period.setRange({ start: m, end: m > period.range!.end ? m : period.range!.end })} className={selectClass} />
+          <span>to</span>
+          <MonthYearPicker name="To" months={all} value={period.range.end} onChange={(m) => period.setRange({ start: m < period.range!.start ? m : period.range!.start, end: m })} className={selectClass} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function Panel({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
@@ -247,22 +321,123 @@ export function PairedColumns({ points, aLabel, bLabel }: { points: { label: str
   );
 }
 
+/** A line chart of one value per label (for example minutes of first response by month) with gridlines, the value over each point and an axis on the left. A month with no value breaks the line. */
+export function LineChart({ points, unit = '' }: { points: { label: string; value: number | null }[]; unit?: string }) {
+  if (points.length === 0) return <p className="text-sm text-gray-500">Nothing in this period.</p>;
+  const top = niceMax(Math.max(0, ...points.map((p) => p.value ?? 0)));
+  const height = 240;
+  const width = 1000;
+  const step = width / points.length;
+  const x = (i: number) => step * i + step / 2;
+  const y = (v: number) => height - (v / top) * height;
+  const segments: string[] = [];
+  let run: string[] = [];
+  points.forEach((p, i) => {
+    if (p.value === null) {
+      if (run.length > 1) segments.push(run.join(' '));
+      run = [];
+    } else run.push(`${x(i).toFixed(1)},${y(p.value).toFixed(1)}`);
+  });
+  if (run.length > 1) segments.push(run.join(' '));
+  const lines = [0, 0.25, 0.5, 0.75, 1];
+  return (
+    <div role="img" aria-label={`Line chart by ${points.length} periods`} data-testid="line-chart" className="flex gap-2">
+      <div className="relative w-9 shrink-0 text-right text-[10px] tabular-nums" style={{ height, color: 'var(--metrics-soft)' }}>
+        {lines.map((l) => (
+          <span key={l} className="absolute right-0 -translate-y-1/2" style={{ bottom: `${l * 100}%` }}>
+            {Math.round(top * l * 10) / 10}
+          </span>
+        ))}
+      </div>
+      <div className="relative min-w-0 flex-1 overflow-x-auto">
+        <div className="relative" style={{ height, minWidth: points.length * 44 }}>
+          {lines.map((l) => (
+            <div key={l} className="pointer-events-none absolute left-0 right-0" style={{ bottom: `${l * 100}%`, borderTop: '1px solid var(--metrics-grid)' }} />
+          ))}
+          <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+            {segments.map((seg) => (
+              <polyline key={seg} points={seg} fill="none" stroke="var(--metrics-bar-b)" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+            ))}
+          </svg>
+          {points.map((p, i) =>
+            p.value === null ? null : (
+              <span key={p.label} className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded border px-1 text-[10px] font-semibold tabular-nums" style={{ left: `${((i + 0.5) / points.length) * 100}%`, top: `${(y(p.value) / height) * 100}%`, background: 'var(--metrics-pill)', color: 'var(--metrics-pill-text)', borderColor: 'var(--metrics-title)' }}>
+                {num(p.value, 2)}
+                {unit}
+              </span>
+            ),
+          )}
+        </div>
+        <div className="mt-1 flex text-[11px]" style={{ minWidth: points.length * 44, color: 'var(--metrics-title)' }}>
+          {points.map((p) => (
+            <span key={p.label} className="flex-1 text-center">
+              {p.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A cell's value for sorting: a number when it reads as one ("$1,234", "12%", "3.5 h"), else its text in lower case; anything that is not text or a number has none (pure). */
+export function sortValue(cell: ReactNode): number | string | null {
+  if (typeof cell === 'number') return Number.isFinite(cell) ? cell : null;
+  if (typeof cell !== 'string') return null;
+  const text = cell.trim();
+  if (text === '' || text === '—') return null;
+  const n = Number(text.replace(/[$,%\s]/g, '').replace(/(h|hrs?|min|m|k)$/i, ''));
+  return Number.isFinite(n) && /\d/.test(text) ? n : text.toLowerCase();
+}
+
+/** Rows ordered by one column, empty values last, numbers by size and text A to Z; ``dir`` 0 leaves them as given (pure). */
+export function sortedRows(rows: ReactNode[][], col: number, dir: 0 | 1 | -1): ReactNode[][] {
+  if (dir === 0) return rows;
+  return [...rows].sort((a, b) => {
+    const x = sortValue(a[col]);
+    const y = sortValue(b[col]);
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    if (typeof x === 'number') return -1;
+    if (typeof y === 'number') return 1;
+    return x.localeCompare(y) * dir;
+  });
+}
+
+/** A table whose columns sort when their heading is pressed: first the biggest (or Z to A), then the smallest, then back to the order given. Columns whose cells are not text or numbers do not sort. */
 export function Table({ head, rows, testId, firstWide = true }: { head: string[]; rows: ReactNode[][]; testId?: string; firstWide?: boolean }) {
+  const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
   if (rows.length === 0) return <p className="text-sm text-gray-500">Nothing in this period.</p>;
+  const shown = sort ? sortedRows(rows, sort.col, sort.dir) : rows;
+  const press = (col: number) => {
+    const text = col === 0 && firstWide;
+    setSort((s) => (s?.col !== col ? { col, dir: text ? 1 : -1 } : s.dir === (text ? 1 : -1) ? { col, dir: text ? -1 : 1 } : null));
+  };
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-800">
       <table className="w-full text-sm" data-testid={testId}>
         <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
           <tr>
-            {head.map((h, i) => (
-              <th key={`${h}-${i}`} className={`px-3 py-2 ${i === 0 && firstWide ? 'text-left' : 'text-right'}`}>
-                {h}
-              </th>
-            ))}
+            {head.map((h, i) => {
+              const sortable = rows.some((r) => sortValue(r[i]) !== null);
+              const on = sort?.col === i;
+              return (
+                <th key={`${h}-${i}`} className={`px-3 py-2 ${i === 0 && firstWide ? 'text-left' : 'text-right'}`} aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+                  {sortable ? (
+                    <button type="button" onClick={() => press(i)} className="uppercase hover:text-gray-200">
+                      <span>{h}</span>
+                      <span aria-hidden="true">{on ? (sort.dir === 1 ? ' ▲' : ' ▼') : ' ↕'}</span>
+                    </button>
+                  ) : (
+                    h
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800 text-gray-200">
-          {rows.map((r, i) => (
+          {shown.map((r, i) => (
             <tr key={i}>
               {r.map((c, j) => (
                 <td key={j} className={`px-3 py-1.5 tabular-nums ${j === 0 && firstWide ? 'text-left' : 'text-right'}`}>

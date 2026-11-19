@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PeriodPicker, periodQuery, usePeriod, type CustomRange } from './kit';
 import { PageHeader, StatCard } from '@/components/ui/kit';
 import { QbrSecurity } from './QbrSecurity';
 import { hoursText, monthName } from './LaborHoursView';
@@ -128,15 +129,15 @@ export function ClientSummaryBody({ empty, t, l, sat }: { empty: boolean; t?: Ti
 export function ClientSummaryView() {
   const [denied, setDenied] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [months, setMonths] = useState<number>(3);
+  const period = usePeriod(3);
   const [clientId, setClientId] = useState('');
   const [tickets, setTickets] = useState<Tickets | null>(null);
   const [labor, setLabor] = useState<Labor | null>(null);
   const [csat, setCsat] = useState<Csat | null>(null);
 
-  const load = useCallback(async (m: number, id: string, known: Tickets['clients']) => {
+  const load = useCallback(async (m: number, range: CustomRange | null, id: string, known: Tickets['clients']) => {
     try {
-      const t = await authFetch(`/api/v1/reports/ticket-metrics?months=${m}${id ? `&client_id=${encodeURIComponent(id)}` : ''}`);
+      const t = await authFetch(`/api/v1/reports/ticket-metrics?${periodQuery(m, range)}${id ? `&client_id=${encodeURIComponent(id)}` : ''}`);
       if (t.status === 403) {
         setDenied(true);
         return;
@@ -145,9 +146,9 @@ export function ClientSummaryView() {
       const body = (await t.json()) as Tickets;
       setTickets(body);
       const name = body.clients.concat(known).find((c) => c.client_id === id)?.client_name ?? '';
-      const l = await authFetch(`/api/v1/reports/ticket-metrics/labor-hours?months=${m}${name ? `&client=${encodeURIComponent(name)}` : ''}`);
+      const l = await authFetch(`/api/v1/reports/ticket-metrics/labor-hours?${periodQuery(m, range)}${name ? `&client=${encodeURIComponent(name)}` : ''}`);
       if (l.ok) setLabor((await l.json()) as Labor);
-      const s = await authFetch(`/api/v1/reports/ticket-metrics/csat?months=${m}${name ? `&company=${encodeURIComponent(name)}` : ''}`);
+      const s = await authFetch(`/api/v1/reports/ticket-metrics/csat?${periodQuery(m, range)}${name ? `&company=${encodeURIComponent(name)}` : ''}`);
       if (s.ok) {
         const sb = (await s.json()) as Csat;
         const company = name ? nameIn(name, sb.companies) : '';
@@ -160,10 +161,10 @@ export function ClientSummaryView() {
     }
   }, []);
   useEffect(() => {
-    void load(months, clientId, tickets?.clients ?? []);
+    void load(period.months, period.range, clientId, tickets?.clients ?? []);
     // the client list is only needed to turn the chosen id into a name, and it arrives with the first answer
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, months, clientId]);
+  }, [load, period.months, period.range, clientId]);
 
   if (denied) return <p className="p-6 text-sm text-amber-300">The client summary needs the metrics permission. Ask the owner to add it to your role.</p>;
   const t = tickets?.summary;
@@ -173,7 +174,7 @@ export function ClientSummaryView() {
   return (
     <div className="space-y-5 p-6 print:p-0" data-testid="client-summary">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title={`Client summary: ${clientName}`} subtitle={`The last ${months === 1 ? 'month' : `${months} months`} of tickets, hours and satisfaction, from HaloPSA and SimpleSat as of the last daily read.`} />
+        <PageHeader title={`Client summary: ${clientName}`} subtitle={`${period.range ? `${period.range.start} to ${period.range.end}` : `The last ${period.months === 1 ? 'month' : `${period.months} months`}`} of tickets, hours and satisfaction, from HaloPSA and SimpleSat as of the last daily read.`} />
         <button type="button" className="rounded border border-gray-700 px-2.5 py-1 text-xs text-gray-200 hover:bg-gray-800 print:hidden" onClick={() => window.print()}>
           Print or save as PDF
         </button>
@@ -191,16 +192,10 @@ export function ClientSummaryView() {
             ))}
           </select>
         </label>
-        <div role="group" aria-label="Period" className="flex gap-1">
-          {PERIODS.map((p) => (
-            <button key={p} type="button" aria-pressed={months === p} className={pill(months === p)} onClick={() => setMonths(p)}>
-              {p === 1 ? 'Last month' : `Last ${p} months`}
-            </button>
-          ))}
-        </div>
+        <PeriodPicker period={period} options={PERIODS} />
       </div>
       <ClientSummaryBody empty={Boolean(tickets && tickets.received_at === null)} t={t} l={l} sat={sat} />
-      {clientId && <QbrSecurity clientName={clientName} months={months} />}
+      {clientId && <QbrSecurity clientName={clientName} months={Math.min(period.months, 12)} />}
     </div>
   );
 }

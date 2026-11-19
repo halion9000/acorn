@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.month_window import pick_months
+
 PERIODS = (1, 3, 6, 12)
 
 
@@ -36,7 +38,7 @@ def csat_for(payload: dict[str, Any], months: int, company: str | None = None) -
     """Customer satisfaction for the newest ``months`` months in the data, for one company (matched by name, ignoring case and punctuation) or all: counts by sentiment, the satisfied share (positive over
     positive, neutral and negative), a monthly trend and the newest comments."""
     available = sorted({str(m) for m in payload.get("months") or []})
-    chosen = available[-months:] if months > 0 else []
+    chosen = pick_months(available, months)
     keep = set(chosen)
     want = name_key(company) if company else None
     trend = {m: {"month": m, "positive": 0, "neutral": 0, "negative": 0, "total": 0} for m in chosen}
@@ -85,9 +87,10 @@ def summarize(
 ) -> dict[str, Any]:
     """The summary for the newest ``months`` months of the data (fewer when the data has fewer), for one client or all."""
     available = months_in(payload)
-    chosen = available[-months:] if months > 0 else []
+    chosen = pick_months(available, months)
     keep = set(chosen)
     series = {m: {"month": m, "created": 0, "resolved": 0} for m in chosen}
+    answered = {m: [0, 0.0] for m in chosen}  # per month: tickets that count toward first response, and their minutes
     by_type: dict[str, int] = {}
     by_agent: dict[str, int] = {}
     responded = 0
@@ -101,6 +104,8 @@ def summarize(
         series[m]["resolved"] += int(r.get("resolved") or 0)
         responded += int(r.get("responded") or 0)
         response_minutes += float(r.get("response_minutes") or 0)
+        answered[m][0] += int(r.get("responded") or 0)
+        answered[m][1] += float(r.get("response_minutes") or 0)
         critical += int(r.get("critical") or 0)
         high += int(r.get("high") or 0)
         for name, n in (r.get("created_by_type") or {}).items():
@@ -113,7 +118,7 @@ def summarize(
     open_rows = [o for o in payload.get("open_now") or [] if client_id is None or str(o.get("client_id")) == client_id]
     return {
         "months": chosen,
-        "series": [series[m] for m in chosen],
+        "series": [{**series[m], "first_response_minutes": _avg(answered[m][1], answered[m][0])} for m in chosen],
         "created": created,
         "resolved": resolved,
         "created_per_month": _avg(created, len(chosen)),
@@ -139,7 +144,7 @@ def labor_hours(payload: dict[str, Any], months: int, client: str | None = None)
     """Hours worked on tickets from the HaloPSA profitability summary: for the newest ``months`` months (counting back from the latest in the data), by month, by engineer, by client and by ticket type, for all
     clients or one (matched by name). Hours only: no rates or money, so this is readable with ``metrics:view``. Hours are rounded to two decimals."""
     all_months = sorted({str(m) for m in payload.get("months") or []})
-    chosen = all_months[-months:] if months > 0 else []
+    chosen = pick_months(all_months, months)
     want = set(chosen)
     agents = {str(a.get("id")): str(a.get("name") or "") for a in payload.get("agents") or []}
     key = name_key(client) if client else ""

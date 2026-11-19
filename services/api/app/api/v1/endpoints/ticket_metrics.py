@@ -12,8 +12,9 @@ from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.models.finance_profit import FinanceProfitSnapshot
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.services import ticket_metrics as tm
+from app.services.month_window import month_window
 
-router = APIRouter(prefix="/reports/ticket-metrics", tags=["reports"])
+router = APIRouter(prefix="/reports/ticket-metrics", tags=["reports"], dependencies=[Depends(month_window)])
 
 
 @router.get("", dependencies=[Depends(require_permission("metrics:view"))])
@@ -41,7 +42,7 @@ async def ticket_metrics(
 async def csat(
     user: AuthUser,
     db: DBSession,
-    months: Annotated[int, Query(ge=1, le=12)] = 3,
+    months: Annotated[int, Query(ge=1, le=36)] = 3,
     company: Annotated[str | None, Query(max_length=200)] = None,
 ) -> dict[str, Any]:
     """Customer satisfaction from SimpleSat for the newest ``months`` months, for one company (by name) or all. ``received_at`` is None until CORE has sent the first summary."""
@@ -56,7 +57,7 @@ async def csat(
 async def labor_hours(
     user: AuthUser,
     db: DBSession,
-    months: Annotated[int, Query(ge=1, le=12)] = 3,
+    months: Annotated[int, Query(ge=1, le=36)] = 3,
     client: Annotated[str | None, Query(max_length=200)] = None,
 ) -> dict[str, Any]:
     """Hours worked on tickets for the newest ``months`` months, by month, engineer, client and ticket type, for one client (by name) or all. Hours only, no rates or money. ``received_at`` is None until CORE has sent the first HaloPSA summary."""
