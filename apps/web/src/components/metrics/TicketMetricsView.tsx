@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader, StatCard } from '@/components/ui/kit';
 import { OpenTicketsPanel } from './TicketPages';
 
 interface Summary {
@@ -101,10 +102,7 @@ export function TicketMetricsView() {
   const max = Math.max(1, ...(s?.series ?? []).flatMap((r) => [r.created, r.resolved]));
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Tickets and satisfaction</h1>
-        <p className="mt-1 text-sm text-gray-400">Tickets created and resolved, how fast we first answer, what is open and how clients rate us. Updated about once a day.</p>
-      </div>
+      <PageHeader title="Tickets and satisfaction" subtitle="Tickets created and resolved, how fast we first answer, what is open and how clients rate us. Updated about once a day." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -142,11 +140,7 @@ export function TicketMetricsView() {
               ['Critical open', num(s.open_now.critical), ''],
               ['High open', num(s.open_now.high), ''],
             ].map(([label, value, note]) => (
-              <div key={label} className={card}>
-                <p className="text-xl font-semibold text-white">{value}</p>
-                <p className="text-xs text-gray-400">{label}</p>
-                {note && <p className="text-[11px] text-gray-500">{note}</p>}
-              </div>
+              <StatCard key={label} label={label} value={value} note={note || undefined} />
             ))}
           </div>
           <OpenTicketsPanel clientId={clientId} />
