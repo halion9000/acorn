@@ -37,3 +37,16 @@ The Metrics pages now use the Rewst look: the dark teal gradient, glass cards wi
 CORE now reads the ticket statistics first through HaloPSA's report call, with the same exclusions as Rewst (deleted and merged tickets left out), the Rewst first-response measure and 36 months (37 calendar months), and falls back to the paged read when HaloPSA refuses the call or the answer does not add up. Every answer is checked against a separate count of the same thing, so rows cut off by the report call are refused and the paged read runs instead; a mismatch is read once more first, because a ticket can arrive while the queries run. The by-type and by-engineer detail covers the newest 12 months. Closed tickets are counted by the closing engineer when HaloPSA accepts that column and by the assigned engineer when it does not. CORE's log line for the ticket metrics says which read was used and why the report call was not.
 
 NOT VERIFIED live: the report call was not run against HaloPSA, so it is not known that CORE's API key may use it. If it may not, nothing changes from before (the paged read runs) and the log line says so. After the next update the numbers should match Rewst's; if they still differ, the log line and this note are the place to look.
+
+## Page by page against the Rewst templates, 2026-11-19 (Hal: compare the other pages)
+
+Read from the Rewst page templates (headings, controls, chart types, table columns). Done in A.C.O.R.N: Labor Hours, Pods, DialPad, Staff Metrics, Ticket Updates, Ticket Resolution, the stale ticket detail, Scorecard settings. Still to bring over, in the order Hal is likely to look:
+
+- **Customer Experience:** a doughnut of sentiment and a bar chart, a filter for All, Positive, Neutral or Negative responses and 1, 3, 6 or 12 months, the tables Breakdown by company, Team members breakdown (CSAT, positive, neutral, negative) and Monthly breakdown (responses, CSAT score, neutral %, negative %).
+- **Scorecard:** a metric picker, the team member picker, a weekly score trend line and a metrics trend by week bar chart, and week tables; periods of 1, 2, 3, 6 and 12 months.
+- **Ticket Summary:** created vs resolved bars, total labor hours bars, open tickets by status (bars) and by priority (doughnut), first response time line; presets from 3 months to all available plus a from and to month.
+- **Monthly Invoicing:** monthly revenue trend line, total billed by billing category bars, client revenue by line item; periods Last Month, 3, 6, 12 months.
+- **Profitability:** MRR from line items, contracts per month, MRR vs COGS by month, a customer profitability table (customer, total, MRR, COGS, profit, profit %) with search, and a monthly breakdown by client.
+- **Monthly Licensing and User Roles:** a month picker, Select all for software or roles and for clients.
+- **Meetings (a Rewst page not in its menu):** total meeting hours, meeting hours by team member and by team, with a team filter. A.C.O.R.N has no page for it and CORE sends no meeting hours.
+- **Not built in Rewst either:** Staff Hours Distribution has no template there.

@@ -195,6 +195,8 @@ describe('the pages with data', () => {
   it('Customer experience shows the breakdowns and the written comment, and filters by sentiment', async () => {
     render(<CustomerExperienceView />);
     expect(within(await screen.findByTestId('exp-company')).getByText('Acme')).toBeTruthy();
+    expect(within(screen.getByTestId('exp-doughnut')).getByText(/Positive/)).toBeTruthy();
+    expect(screen.getByTestId('exp-by-month-chart')).toBeTruthy();
     expect(within(screen.getByTestId('exp-recent')).getByText('Slow to answer')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Filter by'), 'negative');
     await waitFor(() => expect(authFetch.mock.calls.some(([u]) => String(u).includes('sentiment=negative'))).toBe(true));

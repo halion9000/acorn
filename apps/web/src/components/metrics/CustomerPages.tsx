@@ -4,11 +4,12 @@
  * Metrics > Customer Insights (the Rewst metric dashboards, rebuilt): Customer Experience, Monthly Licensing and User Roles. Satisfaction comes from SimpleSat, license counts from the tools, and Microsoft 365
  * roles from CIPP: CORE sends them about once a day and A.C.O.R.N reads its own copy.
  */
+import { Doughnut } from './Doughnut';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useState } from 'react';
 import { MetricPicker } from './MetricPicker';
 
-import { Cards, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, num, pctText, selectClass, useMetric, usePeriod } from './kit';
+import { Cards, Columns, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, num, pctText, selectClass, useMetric, usePeriod } from './kit';
 
 interface Bucket {
   responses: number;
@@ -41,7 +42,7 @@ export function CustomerExperienceView() {
   const [sentiment, setSentiment] = useState('all');
   const { data, denied, problem } = useMetric<ExperienceData>(`/api/v1/reports/metrics/customer-experience?${period.query}&sentiment=${sentiment}`);
   const cells = (b: Bucket): string[] => [num(b.responses), pctText(b.csat), String(b.positive), String(b.neutral), String(b.negative), pctText(b.neutral_percent), pctText(b.negative_percent)];
-  const head = ['Responses', 'CSAT', 'Positive', 'Neutral', 'Negative', 'Neutral %', 'Negative %'];
+  const head = ['Responses', 'CSAT', 'Positive 😊', 'Neutral 😐', 'Negative 😞', 'Neutral %', 'Negative %'];
   return (
     <Page title="Customer experience" subtitle="How customers rate the help they got, from SimpleSat surveys." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the SimpleSat summary" />}>
       <div className="flex flex-wrap items-center gap-3">
@@ -60,6 +61,16 @@ export function CustomerExperienceView() {
       {data?.received_at && (
         <>
           {data.overall && <Cards items={[['Responses', num(data.overall.responses)], ['CSAT', pctText(data.overall.csat)], ['Positive', String(data.overall.positive)], ['Negative', String(data.overall.negative)]]} />}
+          {data.overall && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Panel title="Sentiment of the responses" testId="exp-doughnut">
+                <Doughnut slices={[{ label: 'Positive 😊', value: data.overall.positive, color: '#66bb6a' }, { label: 'Neutral 😐', value: data.overall.neutral, color: '#ffa726' }, { label: 'Negative 😞', value: data.overall.negative, color: '#ef5350' }]} />
+              </Panel>
+              <Panel title="Responses by month" testId="exp-by-month-chart">
+                <Columns points={data.by_month.map((m) => ({ label: monthShort(m.month), value: m.responses }))} />
+              </Panel>
+            </div>
+          )}
           <Panel title="Breakdown by company" testId="exp-company">
             <Table head={['Company', ...head]} rows={data.by_company.map((c) => [c.company, ...cells(c)])} />
           </Panel>
