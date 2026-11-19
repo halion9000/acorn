@@ -194,6 +194,11 @@ const navSections: NavSection[] = [
         icon: <DeviceIcon />,
       },
       {
+        label: 'Toolbox',
+        href: '/toolbox',
+        icon: <DeviceIcon />,
+      },
+      {
         label: 'Identities',
         href: '/identities',
         icon: <UserIcon />,

@@ -120,6 +120,7 @@ export const CURATED_PAGES: PaletteNavItem[] = [
   { label: 'Leafy',           href: '/copilot',      keywords: ['copilot', 'assistant', 'chat', 'ai'] },
   { label: 'Connectors',      href: '/settings/connectors', keywords: ['integrations', 'sources'] },
   { label: 'Client mapping',  href: '/settings/client-mapping', keywords: ['map', 'unmapped', 'clients', 'tools'] },
+  { label: 'Toolbox',         href: '/toolbox', keywords: ['offboard', 'onboard', 'mfa', 'password', 'm365', 'mailbox', 'user'] },
   { label: 'Client families', href: '/settings/families', keywords: ['parent', 'child', 'group', 'siblings', 'linked'] },
   { label: 'Audit Log',       href: '/settings/audit', keywords: ['activity', 'events'] },
   { label: 'Settings',        href: '/settings',     keywords: ['preferences', 'profile', 'tenant'] },

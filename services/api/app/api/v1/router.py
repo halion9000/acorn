@@ -32,6 +32,7 @@ from app.api.v1.endpoints import (
     client_families,
     qbr,
     alert_push,
+    toolbox,
     report_schedules,
     audits,
     auth,
@@ -321,6 +322,7 @@ api_router.include_router(report_schedules.router)
 api_router.include_router(client_families.router)
 api_router.include_router(qbr.router)
 api_router.include_router(alert_push.router)
+api_router.include_router(toolbox.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)
