@@ -13,24 +13,24 @@ export const REVISIONS: Revision[] = [
     "version": "1.24",
     "weekOf": "2026-11-16",
     "lastChange": "2026-11-18",
-    "commits": 148,
+    "commits": 164,
     "changes": [
       "Roadmap: r7-ci-25, r7-ci-34, r7-ci-35 built in CORE and marked completed.",
-      "Automatic tickets: a note on each rule, written into every ticket it opens under Instructions; set when the rule is made and editable in Settings, Tickets (migration 198). Postgres-tested.",
-      "Controls: a gap report per framework (no evidence, no owner, neither) with a CSV of the controls missing both (roadmap r7-af-03). Tested; mutation fails 2 tests.",
-      "Identities: a Download administrators (CSV) button - the privileged account list with Multi-Factor and last sign-in, riskiest first (roadmap r7-af-26). Tested; mutation fails its test.",
-      "Roadmap: r7-ai-18 marked done.",
-      "Vendors: a My vendors box on the register that shows only the vendors whose owner is the person signed in (roadmap r7-af-08). Tested; mutation fails the matching test.",
-      "Roadmap: billing sync sort and breakdown added and done.",
-      "Roadmap: r7-af-23 marked done.",
-      "Alerts: the device filter (Show alerts on Devices) also matches a machine named only in the alert context (ThreatMate, RMM-style tools), the same place the Devices page counts alerts from. Mutation-checked.",
-      "Metrics: ticket updates page says what it counts (tickets an engineer logged time on), guide entry on the corrected hours and ticket updates, contract fixture for the weekly staff rows, roadmap notes.",
-      "Placeholder rows instead of a spinner or the word Loading on Devices, Alerts and Cases while the first answer loads.",
+      "Script log (Settings, Tickets): every script CORE was asked to run, by a person or an auto-run rule, with who/where/what and whether it ran, failed or was never collected; tabs by outcome. Postgres-tested.",
+      "Policies: a What changed since version N button compares two versions of a policy line by line (roadmap r7-af-11). Tested; mutating the diff fails its tests.",
+      "Roadmap: r7-ai-38 marked done.",
+      "Accessibility: every page is checked with axe for labels and roles (form fields, button and link names, images, ARIA), and the 12 pages that broke it now have labels on their selects, inputs and textareas (roadmap r7-ai-",
+      "Roadmap: r7-cf-24 to r7-cf-27 noted as needing a decision on agent access to compliance data.",
+      "Alert notes: a note on an alert that is in a case is also a case timeline entry (roadmap r7-af-20). Postgres-tested; removing it fails the test.",
+      "Roadmap: r7-ai-02 noted (the list filters in Python, not a query to plan).",
+      "Leafy can look a person up through CORE (user_lookup action, lookup_user tool, migration 208, identities:bec, 40 an hour, audited, not text-callable) and the Profitability drill-down lists the tickets behind the hours (C",
+      "Devices keeps its filters in the address; Alerts can copy a link to the list as it is. Pure writers (inverse of the readers, round-trip tested, mutation-checked), a search a link carried is kept, and anything an address ",
       "Net income: P&L, QBO Profitability and Historical client revenue tabs from QuickBooks. CORE now also sends the profit and loss line by line per month (/pnl) and the sales by customer per month (/qbo-sales), 24 months, fr",
-      "Docs for the new routes and settings: openapi, capabilities, guide, an example for the schedule body, roadmap r7-ai-11 done, and CLAUDE.md now says to read the live roadmap for approvals and page-added items and to regen",
-      "Revisions regenerated."
+      "API rate limits are enforced on the Azure VM (roadmap rate-limits-enforce, approved by Hal 2026-11-18): AISOC_RATE_LIMIT_MODE defaults to enforce in the Azure compose file, so a caller over 300 requests a minute gets 429",
+      "Reports > Device Versions: Huntress agent versions across the clients with the agents more than two releases behind the newest the fleet runs (roadmap r7-cf-06), and network devices (Auvik) on older firmware than another",
+      "Roadmap: what runs tonight for the rename and what waits for Hal; new list of what still waits on him (33 items)"
     ],
-    "fixes": 0
+    "fixes": 1
   },
   {
     "version": "1.23",
