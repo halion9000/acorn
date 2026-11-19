@@ -56,6 +56,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/purple-team': { title: 'Purple Team', description: 'Adversary emulation and detection coverage' },
   '/settings/connectors': { title: 'Connectors', description: 'Security tool integrations' },
   '/settings/client-mapping': { title: 'Client mapping', description: 'Link the clients of each tool to your clients' },
+  '/settings/families': { title: 'Client families', description: 'Link a parent company and its child clients' },
   '/compliance/risk-register': { title: 'Risk register', description: 'Risks, how they are treated, and the tasks that treat them' },
   '/settings/roadmap': { title: 'Upcoming improvements', description: 'What is waiting to be built, who it waits on, and its priority' },
   '/compliance/controls': { title: 'Controls', description: 'Every control of the frameworks that are on, and how healthy it is' },

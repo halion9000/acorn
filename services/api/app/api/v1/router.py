@@ -29,6 +29,7 @@ from app.api.v1.endpoints import (
     attack_chain,
     audit,
     audit_portal,
+    client_families,
     report_schedules,
     audits,
     auth,
@@ -315,6 +316,7 @@ api_router.include_router(audits.router)
 api_router.include_router(audit_portal.staff_router)
 api_router.include_router(audit_portal.router)
 api_router.include_router(report_schedules.router)
+api_router.include_router(client_families.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)

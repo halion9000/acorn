@@ -741,14 +741,26 @@ async def test_the_elsewhere_lookup_names_the_client_and_tools_of_each_lookalike
         async def get(self, model, key):
             return None
 
+    from app.api.v1.endpoints import client_families as families_module
+
+    family = uuid.uuid4()
+    linked: dict = {}
+
+    async def family_map(db, owner):
+        return linked
+
     monkeypatch.setattr(devices_module, "_scope", scope)
     monkeypatch.setattr(devices_module, "_load_cached", load)
+    monkeypatch.setattr(families_module, "load_family_map", family_map)
     user = SimpleNamespace(tenant_id=uuid.uuid4())
     out = await devices_module.device_elsewhere(me.id, user, Db())
     assert out.tools == ["ninjaone"]
-    assert [(i.client_name, i.same_client, i.tools, i.matched_on) for i in out.items] == [
-        ("First Baptist (older)", False, ["huntress"], ["serial", "name"])
+    assert [(i.client_name, i.same_client, i.sibling, i.tools, i.matched_on) for i in out.items] == [
+        ("First Baptist (older)", False, False, ["huntress"], ["serial", "name"])
     ]
+    linked.update({a: family, b: family})
+    sib = await devices_module.device_elsewhere(me.id, user, Db())
+    assert [i.sibling for i in sib.items] == [True], "a copy filed under a client linked in the same family is a sibling"
     with pytest.raises(HTTPException) as err:
         await devices_module.device_elsewhere(uuid.uuid4(), user, Db())
     assert err.value.status_code == 404

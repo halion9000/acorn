@@ -102,3 +102,11 @@ def test_the_mismatch_text_lists_machines_and_is_none_when_there_are_none():
     subject, text = r.org_mismatch_text([{"serial": "S1234567", "hostname": "PC1", "ninjaone_client": "Acme", "huntress_client": "Birch"}])
     assert subject.startswith("1 machine filed under different clients")
     assert "PC1: NinjaOne says Acme, Huntress says Birch" in text
+
+
+def test_machines_filed_under_sibling_clients_of_one_family_are_not_a_mismatch():
+    n = dev("ninjaone", "t1", "NW - North", "5CG1234567")
+    h = dev("huntress", "t2", "NW - South", "5CG1234567")
+    assert len(r.org_mismatches([n, h])) == 1
+    assert r.org_mismatches([{**n, "family": "f1"}, {**h, "family": "f1"}]) == []
+    assert len(r.org_mismatches([{**n, "family": "f1"}, {**h, "family": "f2"}])) == 1

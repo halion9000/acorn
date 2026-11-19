@@ -1022,6 +1022,8 @@ class ElsewhereItem(BaseModel):
     hostname: str
     client_name: str | None = None
     same_client: bool
+    # True when it is filed under a different client that is linked to this device's client in a family (roadmap huntress-family): a sibling, not a stranger.
+    sibling: bool = False
     serial_number: str | None = None
     tools: list[str]
     last_seen: datetime
@@ -1234,12 +1236,17 @@ async def device_elsewhere(
     target = next((d for d in loaded if d.id == device_id), None)
     if target is None:
         raise HTTPException(status_code=404, detail="Device not found")
+    from app.api.v1.endpoints.client_families import load_family_map  # noqa: PLC0415
+    from app.services.client_families import same_family  # noqa: PLC0415
+
+    families = await load_family_map(db, owner)
     items = [
         ElsewhereItem(
             device_id=d.id,
             hostname=d.hostname,
             client_name=d.client_name,
             same_client=d.tenant_id == target.tenant_id,
+            sibling=same_family(families, d.tenant_id, target.tenant_id),
             serial_number=d.serial_number,
             tools=sorted({s.vendor for s in d.sources}),
             last_seen=d.last_seen,

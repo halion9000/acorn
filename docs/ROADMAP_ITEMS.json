@@ -155,10 +155,12 @@
     "title": "Parent and child clients (families) so New Waterloo and its NW - clients share group records",
     "detail": "A family lets group-level records follow to the child client where the tools file same-named machines under siblings.",
     "area": "Devices",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes: parent company with linked child companies; everything stays separate but both the separate view and the full parent view work. Starting with a read-only family link. Approved: I build it (Hal does not need to act).",
-    "added": "2026-11-14"
+    "note": "Built (link phase, as approved): Settings > Client families links a parent company with its child clients (migration 227). Read-only link: nothing is moved or merged and each client keeps its own view. Used so far by: the Where else list (marks a same-family copy), and the Huntress-versus-NinjaOne mismatch report (a machine under two clients of one family is not listed). NOT built yet: pages that show a whole family at once (the full parent view); say which pages you want first.",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "A.C.O.R.N this commit"
   },
   {
     "key": "huntress-moves",
@@ -174,19 +176,23 @@
     "key": "name-only-follow",
     "title": "Follow a machine by name alone when it has a random Windows default name",
     "area": "Devices",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): that sounds good: only within one client and only when the serial number is missing. Held with the families design. Approved: I build it (Hal does not need to act)."
+    "note": "Built: a Huntress, ThreatMate or ScreenConnect record with NO serial follows its machine by name when the name is a Windows default name (DESKTOP- or LAPTOP- plus 7 letters or digits) and exactly one client holds that name in NinjaOne or Addigy. An ordinary name, or a placeholder serial, never follows. The join of the two records is done by the existing same-name tidy-up (every ten minutes per client).",
+    "completed": "2026-11-18",
+    "completed_ref": "A.C.O.R.N this commit"
   },
   {
     "key": "merge-search-sibling",
     "title": "Device merge search that finds a machine filed under a sibling client",
     "area": "Devices",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): decided with huntress-family: families first. Approved: I build it (Hal does not need to act).",
-    "added": "2026-11-14"
+    "note": "Built on the families: the Where else is this machine filed search already looked across every client; it now marks a copy under a client of the same family as (same family).",
+    "added": "2026-11-14",
+    "completed": "2026-11-18",
+    "completed_ref": "A.C.O.R.N this commit"
   },
   {
     "key": "ninja-deploy-test",

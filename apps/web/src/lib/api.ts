@@ -696,7 +696,7 @@ export interface DeviceElsewhere {
   hostname: string;
   client_name: string | null;
   tools: string[];
-  items: Array<{ device_id: string; hostname: string; client_name: string | null; same_client: boolean; serial_number: string | null; tools: string[]; last_seen: string; matched_on: string[] }>;
+  items: Array<{ device_id: string; hostname: string; client_name: string | null; same_client: boolean; serial_number: string | null; tools: string[]; last_seen: string; matched_on: string[]; sibling?: boolean }>;
 }
 
 /** The scripts CORE has switched on, to run on picked devices. */
@@ -1446,7 +1446,27 @@ const childrenCache = createSwrCache<ChildTenant[]>(async () => sortClientsByNam
 });
 export const clearChildrenCache = (): void => childrenCache.clear();
 
+export interface ClientFamily {
+  id: string;
+  name: string;
+  client_ids: string[];
+  clients: string[];
+}
+
 export const msspApi = {
+  /** The client families: a parent company and its linked child clients. */
+  async listFamilies(): Promise<ClientFamily[]> {
+    return request<ClientFamily[]>('/api/v1/mssp/families');
+  },
+  async createFamily(name: string, clientIds: string[]): Promise<ClientFamily> {
+    return request<ClientFamily>('/api/v1/mssp/families', { method: 'POST', body: JSON.stringify({ name, client_ids: clientIds }) });
+  },
+  async changeFamily(id: string, patch: { name?: string; client_ids?: string[] }): Promise<ClientFamily> {
+    return request<ClientFamily>(`/api/v1/mssp/families/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  },
+  async deleteFamily(id: string): Promise<void> {
+    await request<void>(`/api/v1/mssp/families/${id}`, { method: 'DELETE' });
+  },
   async listChildren(): Promise<ChildTenant[]> {
     // Every client list in the console comes from here, so it is sorted once: by name, ignoring case, numbers in their natural order.
     return childrenCache.get();

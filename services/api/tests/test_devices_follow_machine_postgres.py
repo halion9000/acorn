@@ -324,3 +324,24 @@ async def test_threatmate_and_screenconnect_records_follow_the_machine_too_but_o
         "HOTEL-A-MBA",
         "HOTEL-B-PC1",
     ], "the two records that could not be told to be the same machine stay where their organization is mapped"
+
+
+async def test_an_agent_with_no_serial_follows_a_windows_default_name_to_the_one_client_that_holds_it(world):
+    await send(
+        world,
+        dev("ninjaone", "A", "n1", "DESKTOP-4F2K9QX", "SERIAL-A1"),
+        dev("ninjaone", "A", "n2", "FRONTDESK", "SERIAL-A2"),
+        dev("ninjaone", "A", "n3", "DESKTOP-ZZ11YY2", "SERIAL-A3"),
+        dev("ninjaone", "B", "n4", "DESKTOP-ZZ11YY2", "SERIAL-B3"),
+    )
+    devices_endpoints._auto_merge_last.clear()  # the tidy-up that joins same-named records runs at most every ten minutes per client
+    res = await send(
+        world,
+        dev("huntress", "H", "h1", "desktop-4f2k9qx"),  # a default name, no serial, one RMM client has it: it follows
+        dev("huntress", "H", "h2", "FRONTDESK"),  # an ordinary name with no serial: never enough
+        dev("huntress", "H", "h3", "DESKTOP-ZZ11YY2"),  # two clients hold that name: no single place
+    )
+    assert res.followed == 1
+    assert (await held(world, "hotel_a"))[0] == [("DESKTOP-4F2K9QX", ["huntress", "ninjaone"]), ("DESKTOP-ZZ11YY2", ["ninjaone"]), ("FRONTDESK", ["ninjaone"])]
+    assert sorted(h for h, _v in (await held(world, "group"))[0]) == ["DESKTOP-ZZ11YY2", "FRONTDESK"]
+

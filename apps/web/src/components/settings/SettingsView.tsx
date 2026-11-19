@@ -285,7 +285,7 @@ export { MORE_SETTINGS } from './moreSettings';
 export const SETTINGS_GROUPS: { title: string; items: string[] }[] = [
   { title: 'Your account', items: ['profile', 'appearance', 'notifications', 'api-keys'] },
   { title: 'People & access', items: ['workspace', 'tenant-access', '/settings/rbac', '/settings/audit'] },
-  { title: 'Clients', items: ['/settings/client-mapping', '/settings/client-cleanup', '/settings/onboarding', '/settings/business-context', '/settings/vcio-risk-scoring'] },
+  { title: 'Clients', items: ['/settings/client-mapping', '/settings/families', '/settings/client-cleanup', '/settings/onboarding', '/settings/business-context', '/settings/vcio-risk-scoring'] },
   { title: 'Tools & integrations', items: ['/settings/connectors', '/settings/cipp-actions', '/settings/tickets'] },
   { title: 'Detection & AI', items: ['autonomy', '/settings/triage', 'deployment', '/settings/costs'] },
   { title: 'Finance', items: ['/settings/finance'] },

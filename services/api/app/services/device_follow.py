@@ -19,11 +19,12 @@ An RMM's own record never moves, so two tools can never chase each other. A reco
 from __future__ import annotations
 
 import uuid
+import re
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 
 from app.db.rls_scope import cross_tenant_reads
 from app.models.device import Device, DeviceSource
@@ -37,11 +38,26 @@ FOLLOWING_TOOLS = frozenset({"huntress", "threatmate", "screenconnect"})
 ANCHOR_FRESH = timedelta(days=3)
 
 
+# The name Windows gives a machine nobody renamed: DESKTOP- or LAPTOP- and seven random letters and digits. It is random per machine, so on its own it identifies one (roadmap name-only-follow).
+_DEFAULT_WINDOWS_NAME = re.compile(r"^(desktop|laptop)-[a-z0-9]{7}$")
+
+
+def default_name_key(hostname: str | None) -> tuple[str, str] | None:
+    """``("", name)`` for a Windows default machine name, else None (pure). The empty first part is where a serial would be: this key says "the name alone"."""
+    h = hostname_key(hostname or "")
+    return ("", h) if _DEFAULT_WINDOWS_NAME.match(h) else None
+
+
 def machine_key(hostname: str | None, serial: str | None) -> tuple[str, str] | None:
-    """What makes two records plainly the same machine: the same real serial and the same machine name (pure). None when either is missing."""
+    """What makes two records plainly the same machine: the same real serial and the same machine name (pure). When the record has NO serial at all, a Windows default machine name
+    (``DESKTOP-4F2K9QX``, random per machine) stands in for it, as ``("", name)``. None when neither can be had: a plain name with no serial is never enough."""
     s = normalize_serial(serial)
     h = hostname_key(hostname or "")
-    return (s, h) if s and h else None
+    if s and h:
+        return (s, h)
+    if not s and not (serial or "").strip():
+        return default_name_key(hostname)
+    return None
 
 
 def follow_targets(
@@ -72,13 +88,33 @@ async def anchored_machines(
     if not wanted:
         return out
     for vendor, hostname, serial, heading in incoming:
-        key = machine_key(hostname, serial)
         # Only one of the owner's shown clients can be followed to: never the owner's own tenant, never a hidden client.
-        if vendor in ANCHOR_TOOLS and key in wanted and heading in clients:
-            out.setdefault(key, set()).add(heading)
-    serials = sorted({s for s, _h in wanted})
+        if vendor in ANCHOR_TOOLS and heading in clients:
+            # The RMM's own record anchors both by serial and name and, for a default Windows name, by the name alone (it may hold the serial the following tool lacks).
+            for key in (machine_key(hostname, serial), default_name_key(hostname)):
+                if key in wanted:
+                    out.setdefault(key, set()).add(heading)
+    serials = sorted({s for s, _h in wanted if s})
+    names = sorted({h for s, h in wanted if not s})
     fresh_since = datetime.now(UTC) - ANCHOR_FRESH
     async with cross_tenant_reads(db):
+        for start in range(0, len(names), 500):
+            by_name = (
+                await db.execute(
+                    select(Device.tenant_id, Device.hostname, DeviceSource.name)
+                    .join(DeviceSource, DeviceSource.device_id == Device.id)
+                    .where(
+                        Device.tenant_id.in_(clients),
+                        or_(func.lower(Device.hostname).in_(names[start : start + 500]), func.lower(DeviceSource.name).in_(names[start : start + 500])),
+                        DeviceSource.vendor.in_(ANCHOR_TOOLS),
+                        DeviceSource.last_seen >= fresh_since,
+                    )
+                )
+            ).all()
+            for tenant_id, hostname, reported_name in by_name:
+                key = default_name_key(reported_name or hostname)
+                if key in wanted:
+                    out.setdefault(key, set()).add(tenant_id)
         for start in range(0, len(serials), 500):
             rows = (
                 await db.execute(

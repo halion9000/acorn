@@ -4,6 +4,7 @@ export const MORE_SETTINGS: { href: string; label: string; description: string; 
   { href: '/settings/rbac', label: 'Roles & permissions', description: 'Who can do what, and which sidebar pages each role sees' },
   { href: '/settings/connectors', label: 'Connectors', description: 'The tools connected to A.C.O.R.N, and the ones CORE manages' },
   { href: '/settings/client-mapping', label: 'Client mapping', description: 'Link the clients of each tool to your client tenants' },
+  { href: '/settings/families', label: 'Client families', description: 'Link a parent company and its child clients, such as New Waterloo and its NW clients' },
   { href: '/settings/audit', label: 'Audit log', description: 'Every administrative and security event, searchable' },
   { href: '/settings/client-cleanup', label: 'Client cleanup', description: 'Clients with nothing in them, and tool clients mapped to the wrong one' },
   { href: '/settings/platform-health', label: 'Platform health', description: 'Whether every service is answering' },

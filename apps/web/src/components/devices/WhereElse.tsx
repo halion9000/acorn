@@ -38,7 +38,7 @@ export function WhereElse({ deviceId }: { deviceId: string }) {
         <ul className="mt-1 space-y-0.5 text-xs text-gray-300">
           {state.data.items.map((i) => (
             <li key={i.device_id}>
-              <span className="text-white">{i.hostname}</span> · {i.same_client ? 'this client' : (i.client_name ?? 'another client')} · {i.tools.map((t) => vendorLabel(t)).join(', ') || 'no tool'} ·{' '}
+              <span className="text-white">{i.hostname}</span> · {i.same_client ? 'this client' : `${i.client_name ?? 'another client'}${i.sibling ? ' (same family)' : ''}`} · {i.tools.map((t) => vendorLabel(t)).join(', ') || 'no tool'} ·{' '}
               {matchedText(i.matched_on)}
               {i.serial_number ? ` (${i.serial_number})` : ''}
             </li>

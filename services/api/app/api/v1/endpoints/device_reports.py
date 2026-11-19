@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.devices import _scope
+from app.api.v1.endpoints.client_families import load_family_map
 from app.db.rls_scope import cross_tenant_reads
 from app.models.device import Device, DeviceSource
 from app.services import device_reports as rep
@@ -32,7 +33,8 @@ async def org_mismatch_rows(db: DBSession, owner: uuid.UUID, client_id: uuid.UUI
                 .where(DeviceSource.vendor.in_(("huntress", "ninjaone")), DeviceSource.tenant_id.in_(scope))
             )
         ).all()
-    return rep.org_mismatches([{"tenant": r[0], "client": names.get(r[0]) or "", "vendor": r[1], "serial": r[2], "hostname": r[3]} for r in rows])
+    fmap = await load_family_map(db, owner)
+    return rep.org_mismatches([{"tenant": r[0], "client": names.get(r[0]) or "", "family": fmap.get(r[0]), "vendor": r[1], "serial": r[2], "hostname": r[3]} for r in rows])
 
 
 async def _rows(db: DBSession, owner: uuid.UUID, client_id: uuid.UUID | None, vendor: str) -> list[tuple[Any, ...]]:

@@ -100,7 +100,7 @@ MAX_MISMATCH_LINES = 80
 
 
 def org_mismatches(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Machines whose Huntress organization is not the client their NinjaOne device is filed under (pure). Each device has ``tenant``, ``client``, ``vendor`` (``huntress`` or ``ninjaone``), ``serial`` and ``hostname``.
+    """Machines whose Huntress organization is not the client their NinjaOne device is filed under (pure). Each device has ``tenant``, ``client``, ``vendor`` (``huntress`` or ``ninjaone``), ``serial`` and ``hostname``, and optionally ``family`` (the id of the client's family).
 
     A machine is matched across the two tools by its serial number (a placeholder, a MAC address or the machine's own name is not a serial: see ``device_identity.real_serial``). It is a mismatch only when
     NO Huntress copy sits under a client that also holds a NinjaOne copy: a machine filed under the same client in both is fine, even if a second copy of it sits elsewhere. Sorted by the NinjaOne client, then name."""
@@ -118,6 +118,9 @@ def org_mismatches(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not h or not n:
             continue
         if {x.get("tenant") for x in h} & {x.get("tenant") for x in n}:
+            continue
+        # Clients linked in one family count as one: a machine its tools file under two sibling clients is not a mistake to chase.
+        if {x.get("family") for x in h if x.get("family")} & {x.get("family") for x in n if x.get("family")}:
             continue
         rows.append(
             {
