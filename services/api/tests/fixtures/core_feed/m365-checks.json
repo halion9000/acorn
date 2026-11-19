@@ -308,7 +308,7 @@
       {
         "key": "admin_license_footprint",
         "status": "met",
-        "evidence": "Administrators hold no licence, or only an identity one."
+        "evidence": "Administrators hold no license, or only an identity one."
       },
       {
         "key": "sspr_enabled",
