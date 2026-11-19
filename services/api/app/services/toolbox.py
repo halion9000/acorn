@@ -12,7 +12,7 @@ person's inbox rules, one name per line, picked from the list CORE reads for tha
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
@@ -20,7 +20,8 @@ MAX_VALUE = 500
 MAX_PEOPLE = 20
 EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
 PERSON_KINDS = ("user", "email")
-KINDS = ("user", "email", "users", "choice", "domain", "datetime", "text", "longtext", "group", "rules")
+KINDS = ("user", "email", "users", "choice", "domain", "datetime", "text", "longtext", "group", "rules", "ticket", "secret")
+MIN_SECRET, MAX_SECRET = 8, 128
 MAX_RULES = 30
 MAX_RULES_CHARS = 4000
 
@@ -33,6 +34,7 @@ class Field:
     options: tuple[str, ...] = ()
     required: bool = True
     hint: str = ""
+    default: str = ""
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,7 @@ USER = Field("user", "Person", "user")
 YES_NO = ("Yes", "No")
 GROUPS = ("User management", "Password and security", "Mail and permissions")
 
-TOOLS: tuple[Tool, ...] = (
+_TOOLS: tuple[Tool, ...] = (
     Tool("group_membership", "User management", "Change group membership", "medium", True, "Add a person to a group, or take them out.", (USER, Field("change", "What to do", "choice", ("Add to the group", "Remove from the group")), Field("group", "Group", "group", hint="Pick from the client's groups. If the list does not load, type the name exactly as it shows in Microsoft Entra."))),
     Tool("onedrive_permissions", "User management", "Give access to someone's OneDrive", "medium", True, "Let another person open this person's OneDrive.", (Field("user", "Whose OneDrive", "user"), Field("grantee", "Who gets access", "user"))),
     Tool(
@@ -123,7 +125,20 @@ TOOLS: tuple[Tool, ...] = (
             Field("approver", "Approver", "user", required=False, hint="Who confirms it before it runs."),
         ),
     ),
-    Tool("change_password", "Password and security", "Change a password", "medium", False, "Set a new temporary password and require a change at next sign-in.", (USER,)),
+    Tool(
+        "change_password",
+        "Password and security",
+        "Change a password",
+        "medium",
+        False,
+        "Set a new password for the person and, if asked, make them change it at their next sign-in. The fields follow Rewst's Change Password form.",
+        (
+            USER,
+            Field("entra_override", "User Entra override", "email", required=False, hint="Only for hybrid environments that are not synced, where the person's username in Entra differs from on-prem."),
+            Field("require_change", "Require a password change at next sign-in", "choice", YES_NO, default="Yes"),
+            Field("password", "Password", "secret", hint="Use the generated password or type one (at least 8 characters). It is kept encrypted and never shown again."),
+        ),
+    ),
     Tool("compromised_user", "Password and security", "Remediate a compromised user", "high", False, "Reset the password, end all sessions, reset MFA and remove inbox rules and forwarding.", (USER, Field("reason", "What happened", "longtext"))),
     Tool("reset_mfa", "Password and security", "Reset a person's MFA", "high", False, "Remove their registered methods so they set MFA up again.", (USER, Field("reason", "Why", "text"))),
     Tool("out_of_office", "Mail and permissions", "Set an out of office reply", "low", True, "Turn the automatic reply on with the text to send.", (USER, Field("message", "Reply text", "longtext"), Field("until", "Until", "datetime"))),
@@ -143,6 +158,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("calendar_permissions", "Mail and permissions", "Give access to a calendar", "low", True, "Let another person see or edit a calendar.", (Field("user", "Whose calendar", "user"), Field("grantee", "Who gets access", "user"), Field("level", "Kind of access", "choice", ("Free and busy times only", "Reviewer (see details)", "Editor (change items)")))),
 )
 
+# Every tool takes a ticket number first: an existing one to write the work into, or none, and a new ticket is opened when the request runs (Hal: all Toolbox items).
+TICKET = Field("ticket", "Ticket number", "ticket", required=False, hint="An existing ticket to write the work into. Leave it empty and a new ticket is opened when this runs.")
+TOOLS: tuple[Tool, ...] = tuple(replace(t, fields=(TICKET, *t.fields)) for t in _TOOLS)
 BY_ID = {t.id: t for t in TOOLS}
 
 
@@ -156,7 +174,7 @@ def catalog() -> list[dict[str, Any]]:
             "risk": t.risk,
             "reversible": t.reversible,
             "summary": t.summary,
-            "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "options": list(f.options), "required": f.required, "hint": f.hint} for f in t.fields],
+            "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "options": list(f.options), "required": f.required, "hint": f.hint, "default": f.default} for f in t.fields],
         }
         for t in TOOLS
     ]
@@ -176,6 +194,10 @@ def _check_value(f: Field, value: str) -> str | None:
         return f"{f.label} must be one of: {', '.join(f.options)}."
     if f.kind == "domain" and not re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", value):
         return f"{f.label} must be a domain name."
+    if f.kind == "ticket" and not re.match(r"^[0-9]{1,12}$", value):
+        return f"{f.label} must be the number of an existing ticket."
+    if f.kind == "secret" and not (MIN_SECRET <= len(value) <= MAX_SECRET):
+        return f"{f.label} must be between {MIN_SECRET} and {MAX_SECRET} characters."
     if f.kind == "rules":
         names = [n.strip() for n in value.splitlines() if n.strip()]
         if not names or len(names) > MAX_RULES or any(len(n) > 160 for n in names):
@@ -198,6 +220,8 @@ def check_request(tool_id: str, args: dict[str, Any]) -> tuple[Tool | None, dict
     for f in tool.fields:
         raw = args.get(f.key)
         value = str(raw).strip() if raw is not None else ""
+        if not value and f.default:
+            value = f.default
         if not value:
             if f.required:
                 return tool, {}, f"{f.label} is needed."
@@ -215,7 +239,9 @@ def approval_text(tool: Tool, client: str, args: dict[str, str]) -> tuple[str, s
     """The title and summary of the approval card: what is asked, for whom, with every value shown (the approver decides on exactly this)."""
     who = args.get("user") or (f"{args['first_name']} {args['last_name']}" if "first_name" in args else "")
     title = f"{tool.label}: {who}" if who else tool.label
-    lines = [f"{tool.summary} Client: {client}."] + [f"{f.label}: {args[f.key].replace(chr(10), '; ')}" for f in tool.fields if f.key in args]
+    lines = [f"{tool.summary} Client: {client}."] + [f"{f.label}: {'set (hidden)' if f.kind == 'secret' else args[f.key].replace(chr(10), '; ')}" for f in tool.fields if f.key in args]
+    if not args.get("ticket"):
+        lines.append("No ticket was given: a new ticket is opened when this runs.")
     lines.append("Reversible." if tool.reversible else "Not easily reversed.")
     return title[:200], "\n".join(lines)
 

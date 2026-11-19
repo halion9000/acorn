@@ -73,7 +73,7 @@ def test_the_approval_card_shows_every_value_and_whether_it_can_be_undone():
     assert "Client: Acme" in text and "Give access to the OneDrive files to: ann@acme.com" in text and "Do it at: 2026-12-05T17:00" in text
     assert "Forward new mail to" not in text, "a field left empty is not shown"
     assert text.endswith("Not easily reversed.")
-    assert len(t.catalog()) == len(t.TOOLS) and t.catalog()[0]["fields"][0]["key"] == "user" and t.catalog()[0]["fields"][0]["kind"] == "user"
+    assert len(t.catalog()) == len(t.TOOLS) and t.catalog()[0]["fields"][1]["key"] == "user" and t.catalog()[0]["fields"][1]["kind"] == "user"
 
 
 def test_the_pickers_list_members_first_and_the_domains_by_use():
@@ -94,7 +94,7 @@ def test_the_pickers_list_members_first_and_the_domains_by_use():
 
 def test_the_group_is_picked_from_the_clients_groups_and_the_rules_are_picked_from_the_persons_rules():
     assert {f.key: f.kind for f in t.BY_ID["group_membership"].fields}["group"] == "group"
-    assert {f.key: f.kind for f in t.BY_ID["remove_inbox_rules"].fields} == {"user": "user", "rules": "rules", "reason": "text"}
+    assert {f.key: f.kind for f in t.BY_ID["remove_inbox_rules"].fields} == {"ticket": "ticket", "user": "user", "rules": "rules", "reason": "text"}
     assert t.BY_ID["remove_inbox_rules"].reversible is False
 
 
@@ -106,3 +106,35 @@ def test_removing_inbox_rules_needs_at_least_one_and_at_most_thirty_and_shows_ea
     assert t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": " \n "})[2] == "Rules to remove is needed."
     assert "between 1 and 30" in t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": "\n".join(f"r{i}" for i in range(31))})[2]
     assert t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": "\n".join(f"rule number {i} " * 3 for i in range(30))})[2] is None, "a long list of long names still fits"
+
+
+def test_every_tool_asks_for_a_ticket_first_and_a_new_one_is_opened_when_none_is_given():
+    for tool in t.TOOLS:
+        assert tool.fields[0].key == "ticket" and tool.fields[0].required is False and tool.fields[0].kind == "ticket", tool.id
+    assert t.check_request("reset_mfa", {"user": "ann@acme.com", "reason": "x"})[2] is None
+    tool, args, why = t.check_request("reset_mfa", {"user": "ann@acme.com", "reason": "x", "ticket": " 4711 "})
+    assert why is None and args["ticket"] == "4711"
+    assert "number of an existing ticket" in t.check_request("reset_mfa", {"user": "ann@acme.com", "reason": "x", "ticket": "T-4711"})[2]
+    assert "No ticket was given: a new ticket is opened when this runs." in t.approval_text(tool, "Acme", {k: v for k, v in args.items() if k != "ticket"})[1]
+    assert "No ticket was given" not in t.approval_text(tool, "Acme", args)[1]
+
+
+def test_change_a_password_follows_the_rewst_form_with_the_change_at_next_sign_in_defaulting_to_yes():
+    fields = {f.key: f for f in t.BY_ID["change_password"].fields}
+    assert list(fields) == ["ticket", "user", "entra_override", "require_change", "password"]
+    assert fields["entra_override"].kind == "email" and fields["entra_override"].required is False
+    assert fields["require_change"].options == ("Yes", "No") and fields["require_change"].default == "Yes"
+    assert fields["password"].kind == "secret" and fields["password"].required is True
+    ok = {"user": "ann@acme.com", "password": "Correct-Horse-9"}
+    assert t.check_request("change_password", ok)[1] == {"user": "ann@acme.com", "require_change": "Yes", "password": "Correct-Horse-9"}, "the default is filled in"
+    assert t.check_request("change_password", {**ok, "require_change": "No"})[1]["require_change"] == "No"
+    assert t.check_request("change_password", {"user": "ann@acme.com"})[2] == "Password is needed."
+    assert "between 8 and 128" in t.check_request("change_password", {**ok, "password": "short"})[2]
+    assert "email address" in t.check_request("change_password", {**ok, "entra_override": "not an address"})[2]
+
+
+def test_a_password_is_never_shown_in_the_approval_text():
+    tool, args, _ = t.check_request("change_password", {"user": "ann@acme.com", "password": "Correct-Horse-9", "ticket": "4711"})
+    title, text = t.approval_text(tool, "Acme", args)
+    assert "Correct-Horse-9" not in text and "Password: set (hidden)" in text and "Ticket number: 4711" in text
+    assert title == "Change a password: ann@acme.com"

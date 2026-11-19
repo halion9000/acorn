@@ -73,7 +73,7 @@ async def test_a_press_creates_one_pending_approval_with_every_value_and_runs_no
     assert len(rows) == 1
     status, risk, by, title, action = rows[0]
     assert (status, risk, by, title) == ("pending", "high", "toolbox:tech@liveoakit.com", "Reset a person's MFA: ann@acme.com")
-    assert action == {"kind": "toolbox", "tool": "reset_mfa", "client_id": str(world.acme), "client": "Acme", "args": {"user": "ann@acme.com", "reason": "lost phone"}}
+    assert action == {"kind": "toolbox", "tool": "reset_mfa", "client_id": str(world.acme), "client": "Acme", "args": {"user": "ann@acme.com", "reason": "lost phone"}, "secret_args": []}
 
 
 async def test_a_bad_request_or_a_foreign_client_creates_nothing(world):
@@ -200,3 +200,24 @@ async def test_inbox_rules_are_asked_only_for_a_person_of_that_client(world):
     assert got["status"] == "waiting" and got["kind"] == "rules"
     rows = await queued(w)
     assert [(r[0], r[1]) for r in rows] == [("mailbox_rules_lookup", {"upn": "ann@acme.com"})]
+
+
+async def test_a_typed_password_is_stored_encrypted_named_as_a_secret_and_never_in_the_summary_or_the_audit(world):
+    from app.security.credential_vault import get_vault
+
+    out = await call(world, world.acme, "change_password", {"user": "ann@acme.com", "password": "Correct-Horse-9", "ticket": "4711"})
+    assert out["status"] == "pending"
+    engine = create_async_engine(PG_URL)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            row = (await conn.execute(text("select summary, action from agent_approvals where tenant_id = :t"), {"t": world.owner})).one()
+            audit = (await conn.execute(text("select changes::text from audit_log where tenant_id = :t"), {"t": world.owner})).scalars().all()
+    finally:
+        await engine.dispose()
+    summary, action = row
+    assert "Correct-Horse-9" not in summary and "Password: set (hidden)" in summary
+    assert action["secret_args"] == ["password"] and action["args"]["password"] != "Correct-Horse-9"
+    assert get_vault().decrypt(action["args"]["password"]) == "Correct-Horse-9", "kept so a later run can use it"
+    assert action["args"]["ticket"] == "4711" and action["args"]["require_change"] == "Yes"
+    assert not any("Correct-Horse-9" in str(c) for c in audit)

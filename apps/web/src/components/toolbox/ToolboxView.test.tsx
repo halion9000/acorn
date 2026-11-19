@@ -60,7 +60,7 @@ describe('ToolboxView', () => {
     render(<ToolboxView />);
     await userEvent.click(await screen.findByRole('button', { name: /Reset a person's MFA/ }));
     expect(screen.getAllByText('high risk, not easily reversed').length).toBe(2);
-    const ask = screen.getByRole('button', { name: 'Send request' }) as HTMLButtonElement;
+    const ask = screen.getByRole('button', { name: 'Save request' }) as HTMLButtonElement;
     expect(ask.disabled).toBe(true);
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     expect(ask.disabled).toBe(true);
@@ -73,7 +73,7 @@ describe('ToolboxView', () => {
     expect(dialog.textContent).toContain('ann@acme.com');
     expect(dialog.textContent).toContain('lost phone');
     expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, send it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, save it' }));
     await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/toolbox/request', expect.objectContaining({ method: 'POST' })));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent).toEqual({ tool: 'reset_mfa', client_id: 'c1', args: { user: 'ann@acme.com', reason: 'lost phone' } });
@@ -90,8 +90,8 @@ describe('ToolboxView', () => {
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
     await userEvent.type(screen.getByLabelText('Why'), 'x');
-    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Yes, send it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save request' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Yes, save it' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Why is needed.');
     cleanup();
     authFetch.mockReset();
@@ -117,7 +117,7 @@ describe('pickers', () => {
     const mailbox = screen.getByLabelText('Mailbox') as HTMLSelectElement;
     expect(Array.from(mailbox.options).map((o) => o.value)).toEqual(['', 'Convert to a shared mailbox', 'Keep as it is']);
     expect(screen.getByText('Who gets access to the mailbox (optional)')).toBeTruthy();
-    const ask = screen.getByRole('button', { name: 'Send request' }) as HTMLButtonElement;
+    const ask = screen.getByRole('button', { name: 'Save request' }) as HTMLButtonElement;
     await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
     await userEvent.selectOptions(mailbox, 'Keep as it is');
     expect(ask.disabled).toBe(true);
@@ -126,7 +126,7 @@ describe('pickers', () => {
     await userEvent.type(screen.getByLabelText('Who gets access to the mailbox'), 'old@acme.com');
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     await userEvent.click(ask);
-    await userEvent.click(await screen.findByRole('button', { name: 'Yes, send it' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Yes, save it' }));
     await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(true));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent.args).toEqual({ user: 'ann@acme.com', mailbox: 'Keep as it is', when: '2026-12-05T17:00', mailbox_access: 'old@acme.com' });
@@ -162,7 +162,7 @@ describe('the confirmation', () => {
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
     await userEvent.type(screen.getByLabelText('Why'), 'lost phone');
-    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save request' }));
     expect(screen.getByRole('dialog', { name: 'Are you sure?' }).textContent).toContain('high risk, not easily reversed');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).toBeNull();

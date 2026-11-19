@@ -22,6 +22,7 @@ from app.models.signin import IdentityMfaUser
 from app.services import core_lookup as lk
 from app.services import toolbox as tb
 from app.services.audit import emit_audit
+from app.security.credential_vault import get_vault
 from app.services.identity_people import MICROSOFT
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
@@ -124,6 +125,7 @@ async def make_request(body: RequestIn, user: Annotated[AuthUser, Depends(requir
     if why or tool is None:
         raise HTTPException(status_code=422, detail=why or "That request cannot be made.")
     client = names[body.client_id]
+    secrets = {f.key for f in tool.fields if f.kind == "secret" and f.key in args}
     title, summary = tb.approval_text(tool, client, args)
     row = AgentApproval(
         tenant_id=user.tenant_id,
@@ -131,7 +133,15 @@ async def make_request(body: RequestIn, user: Annotated[AuthUser, Depends(requir
         title=title,
         summary=summary,
         risk_level=tool.risk,
-        action={"kind": "toolbox", "tool": tool.id, "client_id": str(body.client_id), "client": client, "args": args},
+        # A secret (a typed password) is kept encrypted, named in secret_args, and never written to the summary or the audit.
+        action={
+            "kind": "toolbox",
+            "tool": tool.id,
+            "client_id": str(body.client_id),
+            "client": client,
+            "args": {k: (get_vault().encrypt(v) if k in secrets else v) for k, v in args.items()},
+            "secret_args": sorted(secrets),
+        },
         expires_at=datetime.now(UTC) + EXPIRES_AFTER,
         status="pending",
     )

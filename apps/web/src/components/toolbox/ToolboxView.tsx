@@ -21,10 +21,12 @@ export interface ToolInfo {
 export interface FieldInfo {
   key: string;
   label: string;
-  kind: 'user' | 'email' | 'users' | 'choice' | 'domain' | 'datetime' | 'text' | 'longtext' | 'group' | 'rules';
+  kind: 'user' | 'email' | 'users' | 'choice' | 'domain' | 'datetime' | 'text' | 'longtext' | 'group' | 'rules' | 'ticket' | 'secret';
   options: string[];
   required: boolean;
   hint: string;
+  /** The value the form starts with (for example Yes for Require a password change). */
+  default?: string;
 }
 export interface Person {
   email: string;
@@ -62,7 +64,37 @@ export function removeFromList(list: string, email: string): string {
 
 /** The lines of the confirmation: every value the person gave, labelled, in the form's order, leaving out what was left empty (pure). */
 export function confirmLines(tool: ToolInfo, values: Record<string, string>): { label: string; value: string }[] {
-  return tool.fields.filter((f) => (values[f.key] ?? '').trim() !== '').map((f) => ({ label: f.label, value: (values[f.key] ?? '').trim() }));
+  const lines = tool.fields.filter((f) => (values[f.key] ?? '').trim() !== '').map((f) => ({ label: f.label, value: f.kind === 'secret' ? '(hidden)' : (values[f.key] ?? '').trim() }));
+  const ticket = tool.fields.find((f) => f.kind === 'ticket');
+  return ticket && (values[ticket.key] ?? '').trim() === '' ? [...lines, { label: ticket.label, value: 'none given: a new ticket is opened when this runs' }] : lines;
+}
+
+const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const LOWER = 'abcdefghijkmnopqrstuvwxyz';
+const DIGITS = '23456789';
+const SYMBOLS = '!@#$%&*?';
+
+/** A password of 16 characters with a capital, a small letter, a digit and a symbol, leaving out the letters that look alike. ``below(n)`` gives a whole number from 0 to n - 1 (the browser's secure random by default). */
+export function generatePassword(below: (n: number) => number = (n) => crypto.getRandomValues(new Uint32Array(1))[0]! % n): string {
+  const all = UPPER + LOWER + DIGITS + SYMBOLS;
+  const pick = (set: string) => set[below(set.length)]!;
+  const chars = [pick(UPPER), pick(LOWER), pick(DIGITS), pick(SYMBOLS)];
+  while (chars.length < 16) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = below(i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join('');
+}
+
+/** What a tool's form starts with: each field's default, and a generated password for a secret (pure given the random source). */
+export function startingValues(tool: ToolInfo, below?: (n: number) => number): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of tool.fields) {
+    if (f.default) out[f.key] = f.default;
+    else if (f.kind === 'secret') out[f.key] = generatePassword(below);
+  }
+  return out;
 }
 
 /** Whether a form is ready to send: a client is chosen and every required field has a value. */
@@ -234,9 +266,26 @@ function RulesField({ f, value, onChange, rules, person }: { f: FieldInfo; value
   );
 }
 
+function SecretField({ f, value, onChange }: { f: FieldInfo; value: string; onChange: (v: string) => void }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="mt-1 flex max-w-md gap-2">
+      <input aria-label={f.label} type={shown ? 'text' : 'password'} autoComplete="new-password" value={value} onChange={(e) => onChange(e.target.value)} className="block w-full rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 font-mono text-sm text-gray-100" />
+      <button type="button" onClick={() => setShown(!shown)} className="rounded-md border border-gray-700 px-2 text-xs text-gray-200">
+        {shown ? 'Hide' : 'Show'}
+      </button>
+      <button type="button" onClick={() => onChange(generatePassword())} className="rounded-md border border-gray-700 px-2 text-xs text-gray-200">
+        Generate
+      </button>
+    </div>
+  );
+}
+
 function FieldControl({ f, value, onChange, lookups, groups, rules, person }: { f: FieldInfo; value: string; onChange: (v: string) => void; lookups: Lookups; groups: Asked<GroupData>; rules: Asked<RulesData>; person: boolean }) {
   if (f.kind === 'group') return <GroupField f={f} value={value} onChange={onChange} groups={groups} />;
   if (f.kind === 'rules') return <RulesField f={f} value={value} onChange={onChange} rules={rules} person={person} />;
+  if (f.kind === 'ticket') return <input aria-label={f.label} inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Existing ticket number, or leave empty for a new one" className={INPUT} />;
+  if (f.kind === 'secret') return <SecretField f={f} value={value} onChange={onChange} />;
   const listId = `people-${f.key}`;
   if (f.kind === 'user' || f.kind === 'email') {
     return (
@@ -316,7 +365,7 @@ export function ToolboxView() {
 
   const choose = (t: ToolInfo) => {
     setTool(t);
-    setValues({});
+    setValues(startingValues(t));
     setMessage(null);
   };
 
@@ -331,7 +380,7 @@ export function ToolboxView() {
       if (!res.ok) setMessage({ ok: false, text: typeof body.detail === 'string' ? body.detail : 'The request was not made.' });
       else {
         setMessage({ ok: true, text: `${body.title ?? 'Request'} was recorded. ${body.note ?? ''}`.trim() });
-        setValues({});
+        setValues(startingValues(tool));
       }
     } catch {
       setMessage({ ok: false, text: 'The request was not made. Try again.' });
@@ -352,7 +401,7 @@ export function ToolboxView() {
 
   return (
     <div className="space-y-6 p-6" data-testid="toolbox">
-      <PageHeader title="Toolbox" subtitle="Ask for a Microsoft 365 action for a client. Pressing Send request asks you to confirm first. The request is recorded; nothing runs against the client yet because running it through CIPP is the next stage." />
+      <PageHeader title="Toolbox" subtitle="Ask for a Microsoft 365 action for a client. Pressing Save request asks you to confirm first. The request is recorded; nothing runs against the client yet because running it through CIPP is the next stage." />
       {error && (
         <p role="alert" className="text-sm text-red-300">
           {error}
@@ -362,7 +411,7 @@ export function ToolboxView() {
         Client
         <select aria-label="Client" value={clientId} onChange={(e) => {
             setClientId(e.target.value);
-            setValues({});
+            setValues(tool ? startingValues(tool) : {});
           }} className="ml-2 rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100">
           <option value="">Pick a client</option>
           {clients.map((c) => (
@@ -410,7 +459,7 @@ export function ToolboxView() {
             </div>
           ))}
           <button type="button" disabled={!complete || busy} onClick={() => setConfirming(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
-            Send request
+            Save request
           </button>
           {message && (
             <p role={message.ok ? 'status' : 'alert'} className={`text-sm ${message.ok ? 'text-emerald-300' : 'text-red-300'}`}>
@@ -443,7 +492,7 @@ export function ToolboxView() {
                 Cancel
               </button>
               <button type="button" onClick={() => void send()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white">
-                Yes, send it
+                Yes, save it
               </button>
             </div>
           </div>

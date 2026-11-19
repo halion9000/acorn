@@ -79,10 +79,10 @@ describe('the inbox rules picker', () => {
     expect((screen.getByRole('checkbox', { name: /Tidy/ }) as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText(/sends mail outside the client/)).toBeTruthy();
     expect(authFetch).toHaveBeenCalledWith('/api/v1/toolbox/inbox-rules', expect.objectContaining({ body: JSON.stringify({ client_id: 'c1', user: 'ann@acme.com' }) }));
-    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save request' }));
     expect(screen.getByRole('dialog').textContent).toContain('Forward all');
     expect(screen.getByRole('dialog').textContent).not.toContain('Tidy');
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, send it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, save it' }));
     await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(true));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent).toEqual({ tool: 'remove_inbox_rules', client_id: 'c1', args: { user: 'ann@acme.com', rules: 'Forward all' } });
@@ -95,7 +95,7 @@ describe('the inbox rules picker', () => {
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     await userEvent.type(screen.getByLabelText('Mailbox'), 'ann@acme.com');
     expect(await screen.findByText(/The rules could not be read: The inbox rules could not be read/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Send request' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save request' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
