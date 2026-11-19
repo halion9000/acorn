@@ -17791,6 +17791,218 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/report-schedules:
+    get:
+      tags:
+      - compliance
+      summary: The scheduled reports and the kinds of report that can be scheduled
+      operationId: list_schedules_api_v1_compliance_report_schedules_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Schedule a report
+      operationId: create_schedule_api_v1_compliance_report_schedules_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__report_schedules__ScheduleIn'
+            example:
+              name: Monday digest
+              report_kind: compliance_actions
+              emails:
+              - amy@acme.example
+              frequency: weekly
+              day: 0
+              hour_utc: 7
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__report_schedules__ScheduleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/report-schedules/{schedule_id}:
+    patch:
+      tags:
+      - compliance
+      summary: Change a schedule
+      operationId: patch_schedule_api_v1_compliance_report_schedules__schedule_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Schedule Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePatch'
+            example:
+              enabled: false
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__report_schedules__ScheduleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - compliance
+      summary: Delete a schedule
+      operationId: delete_schedule_api_v1_compliance_report_schedules__schedule_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Schedule Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/report-schedules/{schedule_id}/send-now:
+    post:
+      tags:
+      - compliance
+      summary: Send this report now and record how it went
+      operationId: send_now_api_v1_compliance_report_schedules__schedule_id__send_now_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Schedule Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/app__api__v1__endpoints__report_schedules__ScheduleOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/trust-center:
     get:
       tags:
@@ -60207,6 +60419,73 @@ components:
       - findings_closed
       - error_message
       title: ScanRunOut
+    ScheduleList:
+      properties:
+        schedules:
+          items:
+            $ref: '#/components/schemas/app__api__v1__endpoints__report_schedules__ScheduleOut'
+          type: array
+          title: Schedules
+        kinds:
+          items:
+            additionalProperties:
+              type: string
+            type: object
+          type: array
+          title: Kinds
+      type: object
+      required:
+      - schedules
+      - kinds
+      title: ScheduleList
+    SchedulePatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 120
+            minLength: 2
+          - type: 'null'
+          title: Name
+        emails:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 20
+            minItems: 1
+          - type: 'null'
+          title: Emails
+        frequency:
+          anyOf:
+          - type: string
+            enum:
+            - daily
+            - weekly
+            - monthly
+          - type: 'null'
+          title: Frequency
+        day:
+          anyOf:
+          - type: integer
+            maximum: 28.0
+            minimum: 0.0
+          - type: 'null'
+          title: Day
+        hour_utc:
+          anyOf:
+          - type: integer
+            maximum: 23.0
+            minimum: 0.0
+          - type: 'null'
+          title: Hour Utc
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+      type: object
+      title: SchedulePatch
     ScoreBreakdownOut:
       properties:
         client_id:
@@ -71779,6 +72058,112 @@ components:
       - unmapped
       - alerts_raised
       title: ReportOut
+    app__api__v1__endpoints__report_schedules__ScheduleIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 2
+          title: Name
+        report_kind:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Report Kind
+        emails:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Emails
+        frequency:
+          type: string
+          enum:
+          - daily
+          - weekly
+          - monthly
+          title: Frequency
+        day:
+          type: integer
+          maximum: 28.0
+          minimum: 0.0
+          title: Day
+          default: 0
+        hour_utc:
+          type: integer
+          maximum: 23.0
+          minimum: 0.0
+          title: Hour Utc
+          default: 7
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      type: object
+      required:
+      - name
+      - report_kind
+      - emails
+      - frequency
+      title: ScheduleIn
+    app__api__v1__endpoints__report_schedules__ScheduleOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        report_kind:
+          type: string
+          title: Report Kind
+        report_label:
+          type: string
+          title: Report Label
+        emails:
+          items:
+            type: string
+          type: array
+          title: Emails
+        frequency:
+          type: string
+          title: Frequency
+        day:
+          type: integer
+          title: Day
+        hour_utc:
+          type: integer
+          title: Hour Utc
+        enabled:
+          type: boolean
+          title: Enabled
+        last_run_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Run At
+        last_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Result
+      type: object
+      required:
+      - id
+      - name
+      - report_kind
+      - report_label
+      - emails
+      - frequency
+      - day
+      - hour_utc
+      - enabled
+      - last_run_at
+      - last_result
+      title: ScheduleOut
     app__api__v1__endpoints__reports__TemplateOut:
       properties:
         name:

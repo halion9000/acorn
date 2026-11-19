@@ -8089,6 +8089,34 @@ export const savedScriptsApi = {
   run: (id: string, deviceIds: string[]) => request<SavedScriptRun[]>(`/api/v1/remote-scripts/${encodeURIComponent(id)}/run`, { method: 'POST', body: JSON.stringify({ device_ids: deviceIds, confirm: true }) }),
 };
 
+/** Scheduled reports (/api/v1/compliance/report-schedules): choose a report, who gets it and how often. */
+export interface ReportScheduleRow {
+  id: string;
+  name: string;
+  report_kind: string;
+  report_label: string;
+  emails: string[];
+  frequency: 'daily' | 'weekly' | 'monthly';
+  day: number;
+  hour_utc: number;
+  enabled: boolean;
+  last_run_at: string | null;
+  last_result: string | null;
+}
+export interface ReportScheduleList {
+  schedules: ReportScheduleRow[];
+  kinds: { kind: string; label: string }[];
+}
+export const reportSchedulesApi = {
+  list: (clientId: string) => request<ReportScheduleList>(`/api/v1/compliance/report-schedules?${riskQs(clientId)}`),
+  create: (clientId: string, body: { name: string; report_kind: string; emails: string[]; frequency: 'daily' | 'weekly' | 'monthly'; day: number; hour_utc: number }) =>
+    request<ReportScheduleRow>(`/api/v1/compliance/report-schedules?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  patch: (clientId: string, id: string, body: { name?: string; emails?: string[]; frequency?: string; day?: number; hour_utc?: number; enabled?: boolean }) =>
+    request<ReportScheduleRow>(`/api/v1/compliance/report-schedules/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  remove: (clientId: string, id: string) => request<void>(`/api/v1/compliance/report-schedules/${encodeURIComponent(id)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+  sendNow: (clientId: string, id: string) => request<ReportScheduleRow>(`/api/v1/compliance/report-schedules/${encodeURIComponent(id)}/send-now?${riskQs(clientId)}`, { method: 'POST' }),
+};
+
 /** The auditors who may open an audit, and the files an audit keeps (/api/v1/compliance/audits/{id}/auditors and /files for staff, /api/v1/audit-portal for the auditor). */
 export interface AuditFileRow {
   id: string;

@@ -249,7 +249,7 @@
     "status": "not_started",
     "needs": "signoff",
     "added": "2026-11-14",
-    "note": "A6 (weekly briefing) is a written summary: which clients had what alerts, what changed, what is open. It overlaps with r7-cf-21 and the report scheduler (r7-af-32). Recommend: fold it into the report scheduler instead of a separate feature. Reply 'fold' or 'skip'."
+    "note": "The report scheduler now exists (r7-af-32). A weekly briefing would be one more scheduled report on it (alerts, what changed, what is open). Reply 'fold' to close this item as covered by the scheduler, or 'skip'."
   },
   {
     "key": "agent-tools",
@@ -2004,10 +2004,10 @@
     "key": "r7-af-32",
     "title": "Reports: schedule any report by email",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): build a report scheduler for any report: choose who gets it, how often, when. Client names in e-mail: the scheduler lets you choose per schedule. Approved: I build it (Hal does not need to act)."
+    "note": "Built: Reports > Executive digest > Scheduled reports: pick a report, who gets it, daily, weekly or monthly and the hour; e-mailed as plain text. Two reports can be scheduled so far (Compliance action items, Open audit requests); more are one small piece of code each. Question: which reports do you want on the list next (Executive digest, Client review, the Net income tabs, License waste)? Client names go out only if the report is about that client; tell me if you want a switch for that. NOT seen live."
   },
   {
     "key": "r7-af-33",

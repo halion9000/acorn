@@ -49,6 +49,7 @@ from app.workers.platform_watch_worker import run_platform_watch
 from app.workers.playbook_dry_run_worker import run_playbook_dry_runs
 from app.workers.compliance_notice_worker import run_compliance_notices
 from app.workers.compliance_test_worker import run_compliance_tests
+from app.workers.report_schedule_worker import run_report_schedules
 from app.workers.policy_reminder_worker import run_policy_reminders
 from app.workers.retention_sweeper import run_retention_sweeper
 from app.workers.suppression_sweeper import run_suppression_sweeper
@@ -503,6 +504,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("compliance_tests worker failed to start", error=str(exc))
 
+    # The scheduled reports e-mailed on their day and hour (app/workers/report_schedule_worker.py).
+    report_schedules_task: asyncio.Task | None = None
+    if settings.REPORT_SCHEDULES_ENABLED:
+        try:
+            report_schedules_task = asyncio.create_task(
+                _run_guarded_scheduler_worker(job_name="report_schedules", ttl_seconds=_RETENTION_LOCK_TTL_SECONDS, worker=run_report_schedules),
+                name="report_schedules_worker",
+            )
+            logger.info("report_schedules worker started")
+        except Exception as exc:
+            logger.warning("report_schedules worker failed to start", error=str(exc))
+
     # The platform watching itself: CORE gone quiet, connectors gone quiet, low disk or memory. Emails the alert-email recipients about changes (app/workers/platform_watch_worker.py).
     platform_watch_task: asyncio.Task | None = None
     if settings.PLATFORM_WATCH_ENABLED:
@@ -648,6 +661,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await compliance_notice_task
         except asyncio.CancelledError:
             logger.debug("compliance_notices worker cancelled during shutdown")
+    if report_schedules_task is not None and not report_schedules_task.done():
+        report_schedules_task.cancel()
+        try:
+            await report_schedules_task
+        except asyncio.CancelledError:
+            logger.debug("report_schedules worker cancelled during shutdown")
     if compliance_tests_task is not None and not compliance_tests_task.done():
         compliance_tests_task.cancel()
         try:
