@@ -257,11 +257,45 @@ interface ScoreData {
   } | null;
 }
 
+/** The metrics to show: all of them until a person unticks some (``picked`` is null while every one is shown). */
+export const shownMetrics = (all: string[], picked: string[] | null): string[] => (picked === null ? all : all.filter((m) => picked.includes(m)));
+
+/** The picked list after one metric is ticked or unticked; null again when every metric is on. */
+export function toggleMetric(all: string[], picked: string[] | null, metric: string): string[] | null {
+  const now = shownMetrics(all, picked);
+  const next = now.includes(metric) ? now.filter((m) => m !== metric) : all.filter((m) => now.includes(m) || m === metric);
+  return next.length === all.length ? null : next;
+}
+
+/** One metric's 1 to 5 score per week as small bars with the score above each; a week not scored is empty. */
+export function ScoreBars({ points }: { points: { label: string; value: number | null }[] }) {
+  return (
+    <div data-testid="score-bars">
+      <div className="flex items-end gap-1.5" style={{ height: 90 }}>
+        {points.map((p) => (
+          <div key={p.label} className="flex flex-1 flex-col items-center justify-end" style={{ height: '100%' }}>
+            <span className="text-[10px] tabular-nums">{p.value ?? ''}</span>
+            <div className="w-full rounded-t" style={{ height: `${((p.value ?? 0) / 5) * 100}%`, background: 'rgba(0,212,255,0.55)', border: '1px solid #00d4ff' }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-0.5 flex gap-1.5 text-[10px]" style={{ color: 'var(--metrics-soft)' }}>
+        {points.map((p) => (
+          <span key={p.label} className="flex-1 text-center">
+            {weekLabel(p.label)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export const gradeClass = (g: string): string => (g === 'S' || g === 'A' ? 'text-emerald-300' : g === 'B' ? 'text-sky-300' : g === 'C' ? 'text-amber-300' : g === '-' ? 'text-gray-500' : 'text-red-300');
 
 export function ScorecardView() {
   const period = usePeriod(2);
   const [member, setMember] = useState('');
+  const [picked, setPicked] = useState<string[] | null>(null);
   const { data, denied, problem } = useMetric<ScoreData>(`/api/v1/reports/metrics/scorecard?${period.query}${member ? `&member=${encodeURIComponent(member)}` : ''}`);
   const d = data?.detail;
   return (
@@ -296,15 +330,37 @@ export function ScorecardView() {
             {d && (
               <>
                 <Cards items={[['Average score', String(d.average ?? '—')], ['Grade', d.grade], ['Weeks', String(d.weeks.length)]]} />
-                <Panel title="Weekly score trend" testId="score-trend">
-                  <Columns points={d.trend.map((t) => ({ label: weekLabel(t.week), value: t.score }))} />
+                <Panel title="Weekly Score Trend" testId="score-trend">
+                  <AreaChart points={d.trend.map((t) => ({ label: t.week, value: t.score ?? 0 }))} color="#00d4ff" testId="score-trend-chart" />
+                </Panel>
+                <Panel title="Select Metric(s)" testId="score-metric-picker">
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {data.metrics.map((m) => (
+                      <label key={m} className="flex items-center gap-1.5">
+                        <input type="checkbox" aria-label={`Show ${m}`} checked={shownMetrics(data.metrics, picked).includes(m)} onChange={() => setPicked(toggleMetric(data.metrics, picked, m))} />
+                        {m}
+                      </label>
+                    ))}
+                  </div>
+                </Panel>
+                <Panel title="Metrics Trend by Week" testId="score-metric-trends">
+                  <div className="space-y-3">
+                    {shownMetrics(data.metrics, picked).map((m) => (
+                      <div key={m}>
+                        <p className="mb-1 text-xs font-semibold">
+                          {m} <span className="font-normal text-gray-400">(weight {data.weights[m]})</span>
+                        </p>
+                        <ScoreBars points={[...d.weeks].reverse().map((w) => ({ label: w.week, value: w.factors[m] ?? null }))} />
+                      </div>
+                    ))}
+                  </div>
                 </Panel>
                 <Table
                   testId="score-weeks"
-                  head={['Week', ...data.metrics, 'Score', 'Grade']}
+                  head={['Week', ...shownMetrics(data.metrics, picked), 'Score', 'Grade']}
                   rows={[
-                    ...d.weeks.map((w) => [`${weekLabel(w.week)}${w.score === null ? ' (not scored)' : ''}`, ...data.metrics.map((m) => (w.factors[m] === null || w.factors[m] === undefined ? '-' : String(w.factors[m]))), w.score === null ? '-' : String(w.score), w.grade]),
-                    ['Average', ...data.metrics.map((m) => (d.metric_averages[m] === null || d.metric_averages[m] === undefined ? '-' : String(d.metric_averages[m]))), String(d.average ?? '-'), d.grade],
+                    ...d.weeks.map((w) => [`${weekLabel(w.week)}${w.score === null ? ' (not scored)' : ''}`, ...shownMetrics(data.metrics, picked).map((m) => (w.factors[m] === null || w.factors[m] === undefined ? '-' : String(w.factors[m]))), w.score === null ? '-' : String(w.score), w.grade]),
+                    ['Average', ...shownMetrics(data.metrics, picked).map((m) => (d.metric_averages[m] === null || d.metric_averages[m] === undefined ? '-' : String(d.metric_averages[m]))), String(d.average ?? '-'), d.grade],
                   ]}
                 />
                 <p className="text-xs text-gray-500">Weights: {data.metrics.map((m) => `${m} ${data.weights[m]}`).join(', ')}. A week with no activity or a whole week off is not scored.</p>

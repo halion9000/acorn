@@ -6,7 +6,7 @@ const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('@/lib/saveFile', () => ({ saveText: vi.fn() }));
 
-import { ProfitabilityView, money, monthLabel, pct, sortRows } from './ProfitabilityView';
+import { ProfitabilityView, money, monthLabel, pct, searchRows, sortRows } from './ProfitabilityView';
 
 const row = (over: Record<string, unknown> = {}) => ({ client_id: '5', client_name: 'Acme Dental', revenue: 1000, invoices: 2, hours: 6.5, labor: 900, after_labor: 100, margin_percent: 10, software_per_run: 123.45, ...over });
 const body = (over: Record<string, unknown> = {}) => ({
@@ -141,5 +141,16 @@ describe('Profitability: opening a client', () => {
     await userEvent.click(screen.getAllByRole('button', { name: /Every ticket behind the .* hours of Acme Dental/ })[0]!);
     expect(await screen.findByTestId('detail-ticket-rows')).toHaveTextContent('Quarterly review');
     await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+});
+
+describe('searching the customers', () => {
+  const row = (name: string) => ({ client_id: name, client_name: name, revenue: 1, invoices: 1, hours: 1, labor: 1, after_labor: 0, margin_percent: 0, software_per_run: null });
+  it('keeps the clients that have every word, whatever the case, and all of them with nothing typed', () => {
+    const rows = [row('Acme Dental, Inc.'), row('Birch Law'), row('Acme Law')];
+    expect(searchRows(rows, 'acme law').map((r) => r.client_name)).toEqual(['Acme Law']);
+    expect(searchRows(rows, 'LAW').map((r) => r.client_name)).toEqual(['Birch Law', 'Acme Law']);
+    expect(searchRows(rows, '  ')).toHaveLength(3);
+    expect(searchRows(rows, 'zzz')).toEqual([]);
   });
 });

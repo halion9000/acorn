@@ -50,3 +50,7 @@ Read from the Rewst page templates (headings, controls, chart types, table colum
 - **Monthly Licensing and User Roles:** a month picker, Select all for software or roles and for clients.
 - **Meetings (a Rewst page not in its menu):** total meeting hours, meeting hours by team member and by team, with a team filter. A.C.O.R.N has no page for it and CORE sends no meeting hours.
 - **Not built in Rewst either:** Staff Hours Distribution has no template there.
+
+### Done later the same day
+
+Customer Experience (doughnut and monthly chart), Scorecard (metric picker, weekly score trend, a metrics trend by week), Ticket Summary (total labor hours by month, open tickets by priority as a doughnut), Monthly Invoicing (revenue trend as a line), Profitability (customer search). Still open: the Profitability trend charts (MRR from line items, contracts per month, MRR vs COGS by month, monthly breakdown by client) need a multi-month read the page does not have yet; the Ticket Summary created-vs-resolved chart already exists; Monthly Licensing and User Roles already have Select all; the Meetings page is not built.

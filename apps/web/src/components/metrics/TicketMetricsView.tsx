@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '@/lib/auth-session';
 import { PageHeader } from '@/components/ui/kit';
 import { LineChart, MetricStat, PairedColumns, PeriodPicker, periodQuery, showingText, usePeriod, type CustomRange } from './kit';
-import { OpenTicketsPanel } from './TicketPages';
+import { LaborHoursPanel, OpenTicketsPanel } from './TicketPages';
 
 interface Summary {
   months: string[];
@@ -156,6 +156,7 @@ export function TicketMetricsView() {
             <h2 className="text-base">First Response Time (in minutes)</h2>
             <LineChart points={s.series.map((r) => ({ label: monthName(r.month), value: r.first_response_minutes ?? null }))} unit="m" />
           </section>
+          <LaborHoursPanel query={periodQuery(period.months, period.range)} />
           <OpenTicketsPanel clientId={clientId} />
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="metrics-card" aria-label="By type">

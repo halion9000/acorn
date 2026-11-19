@@ -4,6 +4,8 @@
  * Metrics > Tickets and Finance (the Rewst metric dashboards, rebuilt): Ticket Resolution, Ticket Volume Analysis, Ticket Summary's open-ticket breakdown and Monthly Invoicing. A.C.O.R.N works each out from the
  * weekly and monthly facts CORE sends about once a day (HaloPSA tickets and invoices), never read live.
  */
+import { AreaChart } from './AreaChart';
+import { Doughnut } from './Doughnut';
 import { StaleDetail, type StaleTicket } from './StaleTickets';
 
 import { BarList, Cards, Columns, LONG_PERIODS, NothingYet, Page, Panel, PeriodPicker, Table, monthShort, moneyText, num, showingText, useMetric, usePeriod } from './kit';
@@ -128,7 +130,7 @@ export function MonthlyInvoicingView() {
           <Cards items={[['Billed', moneyText(data.total)], ['Clients', String(data.clients.length)]]} />
           <div className="grid gap-4 lg:grid-cols-2">
             <Panel title="Monthly revenue trend" testId="invoicing-trend">
-              <Columns points={data.trend.map((t) => ({ label: monthShort(t.month), value: Math.round(t.amount) }))} />
+              <AreaChart points={data.trend.map((t) => ({ label: monthShort(t.month), value: Math.round(t.amount) }))} color="#00d4ff" testId="invoicing-trend-chart" />
             </Panel>
             <Panel title="Total billed by billing category" testId="invoicing-category">
               <BarList rows={data.by_category.map((c) => ({ label: c.category, value: c.amount, text: moneyText(c.amount) }))} />
@@ -163,6 +165,29 @@ interface OpenData {
 }
 
 /** What is open now by status and priority (not date filtered): the part of Ticket Summary the tickets page does not hold. */
+const PRIORITY_COLORS: Record<string, string> = { critical: '#ef5350', high: '#ffa726', medium: '#fdd835', low: '#66bb6a' };
+const OTHER_COLORS = ['#42a5f5', '#7e57c2', '#26c6da', '#8d6e63', '#9e9e9e'];
+
+/** The color of a priority: critical red, high orange, medium yellow, low green, and a steady color from a short list for any other name (pure). */
+export function priorityColor(name: string): string {
+  const known = PRIORITY_COLORS[name.trim().toLowerCase()];
+  if (known) return known;
+  let sum = 0;
+  for (const ch of name) sum = (sum + ch.charCodeAt(0)) % 997;
+  return OTHER_COLORS[sum % OTHER_COLORS.length]!;
+}
+
+/** The hours worked on tickets each month, as bars, for the same period the Ticket Summary shows. */
+export function LaborHoursPanel({ query }: { query: string }) {
+  const { data } = useMetric<{ received_at: string | null; summary: { by_month: { month: string; hours: number }[] } | null }>(`/api/v1/reports/ticket-metrics/labor-hours?${query}`);
+  if (!data?.received_at || !Array.isArray(data.summary?.by_month)) return null;
+  return (
+    <Panel title="Total Labor Hours" testId="summary-labor-hours">
+      <Columns points={data.summary!.by_month.map((m) => ({ label: monthShort(m.month), value: m.hours }))} unit=" h" />
+    </Panel>
+  );
+}
+
 export function OpenTicketsPanel({ clientId }: { clientId: string }) {
   const { data } = useMetric<OpenData>(`/api/v1/reports/metrics/open-tickets${clientId ? `?client_id=${encodeURIComponent(clientId)}` : ''}`);
   if (!data?.received_at || !Array.isArray(data.by_status) || !Array.isArray(data.by_priority)) return null;
@@ -171,8 +196,8 @@ export function OpenTicketsPanel({ clientId }: { clientId: string }) {
       <Panel title="Open tickets by status (current)">
         <BarList rows={data.by_status.map((s) => ({ label: s.status, value: s.tickets, text: num(s.tickets) }))} />
       </Panel>
-      <Panel title="Open tickets by priority (current)">
-        <BarList rows={data.by_priority.map((s) => ({ label: s.priority, value: s.tickets, text: num(s.tickets) }))} />
+      <Panel title="Open tickets by priority (current)" testId="open-priority">
+        <Doughnut slices={data.by_priority.map((s) => ({ label: s.priority, value: s.tickets, color: priorityColor(s.priority) }))} />
       </Panel>
     </div>
   );

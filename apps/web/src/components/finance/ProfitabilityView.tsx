@@ -64,6 +64,12 @@ export const monthLabel = (m: string): string => {
   return new Date(Date.UTC(y, mo - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 export type SortKey = 'client_name' | 'revenue' | 'hours' | 'labor' | 'after_labor' | 'margin_percent';
+/** The rows whose client name has every word typed, case ignored (pure); nothing typed keeps them all. */
+export function searchRows(rows: Row[], search: string): Row[] {
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  return words.length === 0 ? rows : rows.filter((r) => words.every((w) => r.client_name.toLowerCase().includes(w)));
+}
+
 /** The rows in the order the person chose (pure): amounts sent as text ("9820.00") are compared by value, and a missing value sorts last either way. */
 export function sortRows(rows: Row[], key: SortKey, desc: boolean): Row[] {
   return sortedBy(rows, (r) => r[key] as SortValue, desc);
@@ -77,6 +83,7 @@ export function ProfitabilityView() {
   const [problem, setProblem] = useState<string | null>(null);
   const [data, setData] = useState<Profitability | null>(null);
   const [month, setMonth] = useState('');
+  const [search, setSearch] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'revenue', desc: true });
   const [scope, setScope] = useState<Rate['scope']>('default');
   const [key, setKey] = useState('');
@@ -107,7 +114,7 @@ export function ProfitabilityView() {
   }, [load]);
 
   const teams = useMemo(() => [...new Set((data?.agents ?? []).map((a) => a.team).filter(Boolean))].sort(), [data]);
-  const rows = useMemo(() => (data?.report ? sortRows(data.report.rows, sort.key, sort.desc) : []), [data, sort]);
+  const rows = useMemo(() => (data?.report ? sortRows(searchRows(data.report.rows, search), sort.key, sort.desc) : []), [data, sort, search]);
 
   const saveRate = async () => {
     setBusy(true);
@@ -165,6 +172,7 @@ export function ProfitabilityView() {
               <span>Month</span>
               <MonthYearPicker months={data.months} value={month} onChange={(m) => { setMonth(m); void load(m); }} className={input} />
             </div>
+            <input aria-label="Search customers" type="search" placeholder="Search customers..." value={search} onChange={(e) => setSearch(e.target.value)} className={input} />
             <button type="button" className={ghost} onClick={() => void download()}>
               Export CSV
             </button>
