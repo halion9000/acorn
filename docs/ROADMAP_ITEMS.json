@@ -73,9 +73,9 @@
     "title": "Audits: auditor sign-in and a data room (the audit tracker is built)",
     "detail": "Built: audits with evidence requests, from controls or typed, with owners, due dates, provided and accepted. Not built: a sign-in for the auditor, and a data room of files.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes: the auditor is invited with a specific auditor role limited to one audit and can upload files into A.C.O.R.N as needed. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built: Compliance > Audits > open an audit > Auditor sign-in (create the account, temporary password shown once) and Files. The auditor signs in, sets up an authenticator app and sees only the audits opened to them (accept or send back requests, download and add files). Files are stored in A.C.O.R.N (10 MB each, 50 per audit). NOT checked in the running app: please create a test auditor on one audit, sign in as that account in a private window and tell me what you see.",
     "added": "2026-11-14"
   },
   {
@@ -83,9 +83,9 @@
     "title": "Trust center: a public share link (the signed-in trust center is built)",
     "detail": "Built: the trust center behind sign-in. Not built: a public link.",
     "area": "Compliance",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes to a public link: one per client, off by default, an off switch, a list of the documents shown. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Hal (core2.docx, 2026-11-18): yes to a public link: one per client, off by default, an off switch, a list of the documents shown. One catch before I build it: A.C.O.R.N only answers from allowed IP addresses, so a prospect outside could not open a public link. Question: may I open one public path that serves only the trust page (nothing else, nothing signed-in), through the same load balancer, with its own rule? If yes I build the page, the per-client token and the off switch, and give you the one infrastructure change to approve. If no, the link works only from allowed addresses.",
     "added": "2026-11-14"
   },
   {
@@ -809,7 +809,7 @@
     "area": "Round 7: CORE improvement",
     "status": "not_started",
     "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): yes: one source for the connector descriptions. Approved: I build it (Hal does not need to act).",
+    "note": "Approved (Hal: yes). Not started: the title does not say which duplicated descriptions are meant. My reading: the connector list, the generated docs and A.C.O.R.N's connector cards each hold their own wording. I will find the copies and merge them when I reach it.",
     "added": "2026-11-14"
   },
   {
@@ -887,10 +887,12 @@
     "key": "r7-ai-01",
     "title": "Say license in every text the API and CORE produce, not only in the console",
     "area": "Round 7: A.C.O.R.N improvement",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): ok: say license in user-visible text only; field names stay. Approved: I build it (Hal does not need to act)."
+    "note": "Done in the API and in CORE: license in every text a person reads (check evidence, pass lines, billing and CSV titles, guidance). Field names, keys and identifiers keep the old spelling so nothing that depends on them breaks.",
+    "completed": "2026-11-18",
+    "completed_ref": "this commit"
   },
   {
     "key": "r7-ai-02",
@@ -1410,19 +1412,21 @@
     "key": "r7-cf-13",
     "title": "Meraki: list SSIDs with no encryption and clients that use them",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: Meraki SSIDs with no encryption. Approved: I build it (Hal does not need to act)."
+    "note": "Already built before this round: the Meraki check 'Wi-Fi names open or WEP' (Settings > Client posture > Meraki) lists each network's Wi-Fi names that are open (no sign-in page) or use WEP. The 'clients that use them' part is not built: Meraki's Wi-Fi settings do not say who connects, and a per-client list means one extra Meraki read for every network; reply here if you want it anyway.",
+    "completed": "2026-11-18",
+    "completed_ref": "built earlier (meraki_open_wifi)"
   },
   {
     "key": "r7-cf-14",
     "title": "UniFi: report devices offline for more than a week",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: UniFi devices offline for more than a week. Approved: I build it (Hal does not need to act)."
+    "note": "Built on the A.C.O.R.N side: Reports > Device Versions has a new list of UniFi devices offline for more than a week. UniFi only says 'offline', never since when, so A.C.O.R.N counts from the day it first saw the device offline; the list starts empty and fills a week after the deploy. NOT checked against live UniFi data: check in a week that devices you know are down appear."
   },
   {
     "key": "r7-cf-15",
@@ -1437,10 +1441,10 @@
     "key": "r7-cf-16",
     "title": "IT Glue: find clients with no documented backup or no network diagram",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): GO: IT Glue clients with no documented backup or network diagram. Approved: I build it (Hal does not need to act)."
+    "note": "Built (CORE reads each client's IT Glue documents once a day; the check 'Backup and network diagram documents' is met with a document titled like a backup plan and one titled like a network diagram, partly with one, not met with neither). Judged by document titles only. NOT verified against live IT Glue (the document list endpoint is from IT Glue's reference): after the next daily IT Glue pass, open a client's checks and see whether it looks right."
   },
   {
     "key": "r7-cf-17",
@@ -1473,10 +1477,10 @@
     "key": "r7-cf-20",
     "title": "A daily CORE self-report: what ran, what failed, what changed",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): go, Slack: daily CORE self-report to Slack (the same acorn_core channel). Approved: I build it (Hal does not need to act)."
+    "note": "Built: CORE posts one short report a day to the CORE Slack channel (the same channel as the not-met check notices): what it runs, uptime, how many tool sweeps ran and sent, which had failures, which have not run in over a day. After 07:00 local, once a day, starting the day after this CORE update. NOT seen live: tell me what the first message looks like, or what to change."
   },
   {
     "key": "r7-cf-21",
@@ -1737,9 +1741,9 @@
     "key": "r7-af-06",
     "title": "Vendors: a questionnaire sent to the vendor as a form with a link",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "new",
+    "status": "in_progress",
     "needs": "hal",
-    "note": "Short answer: not as it is. A.C.O.R.N is reachable only from allowed IPs, so a vendor outside cannot open a form link. Options: a separate public address that serves only the vendor form (nothing else), or e-mailing the questionnaire as a file. Which do you prefer?",
+    "note": "Hal (core2.docx): sounds good, but will it work with the VPN / specific IP setup? Answer: no, not as it is. A vendor outside the allowed addresses cannot open a form link. Same fix as trust-center: one public path that serves only the vendor form (answers are saved, the link expires after 30 days). Reply with the answer given on trust-center and I build both together; otherwise the questionnaire can be e-mailed as a file instead.",
     "added": "2026-11-14"
   },
   {
@@ -1837,18 +1841,18 @@
     "key": "r7-af-16",
     "title": "Audits: a read-only auditor view limited to one audit",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): see audits-data-room: auditor role limited to one audit. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built together with audits-data-room (see that item for what to check).",
     "added": "2026-11-14"
   },
   {
     "key": "r7-af-17",
     "title": "Audits: a data room of uploaded files per audit",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
-    "note": "Hal (core2.docx, 2026-11-18): see audits-data-room: files uploaded into A.C.O.R.N per audit. Approved: I build it (Hal does not need to act).",
+    "status": "in_progress",
+    "needs": "hal",
+    "note": "Built together with audits-data-room (see that item for what to check).",
     "added": "2026-11-14"
   },
   {
@@ -1857,7 +1861,7 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "in_progress",
     "needs": "claude",
-    "note": "Same as trust-center: you said yes. It is a public web address per client showing only the documents you choose; an off switch removes it. Nothing more needed.",
+    "note": "Same as trust-center: waiting on the answer there (public path or not).",
     "added": "2026-11-14"
   },
   {

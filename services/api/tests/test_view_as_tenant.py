@@ -1371,6 +1371,7 @@ class TestCapabilities:
             "viewer": [],
             "billing": [],
             "client_viewer": [],
+            "auditor": [],
             "api_service": [],
         }
 

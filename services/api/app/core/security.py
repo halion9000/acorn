@@ -199,6 +199,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     # A person at a CUSTOMER of the MSP, signed in to see their own company's summary and nothing else (/client-portal). It holds one permission that no staff role holds and that implies nothing: every other route
     # refuses this role outright in get_current_user (app/services/client_portal.py), whatever its own permission check says. It needs an authenticator app before the summary is served.
     "client_viewer": ["client_portal:view"],
+    # An outside auditor, signed in to see ONE audit (the ones linked to them) and add files to it. Like client_viewer it reaches only its own routes (/audit-portal, see app/services/client_portal.py).
+    "auditor": ["audit_portal:view"],
     "api_service": [
         "alerts:read",
         "alerts:write",

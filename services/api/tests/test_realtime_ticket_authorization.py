@@ -60,7 +60,7 @@ class TestWhoGetsATicket:
         for role in (
             r
             for r in ROLE_PERMISSIONS
-            if r not in {"custom", "client_viewer"}  # client_viewer: sealed to the client dashboard
+            if r not in {"custom", "client_viewer", "auditor"}  # client_viewer and auditor: sealed to their own pages
         ):  # "custom": a person whose one role is a custom role holds what that role lists
             assert has_permission(role, "alerts:read") and has_permission(
                 role, "cases:read"

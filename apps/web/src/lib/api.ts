@@ -8067,6 +8067,52 @@ export const auditsApi = {
     request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 
+/** The auditors who may open an audit, and the files an audit keeps (/api/v1/compliance/audits/{id}/auditors and /files for staff, /api/v1/audit-portal for the auditor). */
+export interface AuditFileRow {
+  id: string;
+  name: string;
+  size_bytes: number;
+  request_id: string | null;
+  uploaded_by: string | null;
+  by_auditor: boolean;
+  created_at: string;
+}
+export interface AuditorRow {
+  user_id: string;
+  email: string | null;
+  name: string;
+  since: string;
+}
+/** Fetch a download with the signed-in session and give back its bytes. */
+async function fetchBlob(url: string): Promise<Blob> {
+  const res = await authFetch(url);
+  if (!res.ok) throw new ApiError(`API ${res.status} ${res.statusText}`, res.status, await res.text().catch(() => ''));
+  return res.blob();
+}
+const enc = encodeURIComponent;
+export const auditAccessApi = {
+  auditors: (clientId: string, id: string) => request<AuditorRow[]>(`/api/v1/compliance/audits/${enc(id)}/auditors?${riskQs(clientId)}`),
+  invite: (clientId: string, id: string, body: { account_name: string; email?: string | null; name?: string | null }) =>
+    request<{ auditors: AuditorRow[]; temporary_password: string }>(`/api/v1/compliance/audits/${enc(id)}/auditors/invite?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  link: (clientId: string, id: string, email: string) => request<AuditorRow[]>(`/api/v1/compliance/audits/${enc(id)}/auditors?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify({ email }) }),
+  unlink: (clientId: string, id: string, userId: string) => request<AuditorRow[]>(`/api/v1/compliance/audits/${enc(id)}/auditors/${enc(userId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+  files: (clientId: string, id: string) => request<AuditFileRow[]>(`/api/v1/compliance/audits/${enc(id)}/files?${riskQs(clientId)}`),
+  upload: (clientId: string, id: string, body: { name: string; content_base64: string; request_id?: string | null }) =>
+    request<AuditFileRow[]>(`/api/v1/compliance/audits/${enc(id)}/files?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  download: (clientId: string, id: string, fileId: string) => fetchBlob(`/api/v1/compliance/audits/${enc(id)}/files/${enc(fileId)}/download?${riskQs(clientId)}`),
+  remove: (clientId: string, id: string, fileId: string) => request<AuditFileRow[]>(`/api/v1/compliance/audits/${enc(id)}/files/${enc(fileId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+};
+export const auditPortalApi = {
+  audits: () => request<AuditRow[]>('/api/v1/audit-portal/audits'),
+  get: (id: string) => request<AuditDetail>(`/api/v1/audit-portal/audits/${encodeURIComponent(id)}`),
+  patchRequest: (id: string, requestId: string, body: { status?: 'open' | 'accepted'; note?: string }) =>
+    request<AuditDetail>(`/api/v1/audit-portal/audits/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  files: (id: string) => request<AuditFileRow[]>(`/api/v1/audit-portal/audits/${encodeURIComponent(id)}/files`),
+  upload: (id: string, body: { name: string; content_base64: string; request_id?: string | null }) =>
+    request<AuditFileRow[]>(`/api/v1/audit-portal/audits/${encodeURIComponent(id)}/files`, { method: 'POST', body: JSON.stringify(body) }),
+  download: (id: string, fileId: string) => fetchBlob(`/api/v1/audit-portal/audits/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}/download`),
+};
+
 /** Security questionnaires and the answer library (/api/v1/compliance/questionnaires, /api/v1/compliance/answer-library). */
 export interface LibraryAnswer {
   id: string;

@@ -25,7 +25,7 @@ export function refusalKind(status: number, detail: string): 'mfa' | 'unlinked' 
   return 'other';
 }
 
-function SetupAuthenticator({ onDone }: { onDone: () => void }) {
+export function SetupAuthenticator({ onDone }: { onDone: () => void }) {
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [code, setCode] = useState('');
   const [recovery, setRecovery] = useState<string[] | null>(null);

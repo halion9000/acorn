@@ -10,6 +10,9 @@ from typing import Any
 
 EXAMPLES: dict[tuple[str, str], dict[str, Any]] = {
     ("POST", "/api/v1/compliance/evidence/collect"): {"framework": "SOC2"},
+    ("POST", "/api/v1/compliance/audits/{audit_id}/auditors"): {"email": "pat@auditfirm.example"},
+    ("POST", "/api/v1/compliance/audits/{audit_id}/auditors/invite"): {"account_name": "pat-audit", "name": "Pat Lee", "email": "pat@auditfirm.example"},
+    ("POST", "/api/v1/compliance/audits/{audit_id}/files"): {"name": "access-review-q3.pdf", "content_base64": "JVBERi0xLjQK"},
     ("POST", "/api/v1/compliance/evidence"): {
         "framework": "SOC2",
         "control_id": "CC6.1",

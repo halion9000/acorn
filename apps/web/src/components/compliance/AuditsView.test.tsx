@@ -7,7 +7,7 @@ const csv = vi.hoisted(() => vi.fn());
 const save = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/saveFile', () => ({ saveText: save }));
 vi.mock('@/lib/api', () => ({
-  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), auditsApi: api, msspApi: { listChildren: async () => [] } }));
+  downloadCsv: csv, apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), auditsApi: api, msspApi: { listChildren: async () => [] }, auditAccessApi: { auditors: async () => [], files: async () => [] } }));
 
 import { AuditsView } from './AuditsView';
 

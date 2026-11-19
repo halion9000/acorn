@@ -6,6 +6,9 @@ describe('landingFor', () => {
     expect(landingFor('client_viewer', '/dashboard')).toBe('/client-portal');
     expect(landingFor('client_viewer', '/settings')).toBe('/client-portal');
   });
+  it('sends an auditor sign-in to the audit portal whatever page they asked for', () => {
+    expect(landingFor('auditor', '/dashboard')).toBe('/audit-portal');
+  });
   it('sends everyone else where they were headed', () => {
     expect(landingFor('tenant_admin', '/alerts')).toBe('/alerts');
     expect(landingFor(undefined, '/dashboard')).toBe('/dashboard');

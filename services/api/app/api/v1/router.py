@@ -28,6 +28,7 @@ from app.api.v1.endpoints import (
     assets,
     attack_chain,
     audit,
+    audit_portal,
     audits,
     auth,
     automation_hubspot,
@@ -308,6 +309,8 @@ api_router.include_router(detected_applications.router)
 api_router.include_router(detected_applications.ingest_router)
 api_router.include_router(access_reviews.router)
 api_router.include_router(audits.router)
+api_router.include_router(audit_portal.staff_router)
+api_router.include_router(audit_portal.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(compliance_dashboard.router)

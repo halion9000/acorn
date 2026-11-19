@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { saveText } from '@/lib/saveFile';
 import { missingRequests } from '@/lib/auditTemplates';
+import { AuditAccess } from '@/components/compliance/AuditAccess';
 import { apiErrorDetail, auditsApi, downloadCsv, type AuditDetail, type AuditList } from '@/lib/api';
 
 const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
@@ -141,6 +142,7 @@ function Detail({ clientId, audit, onChange, onClose }: { clientId: string; audi
         ))}
         {audit.items.length === 0 && <li className="text-xs text-gray-500">No requests yet.</li>}
       </ul>
+      <AuditAccess clientId={clientId} auditId={audit.id} complete={done} />
     </section>
   );
 }

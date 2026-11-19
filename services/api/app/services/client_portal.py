@@ -28,6 +28,7 @@ from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.services import ticket_metrics as tm
 
 CLIENT_VIEWER_ROLE = "client_viewer"
+AUDITOR_ROLE = "auditor"
 VENDOR = "halopsa"
 VIEW_AS_HEADER = "x-view-as-tenant"
 
@@ -58,8 +59,21 @@ def reach_allowed(method: str, path: str) -> bool:
     return (method.upper(), relative_path(path)) in ALLOWED_PATHS
 
 
+# What an auditor may call besides /audit-portal: ending and renewing the session, changing their own password, and the authenticator app (which the audit pages insist on).
+_AUDITOR_SESSION_PATHS: frozenset[tuple[str, str]] = ALLOWED_PATHS - {("GET", "/client-portal/summary")}
+
+
+def auditor_reach_allowed(method: str, path: str) -> bool:
+    rel = relative_path(path)
+    return rel.startswith("/audit-portal/") or (method.upper(), rel) in _AUDITOR_SESSION_PATHS
+
+
 def enforce_reach(role: str, request: Request | None) -> None:
     """403 for a client_viewer asking for anything outside ``ALLOWED_PATHS`` (also when the request names another tenant to view). A direct call with no request is not an HTTP request and is left alone."""
+    if request is not None and role == AUDITOR_ROLE:
+        if request.headers.get(VIEW_AS_HEADER) is not None or not auditor_reach_allowed(request.method, request.url.path):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This sign-in can only open the audits it was invited to.")
+        return
     if role != CLIENT_VIEWER_ROLE or request is None:
         return
     if request.headers.get(VIEW_AS_HEADER) is not None or not reach_allowed(request.method, request.url.path):

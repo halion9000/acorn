@@ -105,7 +105,8 @@ def test_role_permissions_map_covers_every_role_under_test() -> None:
         "platform_admin",
         "custom",
         "client_viewer",
-    }  # client_viewer: sealed to the client dashboard, tests/test_client_portal.py
+        "auditor",
+    }  # client_viewer: sealed to the client dashboard, tests/test_client_portal.py; auditor: sealed to the audit pages, tests/test_audit_portal.py
     audited_roles = set(WRITE_ROLES + READ_ONLY_ROLES) - {"admin", "platform_admin"}
     missing = real_roles - audited_roles
     assert (

@@ -17026,6 +17026,609 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/auditors:
+    get:
+      tags:
+      - compliance
+      summary: The people with the auditor role who may open this audit
+      operationId: list_auditors_api_v1_compliance_audits__audit_id__auditors_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditorOut'
+                title: Response List Auditors Api V1 Compliance Audits  Audit Id  Auditors
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Let a person with the auditor role open this audit
+      operationId: add_auditor_api_v1_compliance_audits__audit_id__auditors_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditorIn'
+            example:
+              email: pat@auditfirm.example
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditorOut'
+                title: Response Add Auditor Api V1 Compliance Audits  Audit Id  Auditors
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/auditors/invite:
+    post:
+      tags:
+      - compliance
+      summary: Create a sign-in for an outside auditor and let it open this audit
+        (the temporary password is shown once)
+      description: The new account has the auditor role in this audit's workspace
+        and nothing else; it must set up an authenticator app before the audit opens.
+      operationId: invite_auditor_api_v1_compliance_audits__audit_id__auditors_invite_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteIn'
+            example:
+              account_name: pat-audit
+              name: Pat Lee
+              email: pat@auditfirm.example
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/auditors/{user_id}:
+    delete:
+      tags:
+      - compliance
+      summary: Take an auditor's access to this audit away
+      operationId: remove_auditor_api_v1_compliance_audits__audit_id__auditors__user_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditorOut'
+                title: Response Remove Auditor Api V1 Compliance Audits  Audit Id  Auditors  User
+                  Id  Delete
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/files:
+    get:
+      tags:
+      - compliance
+      summary: The files this audit keeps
+      operationId: list_files_api_v1_compliance_audits__audit_id__files_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileOut'
+                title: Response List Files Api V1 Compliance Audits  Audit Id  Files
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Add a file to this audit (10 MB at most)
+      operationId: upload_file_api_v1_compliance_audits__audit_id__files_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileIn'
+            example:
+              name: access-review-q3.pdf
+              content_base64: JVBERi0xLjQK
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileOut'
+                title: Response Upload File Api V1 Compliance Audits  Audit Id  Files
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/files/{file_id}/download:
+    get:
+      tags:
+      - compliance
+      summary: Download one of the audit's files
+      operationId: download_file_api_v1_compliance_audits__audit_id__files__file_id__download_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: file_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: File Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/audits/{audit_id}/files/{file_id}:
+    delete:
+      tags:
+      - compliance
+      summary: Remove one of the audit's files
+      operationId: delete_file_api_v1_compliance_audits__audit_id__files__file_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: file_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: File Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileOut'
+                title: Response Delete File Api V1 Compliance Audits  Audit Id  Files  File
+                  Id  Delete
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit-portal/audits:
+    get:
+      tags:
+      - audit-portal
+      summary: The audits you were invited to
+      operationId: my_audits_api_v1_audit_portal_audits_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AuditOut'
+                type: array
+                title: Response My Audits Api V1 Audit Portal Audits Get
+      security:
+      - HTTPBearer: []
+  /api/v1/audit-portal/audits/{audit_id}:
+    get:
+      tags:
+      - audit-portal
+      summary: One audit you were invited to, with its requests
+      operationId: my_audit_api_v1_audit_portal_audits__audit_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit-portal/audits/{audit_id}/requests/{request_id}:
+    patch:
+      tags:
+      - audit-portal
+      summary: Accept a request staff marked provided, or send it back with a note
+      operationId: my_request_api_v1_audit_portal_audits__audit_id__requests__request_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditorRequestPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit-portal/audits/{audit_id}/files:
+    get:
+      tags:
+      - audit-portal
+      summary: The files kept for an audit you were invited to
+      operationId: my_files_api_v1_audit_portal_audits__audit_id__files_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileOut'
+                title: Response My Files Api V1 Audit Portal Audits  Audit Id  Files
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - audit-portal
+      summary: Upload a file to an audit you were invited to (10 MB at most)
+      operationId: my_upload_api_v1_audit_portal_audits__audit_id__files_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileOut'
+                title: Response My Upload Api V1 Audit Portal Audits  Audit Id  Files
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit-portal/audits/{audit_id}/files/{file_id}/download:
+    get:
+      tags:
+      - audit-portal
+      summary: Download a file of an audit you were invited to
+      operationId: my_download_api_v1_audit_portal_audits__audit_id__files__file_id__download_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: audit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Audit Id
+      - name: file_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: File Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/trust-center:
     get:
       tags:
@@ -18223,6 +18826,54 @@ paths:
                 additionalProperties: true
                 title: Response Huntress Versions Api V1 Device Reports Huntress Versions
                   Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/device-reports/offline:
+    get:
+      tags:
+      - devices
+      summary: Devices a tool has shown as offline for more than a week (the clock
+        starts when A.C.O.R.N first sees the device offline)
+      operationId: offline_devices_api_v1_device_reports_offline_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+      - name: vendor
+        in: query
+        required: false
+        schema:
+          type: string
+          default: unifi
+          title: Vendor
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 7
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Offline Devices Api V1 Device Reports Offline Get
         '422':
           description: Validation Error
           content:
@@ -22885,7 +23536,7 @@ paths:
     get:
       tags:
       - billing
-      summary: Licences bought but not assigned to anyone, per client and licence
+      summary: Licenses bought but not assigned to anyone, per client and license
         (quantities, never prices)
       description: Each licence a client holds with at least ``minimum`` unassigned,
         most first, with the share of what was bought. A licence a tool did not say
@@ -22929,7 +23580,7 @@ paths:
     get:
       tags:
       - billing
-      summary: The unassigned licences as a CSV file (quantities, never prices)
+      summary: The unassigned licenses as a CSV file (quantities, never prices)
       description: Every licence with at least ``minimum`` unassigned (no row limit),
         most first, the same rows the Licence waste tab shows.
       operationId: licence_waste_csv_api_v1_billing_licence_waste_csv_get
@@ -37177,6 +37828,58 @@ components:
           title: Status
       type: object
       title: AuditPatch
+    AuditorIn:
+      properties:
+        email:
+          type: string
+          maxLength: 255
+          minLength: 3
+          title: Email
+      type: object
+      required:
+      - email
+      title: AuditorIn
+    AuditorOut:
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          title: User Id
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        name:
+          type: string
+          title: Name
+        since:
+          type: string
+          format: date-time
+          title: Since
+      type: object
+      required:
+      - user_id
+      - email
+      - name
+      - since
+      title: AuditorOut
+    AuditorRequestPatch:
+      properties:
+        status:
+          anyOf:
+          - type: string
+            pattern: ^(open|accepted)$
+          - type: 'null'
+          title: Status
+        note:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Note
+      type: object
+      title: AuditorRequestPatch
     AuthenticateBeginRequest:
       properties:
         account_name:
@@ -46425,6 +47128,68 @@ components:
       - is_enabled
       - created_at
       title: FeedOut
+    FileIn:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        content_base64:
+          type: string
+          minLength: 1
+          title: Content Base64
+        request_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Request Id
+      type: object
+      required:
+      - name
+      - content_base64
+      title: FileIn
+    FileOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        size_bytes:
+          type: integer
+          title: Size Bytes
+        request_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Request Id
+        uploaded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Uploaded By
+        by_auditor:
+          type: boolean
+          title: By Auditor
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - name
+      - size_bytes
+      - request_id
+      - uploaded_by
+      - by_auditor
+      - created_at
+      title: FileOut
     FimEventsPage:
       properties:
         events:
@@ -49239,6 +50004,44 @@ components:
           default: ''
       type: object
       title: InvestigateRequest
+    InviteIn:
+      properties:
+        account_name:
+          type: string
+          maxLength: 32
+          minLength: 3
+          title: Account Name
+        email:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Email
+        name:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Name
+      type: object
+      required:
+      - account_name
+      title: InviteIn
+    InviteOut:
+      properties:
+        auditors:
+          items:
+            $ref: '#/components/schemas/AuditorOut'
+          type: array
+          title: Auditors
+        temporary_password:
+          type: string
+          title: Temporary Password
+      type: object
+      required:
+      - auditors
+      - temporary_password
+      title: InviteOut
     ItemEventOut:
       properties:
         item:
