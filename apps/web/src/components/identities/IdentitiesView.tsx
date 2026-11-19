@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
+import { PageHeader } from '@/components/ui/kit';
 import { identitiesApi, msspApi, type IdentityPerson, type IdentityQuery, type IdentitySort } from '@/lib/api';
 import VendorBadge from '@/components/mssp/VendorBadge';
 import { vendorLabel } from '@/components/mssp/ClientMapping';
@@ -430,21 +431,25 @@ export function IdentitiesView() {
       className={`rounded-lg border p-3 text-left ${on ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 bg-gray-900/60'}`}
     >
       <div className="text-xs text-gray-400">{label}</div>
-      <div className={`text-2xl font-semibold ${bad ? 'text-amber-300' : 'text-gray-100'}`}>{value ?? '—'}</div>
+      <div className={`text-2xl font-semibold tabular-nums ${bad ? 'text-amber-400' : 'text-gray-100'}`}>{value ?? '—'}</div>
     </button>
   );
 
+  // A label that starts a new row of tiles, so nineteen filters read as four groups.
+  const group = (label: string) => (
+    <p className="w-full pt-1 text-xs font-semibold text-gray-500" data-testid="tile-group">
+      {label}
+    </p>
+  );
   const summary = data?.summary;
   const tools = Object.keys(summary?.tools ?? {});
 
   return (
     <div className="space-y-5 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Identities</h1>
-        <p className="mt-1 text-sm text-gray-400">Every person the connected tools know, one row each, with the tools that know them, their multi-factor state and the alerts that name them.</p>
-      </div>
+      <PageHeader title="Identities" subtitle="Every person the connected tools know, one row each." about={<p>One row per person, with the tools that know them, their multi-factor state and the alerts that name them. The tiles are filters: press one to list those people.</p>} />
 
       <div className="flex flex-wrap gap-3">
+        {group('Overview')}
         {tile('Active Identities', summary?.active, activeOnly, () => setActiveOnly((v) => !v))}
         <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3" title="Every person the connected tools know, whatever the filters">
           <div className="text-xs text-gray-400">All Identities</div>
@@ -452,11 +457,13 @@ export function IdentitiesView() {
             {summary?.total ?? '—'}
           </div>
         </div>
+        {group('Risk')}
         {tile('With open alerts', summary?.with_alerts, hasAlerts, () => setHasAlerts((v) => !v), true)}
         {tile('No Multi-Factor', summary?.without_mfa, mfa === 'none', () => setMfa(mfa === 'none' ? '' : 'none'), true)}
         {tile('Backup problems', summary?.backup_problems, backup === 'problem', () => setBackup(backup === 'problem' ? '' : 'problem'), true)}
         {tile('Exposed in a breach', summary?.exposed, exposed === 'any', () => setExposed(exposed === 'any' ? '' : 'any'), true)}
         {tile('Password or stealer log', summary?.exposed_serious, exposed === 'serious', () => setExposed(exposed === 'serious' ? '' : 'serious'), true)}
+        {group('Directory and tools')}
         {tile('Cloud account, not in Halo', summary?.cloud_not_in_halo, haloCheck === 'cloud_not_in_halo', () => setHaloCheck(haloCheck === 'cloud_not_in_halo' ? '' : 'cloud_not_in_halo'), true)}
         {tile('Gone in Halo, still enabled', summary?.halo_inactive_cloud_enabled, haloCheck === 'halo_inactive_cloud_enabled', () => setHaloCheck(haloCheck === 'halo_inactive_cloud_enabled' ? '' : 'halo_inactive_cloud_enabled'), true)}
         {tile('Administrators', summary?.admins, adminOnly, () => setAdminOnly((v) => !v))}
@@ -464,6 +471,7 @@ export function IdentitiesView() {
         {tile('Disabled accounts', summary?.disabled, disabledOnly, () => reset(() => setState(state === 'disabled' ? '' : 'disabled')))}
         {tile('In only one tool', summary?.in_one_tool, oneTool, () => setOneTool((v) => !v))}
         {tile('External guests', summary?.guests, kind === 'guest', () => setKind(kind === 'guest' ? '' : 'guest'))}
+        {group('Sign-ins')}
         <button
           type="button"
           data-testid="failed-signins"
