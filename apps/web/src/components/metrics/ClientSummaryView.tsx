@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader, StatCard } from '@/components/ui/kit';
 import { hoursText, monthName } from './LaborHoursView';
 import { PERIODS, num, waitText } from './TicketMetricsView';
 
@@ -70,13 +71,7 @@ export function ClientSummaryBody({ empty, t, l, sat }: { empty: boolean; t?: Ti
               ['First response', waitText(t.first_response_minutes), 'on average'],
               ['Open now', num(t.open_now.total), `${t.open_now.critical} critical, ${t.open_now.high} high`],
             ].map(([label, value, sub]) => (
-              <div key={label} className={card}>
-                <p className="text-xl font-semibold text-white">{value}</p>
-                <p className="text-xs text-gray-400">
-                  {label}
-                  {sub ? `, ${sub}` : ''}
-                </p>
-              </div>
+              <StatCard key={label} label={label} value={value} note={sub || undefined} />
             ))}
           </div>
           {t.by_type.length > 0 && (
@@ -177,10 +172,7 @@ export function ClientSummaryView() {
   return (
     <div className="space-y-5 p-6 print:p-0" data-testid="client-summary">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Client summary: {clientName}</h1>
-          <p className="mt-1 text-sm text-gray-400">The last {months === 1 ? 'month' : `${months} months`} of tickets, hours and satisfaction, from HaloPSA and SimpleSat as of the last daily read.</p>
-        </div>
+        <PageHeader title={`Client summary: ${clientName}`} subtitle={`The last ${months === 1 ? 'month' : `${months} months`} of tickets, hours and satisfaction, from HaloPSA and SimpleSat as of the last daily read.`} />
         <button type="button" className="rounded border border-gray-700 px-2.5 py-1 text-xs text-gray-200 hover:bg-gray-800 print:hidden" onClick={() => window.print()}>
           Print or save as PDF
         </button>

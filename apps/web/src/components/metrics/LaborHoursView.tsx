@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
+import { PageHeader, StatCard } from '@/components/ui/kit';
 
 interface Summary {
   months: string[];
@@ -89,10 +90,7 @@ export function LaborHoursView() {
   const s = data?.summary;
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Labor hours</h1>
-        <p className="mt-1 text-sm text-gray-400">Hours worked on tickets, by month, engineer, client and ticket type. Updated about once a day.</p>
-      </div>
+      <PageHeader title="Labor hours" subtitle="Hours worked on tickets, by month, engineer, client and ticket type. Updated about once a day." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -127,10 +125,7 @@ export function LaborHoursView() {
               ['A month on average', hoursText(s.hours_per_month)],
               ['Engineers', String(s.by_agent.length)],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-gray-700 bg-gray-800 p-3">
-                <p className="text-xl font-semibold text-white">{value}</p>
-                <p className="text-xs text-gray-400">{label}</p>
-              </div>
+              <StatCard key={label} label={label} value={value} />
             ))}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
