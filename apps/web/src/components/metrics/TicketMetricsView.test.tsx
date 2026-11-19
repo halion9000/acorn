@@ -65,7 +65,12 @@ describe('TicketMetricsView', () => {
     const cards = await screen.findByTestId('ticket-cards');
     expect(cards).toHaveTextContent('50');
     expect(cards).toHaveTextContent('2 h 5 min');
-    expect(within(screen.getByTestId('ticket-series')).getAllByText(/\//)).toHaveLength(2);
+    const chart = screen.getByTestId('paired-columns');
+    expect(within(chart).getByText('Sep 26')).toBeInTheDocument();
+    expect(within(chart).getByText('Oct 26')).toBeInTheDocument();
+    expect(within(chart).getAllByTitle(/created/i)).toHaveLength(2);
+    expect(chart.querySelector('[title="Oct 26: 30 created, 33 resolved"]')).not.toBeNull();
+    expect(screen.getByTestId('ticket-showing')).toHaveTextContent('Showing Sep 2026 - Oct 2026 (2 months)');
     expect(screen.getByTestId('ticket-types')).toHaveTextContent('Incident');
     expect(screen.getByTestId('ticket-agents')).toHaveTextContent('Dan Kemp');
     const sat = await screen.findByTestId('csat');

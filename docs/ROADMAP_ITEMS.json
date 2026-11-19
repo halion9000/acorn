@@ -2469,5 +2469,15 @@
     "detail": "Hal signed in to Secureframe on 2026-11-19 so the screens can be compared with A.C.O.R.N's Compliance pages and the differences closed.",
     "note": "Compared 13 screens (list in docs/SECUREFRAME_PARITY_PLAN.md). Built: People now shows a status per person (Overdue tasks, Tasks in progress, All tasks completed, No checklist started, Offboarded) with Active and Inactive tabs, a status filter and a search, overdue first. Framework overlap built (Expand your coverage on the Frameworks page, from the topic crosswalk). Not built yet, in the order suggested: tests library and custom tests, custom frameworks, the five device checks per device on Devices, the other People columns (type, audit scope, groups, notification frequency), the questionnaire knowledge base.",
     "added": "2026-11-19"
+  },
+  {
+    "status": "in_progress",
+    "needs": "hal",
+    "area": "Metrics",
+    "key": "rewst-metrics-number-differences",
+    "title": "Make the ticket numbers match Rewst's, and the pages look like Rewst's",
+    "detail": "Hal signed in to the Rewst metric dashboards on 2026-11-19 to compare numbers and visuals.",
+    "note": "Compared the Ticket Summary page (docs/REWST_METRICS_COMPARISON.md). A.C.O.R.N shows about 24 percent more created tickets and 12 to 23 percent more resolved: Rewst runs SQL on HaloPSA that leaves out deleted and merged tickets, CORE counts the REST list, which includes merged duplicates (not verified against Halo). First response differs by definition (Rewst 7.7 min from HaloPSA's own field; A.C.O.R.N 1,183 min of clock time). A.C.O.R.N holds 5 months, Rewst 37. Built: the Rewst look on every Metrics page and a paired column chart with a Showing line. QUESTION FOR HAL: may CORE run the same read-only SELECT through HaloPSA's report call (what Rewst does) to match the numbers and reach 36 months, with the old read as the fallback? It needs the report permission on CORE's HaloPSA API key, which I cannot see. The other Rewst pages (labor hours, scorecard, staff metrics, pods) are not compared number by number yet.",
+    "added": "2026-11-19"
   }
 ]

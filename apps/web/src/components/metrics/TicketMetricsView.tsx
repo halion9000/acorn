@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
-import { PageHeader, StatCard } from '@/components/ui/kit';
+import { PageHeader } from '@/components/ui/kit';
+import { MetricStat, PairedColumns, showingText } from './kit';
 import { OpenTicketsPanel } from './TicketPages';
 
 interface Summary {
@@ -26,6 +27,7 @@ interface TicketData {
   received_at: string | null;
   clients: { client_id: string; client_name: string }[];
   summary: Summary | null;
+  available_months?: number;
 }
 interface CsatSummary {
   months: string[];
@@ -101,7 +103,8 @@ export function TicketMetricsView() {
   const sat = csat?.summary;
   const max = Math.max(1, ...(s?.series ?? []).flatMap((r) => [r.created, r.resolved]));
   return (
-    <div className="space-y-4 p-6">
+    <div className="p-6">
+    <div className="metrics-shell space-y-4">
       <PageHeader title="Tickets and satisfaction" subtitle="Tickets created and resolved, how fast we first answer, what is open and how clients rate us. Updated about once a day." />
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
       <div className="flex flex-wrap items-center gap-3">
@@ -124,6 +127,11 @@ export function TicketMetricsView() {
           ))}
         </div>
       </div>
+      {s && tickets?.received_at ? (
+        <p className="text-xs" style={{ color: 'var(--metrics-soft)' }} data-testid="ticket-showing">
+          {showingText(s.months, tickets.available_months ?? s.months.length)}
+        </p>
+      ) : null}
       {tickets && tickets.received_at === null && (
         <p className="text-sm text-gray-400" data-testid="tickets-empty">
           Nothing has arrived from HaloPSA yet. CORE sends the ticket summary about once a day once HaloPSA is connected in CORE.
@@ -131,40 +139,29 @@ export function TicketMetricsView() {
       )}
       {s && tickets?.received_at && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6" data-testid="ticket-cards">
-            {[
-              ['Created', num(s.created), `${num(s.created_per_month)} a month`],
-              ['Resolved', num(s.resolved), `${num(s.resolved_per_month)} a month`],
-              ['First response', waitText(s.first_response_minutes), 'on average'],
-              ['Open now', num(s.open_now.total), ''],
-              ['Critical open', num(s.open_now.critical), ''],
-              ['High open', num(s.open_now.high), ''],
-            ].map(([label, value, note]) => (
-              <StatCard key={label} label={label} value={value} note={note || undefined} />
-            ))}
-          </div>
-          <OpenTicketsPanel clientId={clientId} />
-          <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" aria-label="Created and resolved">
-            <h2 className="mb-2 text-sm font-semibold text-gray-200">Created and resolved by month</h2>
-            <div className="space-y-1" data-testid="ticket-series">
-              {s.series.map((r) => (
-                <div key={r.month} className="flex items-center gap-2 text-xs text-gray-300">
-                  <span className="w-14 text-gray-500">{monthName(r.month)}</span>
-                  <div className="flex-1 space-y-0.5">
-                    <div className="h-2 rounded bg-sky-500/70" style={{ width: `${(r.created / max) * 100}%` }} title={`${r.created} created`} />
-                    <div className="h-2 rounded bg-emerald-500/70" style={{ width: `${(r.resolved / max) * 100}%` }} title={`${r.resolved} resolved`} />
-                  </div>
-                  <span className="w-32 text-right">
-                    {num(r.created)} / {num(r.resolved)}
-                  </span>
-                </div>
+          <section className="metrics-card" aria-label="Ticket volume">
+            <h2 className="text-base">Ticket volume</h2>
+            <div className="mb-4">
+              <PairedColumns points={s.series.map((r) => ({ label: monthName(r.month), a: r.created, b: r.resolved }))} aLabel="Created" bLabel="Resolved" />
+              <p className="mt-2 text-[11px] text-gray-500">A ticket is counted as resolved in the month it was closed.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6" data-testid="ticket-cards">
+              {[
+                ['Created', num(s.created), `${num(s.created_per_month)} a month`],
+                ['Resolved', num(s.resolved), `${num(s.resolved_per_month)} a month`],
+                ['First response', waitText(s.first_response_minutes), 'on average'],
+                ['Open now', num(s.open_now.total), ''],
+                ['Critical open', num(s.open_now.critical), ''],
+                ['High open', num(s.open_now.high), ''],
+              ].map(([label, value, note]) => (
+                <MetricStat key={label} label={label} value={value} note={note || undefined} />
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-gray-500">Blue is created, green is resolved. A ticket is counted as resolved in the month it was closed.</p>
           </section>
+          <OpenTicketsPanel clientId={clientId} />
           <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" aria-label="By type">
-              <h2 className="mb-2 text-sm font-semibold text-gray-200">Tickets by type</h2>
+            <section className="metrics-card" aria-label="By type">
+              <h2 className="text-base">Tickets by type</h2>
               <ul className="text-sm text-gray-300" data-testid="ticket-types">
                 {s.by_type.slice(0, 12).map((t) => (
                   <li key={t.type} className="flex justify-between">
@@ -174,8 +171,8 @@ export function TicketMetricsView() {
                 ))}
               </ul>
             </section>
-            <section className="rounded-lg border border-gray-700 bg-gray-900/60 p-4" aria-label="By engineer">
-              <h2 className="mb-2 text-sm font-semibold text-gray-200">Tickets resolved by engineer</h2>
+            <section className="metrics-card" aria-label="By engineer">
+              <h2 className="text-base">Tickets resolved by engineer</h2>
               <ul className="text-sm text-gray-300" data-testid="ticket-agents">
                 {s.resolved_by_agent.slice(0, 12).map((a) => (
                   <li key={a.agent_id} className="flex justify-between">
@@ -190,8 +187,8 @@ export function TicketMetricsView() {
       )}
       {csat && csat.received_at === null && <p className="text-sm text-gray-400" data-testid="csat-empty">Customer satisfaction appears once SimpleSat is connected in CORE.</p>}
       {sat && csat?.received_at && (
-        <section className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-4" aria-label="Customer satisfaction" data-testid="csat">
-          <h2 className="text-sm font-semibold text-gray-200">Customer satisfaction</h2>
+        <section className="metrics-card space-y-3" aria-label="Customer satisfaction" data-testid="csat">
+          <h2 className="text-base">Customer satisfaction</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               ['Satisfied', sat.satisfied_percent === null ? '—' : `${sat.satisfied_percent}%`],
@@ -231,6 +228,7 @@ export function TicketMetricsView() {
           </div>
         </section>
       )}
+    </div>
     </div>
   );
 }

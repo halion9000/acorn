@@ -436,3 +436,65 @@ code {
     text-decoration: none !important;
   }
 }
+
+/* ── Metrics pages: the look of the Rewst metric dashboards (a teal gradient, glass cards, big numbers, green bars) ─────────────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  --metrics-bg: linear-gradient(135deg, #1a2c30 0%, #182b2d 100%);
+  --metrics-card: rgba(255, 255, 255, 0.08);
+  --metrics-card-border: rgba(255, 255, 255, 0.1);
+  --metrics-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --metrics-title: #ffffff;
+  --metrics-soft: rgba(255, 255, 255, 0.78);
+  --metrics-bar-a: #8fb996;
+  --metrics-bar-b: #3d6b44;
+  --metrics-accent: #8cc63f;
+  --metrics-pill: rgba(0, 0, 0, 0.7);
+  --metrics-pill-text: #ffffff;
+  --metrics-grid: rgba(255, 255, 255, 0.45);
+}
+[data-theme="light"] {
+  --metrics-bg: linear-gradient(135deg, #e6f0ee 0%, #dbe9e6 100%);
+  --metrics-card: #ffffff;
+  --metrics-card-border: rgba(15, 23, 42, 0.1);
+  --metrics-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+  --metrics-title: #0f172a;
+  --metrics-soft: rgba(15, 23, 42, 0.7);
+  --metrics-bar-a: #6aa57a;
+  --metrics-bar-b: #2f5d3a;
+  --metrics-accent: #4d8a1f;
+  --metrics-pill: rgba(15, 23, 42, 0.8);
+  --metrics-pill-text: #ffffff;
+  --metrics-grid: rgba(15, 23, 42, 0.18);
+}
+.metrics-shell {
+  background: var(--metrics-bg);
+  border-radius: 18px;
+  padding: 20px;
+}
+.metrics-card {
+  background: var(--metrics-card);
+  border: 1px solid var(--metrics-card-border);
+  border-radius: 15px;
+  box-shadow: var(--metrics-shadow);
+  padding: 20px;
+  color: var(--metrics-title);
+}
+.metrics-card > h2 {
+  font-weight: 700;
+  color: var(--metrics-title);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--metrics-card-border);
+}
+.metrics-stat-value {
+  font-size: 2.4rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--metrics-title);
+}
+.metrics-stat-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--metrics-soft);
+}
