@@ -7,7 +7,7 @@ const listChildren = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 vi.mock('@/lib/api', () => ({ msspApi: { listChildren } }));
 
-import { ToolboxView, addToList, isComplete, personLabel, removeFromList } from './ToolboxView';
+import { ToolboxView, addToList, confirmLines, isComplete, personLabel, removeFromList } from './ToolboxView';
 
 const catalog = {
   groups: ['Password and security'],
@@ -60,7 +60,7 @@ describe('ToolboxView', () => {
     render(<ToolboxView />);
     await userEvent.click(await screen.findByRole('button', { name: /Reset a person's MFA/ }));
     expect(screen.getAllByText('high risk, not easily reversed').length).toBe(2);
-    const ask = screen.getByRole('button', { name: 'Ask for approval' }) as HTMLButtonElement;
+    const ask = screen.getByRole('button', { name: 'Send request' }) as HTMLButtonElement;
     expect(ask.disabled).toBe(true);
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     expect(ask.disabled).toBe(true);
@@ -68,10 +68,16 @@ describe('ToolboxView', () => {
     await userEvent.type(screen.getByLabelText('Why'), 'lost phone');
     expect(ask.disabled).toBe(false);
     await userEvent.click(ask);
+    const dialog = await screen.findByRole('dialog', { name: 'Are you sure?' });
+    expect(dialog.textContent).toContain('Acme');
+    expect(dialog.textContent).toContain('ann@acme.com');
+    expect(dialog.textContent).toContain('lost phone');
+    expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, send it' }));
     await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/toolbox/request', expect.objectContaining({ method: 'POST' })));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent).toEqual({ tool: 'reset_mfa', client_id: 'c1', args: { user: 'ann@acme.com', reason: 'lost phone' } });
-    expect((await screen.findByRole('status')).textContent).toContain('waiting for approval');
+    expect((await screen.findByRole('status')).textContent).toContain('was recorded');
   });
 
   it('shows the server reason when a request is refused, and a plain message when the toolbox is not allowed', async () => {
@@ -84,7 +90,8 @@ describe('ToolboxView', () => {
     await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
     await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
     await userEvent.type(screen.getByLabelText('Why'), 'x');
-    await userEvent.click(screen.getByRole('button', { name: 'Ask for approval' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Yes, send it' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Why is needed.');
     cleanup();
     authFetch.mockReset();
@@ -110,7 +117,7 @@ describe('pickers', () => {
     const mailbox = screen.getByLabelText('Mailbox') as HTMLSelectElement;
     expect(Array.from(mailbox.options).map((o) => o.value)).toEqual(['', 'Convert to a shared mailbox', 'Keep as it is']);
     expect(screen.getByText('Who gets access to the mailbox (optional)')).toBeTruthy();
-    const ask = screen.getByRole('button', { name: 'Ask for approval' }) as HTMLButtonElement;
+    const ask = screen.getByRole('button', { name: 'Send request' }) as HTMLButtonElement;
     await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
     await userEvent.selectOptions(mailbox, 'Keep as it is');
     expect(ask.disabled).toBe(true);
@@ -119,6 +126,8 @@ describe('pickers', () => {
     await userEvent.type(screen.getByLabelText('Who gets access to the mailbox'), 'old@acme.com');
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     await userEvent.click(ask);
+    await userEvent.click(await screen.findByRole('button', { name: 'Yes, send it' }));
+    await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(true));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent.args).toEqual({ user: 'ann@acme.com', mailbox: 'Keep as it is', when: '2026-12-05T17:00', mailbox_access: 'old@acme.com' });
   });
@@ -138,5 +147,30 @@ describe('helpers', () => {
     expect(isComplete(tool, 'c1', { a: 'x' })).toBe(true);
     expect(isComplete(tool, '', { a: 'x' })).toBe(false);
     expect(isComplete(tool, 'c1', { b: 'x' })).toBe(false);
+  });
+});
+
+describe('the confirmation', () => {
+  it('sends nothing when the person cancels, and lists only the values that were filled in', async () => {
+    authFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith('/tools')) return { ok: true, json: async () => catalog };
+      if (url.includes('/lookups')) return { ok: true, json: async () => lookups };
+      return { ok: true, json: async () => ({ title: 'x' }) };
+    });
+    render(<ToolboxView />);
+    await userEvent.click(await screen.findByRole('button', { name: /Reset a person's MFA/ }));
+    await userEvent.selectOptions(screen.getByLabelText('Client'), 'c1');
+    await userEvent.type(screen.getByLabelText('Person'), 'ann@acme.com');
+    await userEvent.type(screen.getByLabelText('Why'), 'lost phone');
+    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(screen.getByRole('dialog', { name: 'Are you sure?' }).textContent).toContain('high risk, not easily reversed');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(false);
+  });
+
+  it('keeps the form order and drops empty values', () => {
+    const tool = { id: 't', group: 'g', label: 'l', risk: 'low' as const, reversible: true, summary: '', fields: [{ key: 'a', label: 'A', kind: 'text' as const, options: [], required: true, hint: '' }, { key: 'b', label: 'B', kind: 'text' as const, options: [], required: false, hint: '' }, { key: 'c', label: 'C', kind: 'text' as const, options: [], required: false, hint: '' }] };
+    expect(confirmLines(tool, { c: ' z ', a: 'x', b: '  ' })).toEqual([{ label: 'A', value: 'x' }, { label: 'C', value: 'z' }]);
   });
 });

@@ -82,4 +82,4 @@ async def make_request(body: RequestIn, user: Annotated[AuthUser, Depends(requir
     await db.flush()
     await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="toolbox:request", resource="agent_approval", resource_id=str(row.id), changes={"tool": tool.id, "client": client})
     await db.commit()
-    return {"approval_id": str(row.id), "status": "pending", "title": title, "risk": tool.risk, "note": "Waiting for approval. Nothing has been run."}
+    return {"approval_id": str(row.id), "status": "pending", "title": title, "risk": tool.risk, "note": "Recorded. Nothing has been run yet."}

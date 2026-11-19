@@ -60,6 +60,11 @@ export function removeFromList(list: string, email: string): string {
   return list.split(',').map((x) => x.trim()).filter((x) => x && x !== email).join(', ');
 }
 
+/** The lines of the confirmation: every value the person gave, labelled, in the form's order, leaving out what was left empty (pure). */
+export function confirmLines(tool: ToolInfo, values: Record<string, string>): { label: string; value: string }[] {
+  return tool.fields.filter((f) => (values[f.key] ?? '').trim() !== '').map((f) => ({ label: f.label, value: (values[f.key] ?? '').trim() }));
+}
+
 /** Whether a form is ready to send: a client is chosen and every required field has a value. */
 export function isComplete(tool: ToolInfo | null, clientId: string, values: Record<string, string>): boolean {
   return tool !== null && clientId !== '' && tool.fields.every((f) => !f.required || (values[f.key] ?? '').trim() !== '');
@@ -144,6 +149,7 @@ export function ToolboxView() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [loaded, setLoaded] = useState<{ id: string; data: Lookups } | null>(null);
   const lookups: Lookups = loaded && loaded.id === clientId ? loaded.data : { people: [], domains: [] };
 
@@ -184,6 +190,7 @@ export function ToolboxView() {
 
   const send = async () => {
     if (!tool) return;
+    setConfirming(false);
     setBusy(true);
     setMessage(null);
     try {
@@ -191,7 +198,7 @@ export function ToolboxView() {
       const body = (await res.json().catch(() => ({}))) as { detail?: string; note?: string; title?: string };
       if (!res.ok) setMessage({ ok: false, text: typeof body.detail === 'string' ? body.detail : 'The request was not made.' });
       else {
-        setMessage({ ok: true, text: `${body.title ?? 'Request'} is waiting for approval. ${body.note ?? ''}`.trim() });
+        setMessage({ ok: true, text: `${body.title ?? 'Request'} was recorded. ${body.note ?? ''}`.trim() });
         setValues({});
       }
     } catch {
@@ -205,7 +212,7 @@ export function ToolboxView() {
 
   return (
     <div className="space-y-6 p-6" data-testid="toolbox">
-      <PageHeader title="Toolbox" subtitle="Ask for a Microsoft 365 action for a client. Every press creates an approval request for a person to decide; nothing runs until a later stage connects approved requests to CIPP." />
+      <PageHeader title="Toolbox" subtitle="Ask for a Microsoft 365 action for a client. Pressing Send request asks you to confirm first. The request is recorded; nothing runs against the client yet because running it through CIPP is the next stage." />
       {error && (
         <p role="alert" className="text-sm text-red-300">
           {error}
@@ -262,8 +269,8 @@ export function ToolboxView() {
               {f.hint && <p className="mt-0.5 text-xs text-gray-500">{f.hint}</p>}
             </div>
           ))}
-          <button type="button" disabled={!complete || busy} onClick={() => void send()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
-            Ask for approval
+          <button type="button" disabled={!complete || busy} onClick={() => setConfirming(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
+            Send request
           </button>
           {message && (
             <p role={message.ok ? 'status' : 'alert'} className={`text-sm ${message.ok ? 'text-emerald-300' : 'text-red-300'}`}>
@@ -272,6 +279,36 @@ export function ToolboxView() {
           )}
         </section>
       )}
+      {confirming && tool ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div role="dialog" aria-modal="true" aria-label="Are you sure?" className="w-full max-w-md space-y-3 rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-xl">
+            <h2 className="text-base font-semibold text-white">Are you sure?</h2>
+            <p className="text-sm text-gray-300">
+              {tool.label} for <strong>{clients.find((c) => c.id === clientId)?.name ?? 'this client'}</strong>.
+            </p>
+            <dl className="space-y-1 text-sm">
+              {confirmLines(tool, values).map((l) => (
+                <div key={l.label} className="flex gap-2">
+                  <dt className="text-gray-500">{l.label}:</dt>
+                  <dd className="min-w-0 break-words text-gray-200">{l.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className={`text-xs ${RISK_CLASS[tool.risk]}`}>
+              {RISK_TEXT[tool.risk]}
+              {tool.reversible ? '' : ', not easily reversed'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" autoFocus onClick={() => setConfirming(false)} className="rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-200">
+                Cancel
+              </button>
+              <button type="button" onClick={() => void send()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white">
+                Yes, send it
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
