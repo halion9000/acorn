@@ -5,6 +5,7 @@
  * customer is counted under, who was paid, the memo and the amount, and the total for each client. Every column sorts and a month can be chosen.
  */
 
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
@@ -84,16 +85,10 @@ export function CostTransactionsPanel({ kind }: { kind: 'travel' | 'hardware' })
   return (
     <div className="space-y-3" data-testid="tx-panel">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-300">
-          Month
-          <select aria-label="Transactions month" className={input} value={data.month ?? ''} onChange={(e) => setMonth(e.target.value)}>
-            {[...data.months].reverse().map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <span>Month</span>
+          <MonthYearPicker name="Transactions" months={data.months} value={data.month ?? ''} onChange={setMonth} className={input} />
+        </div>
         <input aria-label="Find a transaction" placeholder="Find a client, vendor or memo" className={`${input} w-64`} value={text} onChange={(e) => setText(e.target.value)} />
         <p className="text-xs text-gray-500">{kind === 'travel' ? 'Accounts 5800 and 5805' : 'Account 5600'}, as QuickBooks booked them. A customer is counted under the client it is grouped with (Settings &gt; Finance &gt; Client groups).</p>
       </div>

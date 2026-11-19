@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { HistoryPanel, PnlPanel, QboProfitPanel, filterClients, pnlAmount, qboColumns } from './QboSections';
+import { HistoryPanel, PnlPanel, QboProfitPanel, filterClients, pnlAmount, qboColumns, moneyWhole } from './QboSections';
 
 const answer = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
 
@@ -84,6 +84,22 @@ describe('QboProfitPanel', () => {
     expect(names()).toEqual(['Birch Law', 'Acme Dental']);
     expect(within(table).getByText('Total')).toBeTruthy();
     expect(within(table).getByRole('button', { name: /Months active/ })).toBeTruthy();
+  });
+});
+
+describe('the wide table', () => {
+  it('writes a crowded amount in whole dollars with a dash for nothing', () => {
+    expect([moneyWhole(3598.11), moneyWhole(-12.5), moneyWhole(0), moneyWhole(null)]).toEqual(['$3,598', '-$13', '$0', '—']);
+  });
+
+  it('shows whole dollars in the cells with the exact amount in the tooltip, and the month as a Month and a Year', async () => {
+    authFetch.mockImplementation(() => answer({ months: ['2026-09', '2026-10'], report: { month: '2026-10', rows: [qrow({ revenue: '3598.11' })], totals: {} }, received_at: 'x' }));
+    render(<QboProfitPanel />);
+    const table = await screen.findByTestId('qbo-table');
+    const cell = within(table).getByText('$3,598');
+    expect(cell).toHaveAttribute('title', '$3,598.11');
+    expect(screen.getByLabelText('QBO month')).toBeInTheDocument();
+    expect(screen.getByLabelText('QBO year')).toBeInTheDocument();
   });
 });
 

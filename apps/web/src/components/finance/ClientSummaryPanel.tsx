@@ -5,6 +5,7 @@
  * the year to date (revenue, net income, average net margin and the band that margin falls in) and each month's net income. Every column sorts; the industry and the for-profit choice narrow the list.
  */
 
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
@@ -92,16 +93,10 @@ export function ClientSummaryPanel() {
   return (
     <div className="space-y-3" data-testid="summary-panel">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-300">
-          Through
-          <select aria-label="Summary month" className={input} value={data.through ?? ''} onChange={(e) => setMonth(e.target.value)}>
-            {[...(data.available ?? [])].reverse().map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <span>Through</span>
+          <MonthYearPicker name="Summary" months={(data.available ?? [])} value={data.through ?? ''} onChange={setMonth} className={input} />
+        </div>
         <select aria-label="Industry" className={input} value={industry} onChange={(e) => setIndustry(e.target.value)}>
           <option value="all">All industries</option>
           {industries.map((i) => (

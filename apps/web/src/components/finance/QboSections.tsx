@@ -8,6 +8,7 @@
  * Each reads its own data and has its own month list; the figures arrive about once a day.
  */
 
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
@@ -19,6 +20,15 @@ import type { FullRow } from './NetIncomeView';
 const input = 'rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-sm text-gray-100';
 const th = 'px-3 py-2 text-right';
 const td = 'px-3 py-1.5 text-right tabular-nums';
+// The wide QuickBooks profitability table: smaller cells and whole dollars (the cents are in the cell's tooltip) so all its columns fit across a screen.
+const qth = 'px-1.5 py-2 text-right text-[10px] leading-tight';
+const qtd = 'px-1.5 py-1.5 text-right tabular-nums text-xs';
+
+/** A whole-dollar amount for a crowded table, with a dash for nothing; the exact amount goes in the title (pure). */
+export function moneyWhole(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
 
 /** One JSON read, with the answer, a problem line and a way to ask again. */
 function useRead<T>(url: string): { data: T | null; problem: string | null; denied: boolean } {
@@ -81,16 +91,10 @@ export function PnlPanel() {
   return (
     <div className="space-y-3" data-testid="pnl-panel">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-300">
-          Month
-          <select aria-label="P&L month" className={input} value={data.month ?? ''} onChange={(e) => setMonth(e.target.value)}>
-            {[...data.months].reverse().map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <span>Month</span>
+          <MonthYearPicker name="P&L" months={data.months} value={data.month ?? ''} onChange={setMonth} className={input} />
+        </div>
         <p className="text-xs text-gray-500">Live Oak IT Partners, profit and loss, accrual basis, as QuickBooks shows it.</p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-gray-800">
@@ -188,35 +192,29 @@ export function QboProfitPanel() {
   return (
     <div className="space-y-3" data-testid="qbo-panel">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-300">
-          Month
-          <select aria-label="QBO month" className={input} value={data.report.month} onChange={(e) => setMonth(e.target.value)}>
-            {[...data.months].reverse().map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <span>Month</span>
+          <MonthYearPicker name="QBO" months={data.months} value={data.report.month} onChange={setMonth} className={input} />
+        </div>
         <p className="text-xs text-gray-500">Revenue is what QuickBooks booked for the client (sales by customer); hours, labor and the cost allocations are the same as on Revenue to net income. Commissions are not a client.</p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-sm" data-testid="qbo-table">
           <thead className="bg-gray-900/60 text-xs uppercase text-gray-500">
             <tr>
-              <SortHeader label="Client" field="client_name" sort={sort} onSort={setSort} text className="px-3 py-2 text-left" />
+              <SortHeader label="Client" field="client_name" sort={sort} onSort={setSort} text className="px-2 py-2 text-left text-[10px]" />
               {QBO_HEADERS.map(([h, f]) => (
-                <SortHeader key={f} label={h} field={f} sort={sort} onSort={setSort} className={th} />
+                <SortHeader key={f} label={h} field={f} sort={sort} onSort={setSort} className={qth} />
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800 text-gray-200">
             {rows.map((r) => (
               <tr key={r.client_name}>
-                <td className="px-3 py-1.5 text-left">{r.client_name}</td>
+                <td className="px-2 py-1.5 text-left text-xs">{r.client_name}</td>
                 {QBO_HEADERS.map(([, f, kind]) => (
-                  <td key={f} className={`${td} ${f === 'net_income' && (r[f] as number) < 0 ? 'text-red-300' : ''}`}>
-                    {kind === 'money' ? money(r[f] as number) : kind === 'pct' ? pct(r[f] as number | null) : String(r[f])}
+                  <td key={f} className={`${qtd} ${f === 'net_income' && (r[f] as number) < 0 ? 'text-red-300' : ''}`} title={kind === 'money' ? money(r[f] as number) : undefined}>
+                    {kind === 'money' ? moneyWhole(r[f] as number) : kind === 'pct' ? pct(r[f] as number | null) : String(r[f])}
                   </td>
                 ))}
               </tr>
@@ -224,7 +222,7 @@ export function QboProfitPanel() {
           </tbody>
           <tfoot className="border-t border-gray-700 text-gray-100">
             <tr>
-              <td className="px-3 py-2 text-left font-medium">Total</td>
+              <td className="px-2 py-2 text-left text-xs font-medium">Total</td>
               {QBO_HEADERS.map(([, f, kind]) => {
                 const total: Record<string, number | null> = {
                   revenue: t.revenue ?? 0,
@@ -247,8 +245,8 @@ export function QboProfitPanel() {
                   net_margin: t.net_margin ?? null,
                 };
                 return (
-                  <td key={f} className={td}>
-                    {f === 'months_active' ? '' : kind === 'pct' ? pct(total[f] ?? null) : money(total[f] ?? 0)}
+                  <td key={f} className={qtd} title={kind === 'money' ? money(total[f] ?? 0) : undefined}>
+                    {f === 'months_active' ? '' : kind === 'pct' ? pct(total[f] ?? null) : moneyWhole(total[f] ?? 0)}
                   </td>
                 );
               })}

@@ -28,18 +28,18 @@ export function monthName(month: string): string {
   return MONTH_NAMES[Number(month.slice(5, 7)) - 1] ?? month;
 }
 
-export function MonthYearPicker({ months, value, onChange, className }: { months: string[]; value: string; onChange: (month: string) => void; className?: string }) {
+export function MonthYearPicker({ months, value, onChange, className, name }: { months: string[]; value: string; onChange: (month: string) => void; className?: string; name?: string }) {
   const year = value.slice(0, 4);
   return (
     <span className="inline-flex items-center gap-2">
-      <select aria-label="Month" className={className} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select aria-label={name ? `${name} month` : 'Month'} className={className} value={value} onChange={(e) => onChange(e.target.value)}>
         {monthsOfYear(months, year).map((m) => (
           <option key={m} value={m}>
             {monthName(m)}
           </option>
         ))}
       </select>
-      <select aria-label="Year" className={className} value={year} onChange={(e) => onChange(monthForYear(months, value, e.target.value))}>
+      <select aria-label={name ? `${name} year` : 'Year'} className={className} value={year} onChange={(e) => onChange(monthForYear(months, value, e.target.value))}>
         {yearsOf(months).map((y) => (
           <option key={y} value={y}>
             {y}
