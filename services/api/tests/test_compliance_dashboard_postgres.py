@@ -248,3 +248,13 @@ async def test_an_accepted_risk_whose_acceptance_has_ended_or_ends_soon_is_an_ac
     assert items["Risk R-1: Lapsed acceptance"].event == "Acceptance ended"
     assert items["Risk R-2: Soon acceptance"].event == "Acceptance ends soon"
     assert items["Risk R-2: Soon acceptance"].link == "/compliance/risk-register"
+
+
+async def test_the_overlap_follows_each_clients_own_switches(world):
+    w = world
+    await switch(w, ["NIST-CSF"], w.acme)
+    acme = await run(w.acme, lambda db: ep.framework_overlap(w.acme, db, w.user))
+    assert acme.enabled == ["NIST-CSF"] and "NIST-CSF" not in [c.framework for c in acme.candidates]
+    assert any(c.framework == "PCI-DSS" and c.overlapping_controls > 0 for c in acme.candidates)
+    birch = await run(w.birch, lambda db: ep.framework_overlap(w.birch, db, w.user))
+    assert birch.enabled == [] and all(c.overlapping_controls == 0 for c in birch.candidates), "another client's switches are not seen"

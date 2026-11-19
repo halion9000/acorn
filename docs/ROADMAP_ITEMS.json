@@ -2467,7 +2467,7 @@
     "key": "secureframe-compare-2026-11-19",
     "title": "Compare with Live Oak's Secureframe and close the gaps",
     "detail": "Hal signed in to Secureframe on 2026-11-19 so the screens can be compared with A.C.O.R.N's Compliance pages and the differences closed.",
-    "note": "Compared 13 screens (list in docs/SECUREFRAME_PARITY_PLAN.md). Built: People now shows a status per person (Overdue tasks, Tasks in progress, All tasks completed, No checklist started, Offboarded) with Active and Inactive tabs, a status filter and a search, overdue first. Not built yet, in the order suggested: tests library and custom tests, framework overlap and custom frameworks, the five device checks per device on Devices, the other People columns (type, audit scope, groups, notification frequency), the questionnaire knowledge base.",
+    "note": "Compared 13 screens (list in docs/SECUREFRAME_PARITY_PLAN.md). Built: People now shows a status per person (Overdue tasks, Tasks in progress, All tasks completed, No checklist started, Offboarded) with Active and Inactive tabs, a status filter and a search, overdue first. Framework overlap built (Expand your coverage on the Frameworks page, from the topic crosswalk). Not built yet, in the order suggested: tests library and custom tests, custom frameworks, the five device checks per device on Devices, the other People columns (type, audit scope, groups, notification frequency), the questionnaire knowledge base.",
     "added": "2026-11-19"
   }
 ]

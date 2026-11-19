@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { authFetch } from '@/lib/auth-session';
 import { complianceDashboardApi } from '@/lib/api';
+import { FrameworkOverlap } from './FrameworkOverlap';
 
 export interface FrameworkCard {
   id: string;
@@ -166,6 +167,7 @@ export function FrameworkIndex({ frameworks }: { frameworks: FrameworkCard[] }) 
           </Link>
         ))}
       </div>
+      <FrameworkOverlap clientId={clientId} />
     </div>
   );
 }

@@ -24,7 +24,7 @@ from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.risk_register import RiskRegisterItem, RiskRegisterTask
 from app.models.trust_audit import Audit, AuditRequest
 from app.models.vendor_management import Vendor, VendorReview
-from app.services import compliance_health, evidence_age, vendor_management
+from app.services import compliance_crosswalk, compliance_health, evidence_age, vendor_management
 from app.services.audit import emit_audit
 from app.services import risk_register
 from app.services.risk_register import level
@@ -37,6 +37,23 @@ MAX_ITEMS = 200
 class EnabledOut(BaseModel):
     enabled: list[str]
     available: list[str]
+
+
+class OverlapRow(BaseModel):
+    framework: str
+    name: str
+    total_controls: int
+    overlapping_controls: int
+    unmapped_controls: int
+    percent_overlapping: int
+    shared_topics: list[str]
+    new_topics: list[str]
+    by_framework: dict[str, int]
+
+
+class OverlapOut(BaseModel):
+    enabled: list[str]
+    candidates: list[OverlapRow]
 
 
 class EnabledIn(BaseModel):
@@ -111,6 +128,19 @@ async def enabled_frameworks(
     tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
 ) -> EnabledOut:
     return EnabledOut(enabled=await _enabled(db, tenant), available=sorted(FRAMEWORKS))
+
+
+@router.get(
+    "/frameworks/overlap",
+    response_model=OverlapOut,
+    summary="For each framework that is off: how many of its controls the frameworks that are on already cover",
+)
+async def framework_overlap(
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+) -> OverlapOut:
+    """Read only. A planning aid from the topic crosswalk: adding a framework whose controls mostly sit on topics already covered costs little extra work."""
+    on = await _enabled(db, tenant)
+    return OverlapOut(enabled=on, candidates=[OverlapRow(**r) for r in compliance_crosswalk.overlap(on)])
 
 
 @router.put(

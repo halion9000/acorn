@@ -35,3 +35,23 @@ def test_a_control_in_the_frameworks_list_carries_where_else_it_counts():
     item = _control_item("PCI-DSS", "Req-8.4", "MFA")
     assert "A.8.5" in item.also_in["ISO27001"] and "PCI-DSS" not in item.also_in
     assert _control_item("SOC2", "CC1.1", "x").also_in == {}
+
+
+def test_overlap_counts_what_the_frameworks_that_are_on_already_cover():
+    out = {r["framework"]: r for r in cw.overlap(["NIST-CSF"])}
+    assert set(out) == {"SOC2", "ISO27001", "PCI-DSS", "HIPAA", "CIS-IG1"}, "only frameworks that are off are candidates"
+    pci = out["PCI-DSS"]
+    # PCI's controls on topics that NIST CSF also covers (e.g. Req-8.4 on authentication) count; its controls on topics NIST has no part in do not.
+    assert 0 < pci["overlapping_controls"] < pci["total_controls"] and pci["by_framework"] == {"NIST CSF": pci["by_framework"]["NIST CSF"]}
+    covered = {t for t, (_n, m) in cw.TOPICS.items() if m.get("NIST-CSF") and m.get("PCI-DSS")}
+    expected = {i for t in covered for i in cw.TOPICS[t][1]["PCI-DSS"]}
+    assert pci["overlapping_controls"] == len(expected)
+    assert pci["unmapped_controls"] + len({i for _n, m in cw.TOPICS.values() for i in m.get("PCI-DSS", [])}) == pci["total_controls"]
+
+
+def test_overlap_with_nothing_on_is_zero_and_the_most_covered_candidate_comes_first():
+    assert all(r["overlapping_controls"] == 0 and r["percent_overlapping"] == 0 for r in cw.overlap([]))
+    rows = cw.overlap(["NIST-CSF", "CIS-IG1"])
+    counts = [r["overlapping_controls"] for r in rows]
+    assert counts == sorted(counts, reverse=True) and rows[0]["by_framework"].keys() <= {"NIST CSF", "CIS IG1"}
+    assert cw.overlap(["NIST-CSF"], {"NIST-CSF": [("g", "x", "t")], "PCI-DSS": []})[0]["total_controls"] == 0, "an empty catalog does not divide by zero"

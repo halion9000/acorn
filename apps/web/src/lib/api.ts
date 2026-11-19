@@ -8442,7 +8442,20 @@ export interface ComplianceDashboard {
 }
 const complianceQs = (clientId: string): string => (clientId ? `?client_id=${encodeURIComponent(clientId)}` : '');
 
+export interface FrameworkOverlapRow {
+  framework: string;
+  name: string;
+  total_controls: number;
+  overlapping_controls: number;
+  unmapped_controls: number;
+  percent_overlapping: number;
+  shared_topics: string[];
+  new_topics: string[];
+  by_framework: Record<string, number>;
+}
+
 export const complianceDashboardApi = {
+  overlap: (clientId: string) => request<{ enabled: string[]; candidates: FrameworkOverlapRow[] }>(`/api/v1/compliance/frameworks/overlap${complianceQs(clientId)}`),
   dashboard: (clientId: string) => request<ComplianceDashboard>(`/api/v1/compliance/dashboard${complianceQs(clientId)}`),
   enabled: (clientId: string) => request<{ enabled: string[]; available: string[] }>(`/api/v1/compliance/frameworks/enabled${complianceQs(clientId)}`),
   setEnabled: (clientId: string, frameworks: string[]) =>

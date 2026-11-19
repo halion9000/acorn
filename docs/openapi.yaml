@@ -18647,6 +18647,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/frameworks/overlap:
+    get:
+      tags:
+      - compliance
+      summary: 'For each framework that is off: how many of its controls the frameworks
+        that are on already cover'
+      description: 'Read only. A planning aid from the topic crosswalk: adding a framework
+        whose controls mostly sit on topics already covered costs little extra work.'
+      operationId: framework_overlap_api_v1_compliance_frameworks_overlap_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverlapOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/dashboard:
     get:
       tags:
@@ -54600,6 +54638,70 @@ components:
       required:
       - outcome
       title: OutcomeIn
+    OverlapOut:
+      properties:
+        enabled:
+          items:
+            type: string
+          type: array
+          title: Enabled
+        candidates:
+          items:
+            $ref: '#/components/schemas/OverlapRow'
+          type: array
+          title: Candidates
+      type: object
+      required:
+      - enabled
+      - candidates
+      title: OverlapOut
+    OverlapRow:
+      properties:
+        framework:
+          type: string
+          title: Framework
+        name:
+          type: string
+          title: Name
+        total_controls:
+          type: integer
+          title: Total Controls
+        overlapping_controls:
+          type: integer
+          title: Overlapping Controls
+        unmapped_controls:
+          type: integer
+          title: Unmapped Controls
+        percent_overlapping:
+          type: integer
+          title: Percent Overlapping
+        shared_topics:
+          items:
+            type: string
+          type: array
+          title: Shared Topics
+        new_topics:
+          items:
+            type: string
+          type: array
+          title: New Topics
+        by_framework:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Framework
+      type: object
+      required:
+      - framework
+      - name
+      - total_controls
+      - overlapping_controls
+      - unmapped_controls
+      - percent_overlapping
+      - shared_topics
+      - new_topics
+      - by_framework
+      title: OverlapRow
     OverrideEntryModel:
       properties:
         key:

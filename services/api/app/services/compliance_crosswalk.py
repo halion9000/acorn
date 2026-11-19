@@ -55,3 +55,54 @@ def related(framework: str, control_id: str) -> dict[str, list[str]]:
                 if i not in out.setdefault(fw, []):
                     out[fw].append(i)
     return {fw: ids for fw, ids in out.items() if ids}
+
+
+def overlap(active: list[str], catalogs: dict[str, list[tuple[str, str, str]]] | None = None) -> list[dict[str, object]]:
+    """For every framework that is not on: how much of it the frameworks that are on already cover (pure).
+
+    A control of the candidate counts as overlapping when it sits on a crosswalk topic that a framework that is on also covers, so work done for the active frameworks counts toward it. ``by_framework``
+    says how many of the candidate's controls each active framework accounts for (one control can be counted under several). Controls on no crosswalk topic are reported as ``unmapped``: the crosswalk is
+    a planning aid, so for those the overlap is not known rather than none. Most overlap first, then the name.
+    """
+    from app.services.compliance_catalog import CATALOGS
+
+    catalogs = catalogs or CATALOGS
+    on = [f for f in active if f in FRAMEWORK_NAMES]
+    out: list[dict[str, object]] = []
+    for fw in catalogs:
+        if fw in on or fw not in FRAMEWORK_NAMES:
+            continue
+        total = len(catalogs[fw])
+        shared_topics: list[str] = []
+        new_topics: list[str] = []
+        overlapping: set[str] = set()
+        mapped: set[str] = set()
+        by_framework = dict.fromkeys(on, 0)
+        for _topic, (title, by_fw) in TOPICS.items():
+            mine = by_fw.get(fw, [])
+            if not mine:
+                continue
+            mapped.update(mine)
+            covered_by = [a for a in on if by_fw.get(a)]
+            if covered_by:
+                shared_topics.append(title)
+                overlapping.update(mine)
+                for a in covered_by:
+                    by_framework[a] += len(mine)
+            else:
+                new_topics.append(title)
+        out.append(
+            {
+                "framework": fw,
+                "name": FRAMEWORK_NAMES[fw],
+                "total_controls": total,
+                "overlapping_controls": len(overlapping),
+                "unmapped_controls": max(total - len(mapped), 0),
+                "percent_overlapping": round(100 * len(overlapping) / total) if total else 0,
+                "shared_topics": shared_topics,
+                "new_topics": new_topics,
+                "by_framework": {FRAMEWORK_NAMES[k]: v for k, v in by_framework.items() if v},
+            }
+        )
+    return sorted(out, key=lambda r: (-int(r["overlapping_controls"]), str(r["name"])))
+
