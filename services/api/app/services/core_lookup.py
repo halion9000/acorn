@@ -115,3 +115,90 @@ async def read_lookup(db: Any, tenant_id: uuid.UUID, request_id: Any) -> VendorA
             select(VendorAction).where(VendorAction.id == rid, VendorAction.tenant_id == tenant_id, VendorAction.action == ACTION)
         )
     ).scalar_one_or_none()
+
+
+# --- Lookups for the Toolbox forms -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Two more read-only requests for CORE, so the Toolbox can offer a client's real groups and a person's real inbox rules instead of a text box. Same queue, same safety: a fixed set of asks, one
+# plain value each (a domain or an address, checked here and again by CORE), and a limit an hour per client.
+
+DIRECTORY = "directory_lookup"
+RULES = "mailbox_rules_lookup"
+TOOLBOX_ACTIONS = (DIRECTORY, RULES)
+TOOLBOX_MAX_PER_HOUR = 60
+REUSE_FOR = {DIRECTORY: timedelta(minutes=30), RULES: timedelta(minutes=2)}
+DOMAIN = re.compile(r"^(?:[A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}$")
+
+
+def clean_domain(value: Any) -> str:
+    """The domain as it will be asked for: trimmed, lower case, plainly a domain name (pure)."""
+    domain = str(value or "").strip().lower()
+    if not DOMAIN.match(domain):
+        raise LookupRefused("Give one domain name (for example client.com), nothing else.")
+    return domain
+
+
+async def queue_toolbox_lookup(
+    db: Any, tenant_id: uuid.UUID, user_id: uuid.UUID | None, action: str, value: str, *, now: datetime | None = None
+) -> VendorAction:
+    """Queue one Toolbox lookup (``directory_lookup`` for a domain, ``mailbox_rules_lookup`` for an address) or return the one already asked for the same value and answered, or still waiting, in the
+    reuse window (groups: 30 minutes, rules: 2 minutes). The caller commits."""
+    if action not in TOOLBOX_ACTIONS:
+        raise LookupRefused("That lookup does not exist.")
+    now = now or datetime.now(UTC)
+    key, clean = ("domain", clean_domain(value)) if action == DIRECTORY else ("upn", clean_upn(value))
+    recent = (
+        await db.execute(
+            select(VendorAction)
+            .where(VendorAction.tenant_id == tenant_id, VendorAction.vendor == VENDOR, VendorAction.action == action, VendorAction.created_at >= now - REUSE_FOR[action])
+            .order_by(VendorAction.created_at.desc())
+        )
+    ).scalars()
+    for row in recent:
+        if (row.params or {}).get(key) == clean and row.status != "failed":
+            return row
+    asked = (
+        await db.execute(
+            select(func.count())
+            .select_from(VendorAction)
+            .where(VendorAction.tenant_id == tenant_id, VendorAction.action.in_(TOOLBOX_ACTIONS), VendorAction.created_at >= now - timedelta(hours=1))
+        )
+    ).scalar_one()
+    if asked >= TOOLBOX_MAX_PER_HOUR:
+        raise LookupRefused(f"{TOOLBOX_MAX_PER_HOUR} lookups have already been made for this client in the last hour. Try again later.")
+    row = VendorAction(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        alert_id=None,
+        vendor=VENDOR,
+        incident_uid=f"toolbox:{uuid.uuid4().hex[:12]}",
+        action=action,
+        params={key: clean},
+        status="pending",
+        requested_by=user_id,
+        created_at=now,
+    )
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def read_toolbox_lookup(db: Any, tenant_id: uuid.UUID, request_id: Any) -> VendorAction | None:
+    """The Toolbox lookup with this id in this tenant, or None."""
+    try:
+        rid = uuid.UUID(str(request_id))
+    except ValueError:
+        return None
+    return (
+        await db.execute(select(VendorAction).where(VendorAction.id == rid, VendorAction.tenant_id == tenant_id, VendorAction.action.in_(TOOLBOX_ACTIONS)))
+    ).scalar_one_or_none()
+
+
+def present_toolbox(row: VendorAction) -> dict[str, Any]:
+    """What the page is told about a Toolbox lookup: waiting, failed with CORE's reason, or the answer (pure)."""
+    base = {"request_id": str(row.id), "kind": "groups" if row.action == DIRECTORY else "rules"}
+    if row.status in OPEN:
+        return {**base, "status": "waiting"}
+    if row.status == "failed":
+        return {**base, "status": "failed", "message": row.result_message or "CORE could not do the lookup."}
+    return {**base, "status": "done", "result": row.result_data or {}}
+

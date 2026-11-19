@@ -19,6 +19,7 @@ from app.api.v1.endpoints.devices import _scope
 from app.db.rls_scope import cross_tenant_reads
 from app.models.responder import AgentApproval
 from app.models.signin import IdentityMfaUser
+from app.services import core_lookup as lk
 from app.services import toolbox as tb
 from app.services.audit import emit_audit
 from app.services.identity_people import MICROSOFT
@@ -41,10 +42,9 @@ async def tools(user: Annotated[AuthUser, Depends(require_permission("alerts:rea
     return {"groups": list(tb.GROUPS), "tools": tb.catalog(), "stage": "Requests are recorded for approval. Running an approved request is the next stage."}
 
 
-@router.get("/lookups", summary="The people and sign-in domains of one client, for the pickers")
-async def lookups(client_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
-    """Read from the client's latest Microsoft 365 user list (the one CORE reads through CIPP), so a form offers real people instead of a text box."""
-    scope, names = await _scope(db, user.tenant_id, client_id)
+async def _client_people(db: DBSession, owner: uuid.UUID, client_id: uuid.UUID) -> dict[str, Any]:
+    """The picker lists of one client (people and sign-in domains) from its latest Microsoft 365 user list, or 404 when it is not the caller's client."""
+    scope, names = await _scope(db, owner, client_id)
     if client_id not in scope or client_id not in names:
         raise HTTPException(status_code=404, detail="Client not found")
     async with cross_tenant_reads(db):
@@ -56,6 +56,63 @@ async def lookups(client_id: uuid.UUID, user: Annotated[AuthUser, Depends(requir
             )
         ).all()
     return tb.people_and_domains([(r[0], r[1], r[2], r[3]) for r in rows])
+
+
+@router.get("/lookups", summary="The people and sign-in domains of one client, for the pickers")
+async def lookups(client_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+    """Read from the client's latest Microsoft 365 user list (the one CORE reads through CIPP), so a form offers real people instead of a text box."""
+    return await _client_people(db, user.tenant_id, client_id)
+
+
+class GroupsIn(BaseModel):
+    client_id: uuid.UUID
+
+
+class RulesIn(BaseModel):
+    client_id: uuid.UUID
+    user: str = Field(min_length=3, max_length=320)
+
+
+async def _queue(db: DBSession, user: AuthUser, action: str, value: str) -> dict[str, Any]:
+    try:
+        row = await lk.queue_toolbox_lookup(db, user.tenant_id, user.user_id, action, value)
+    except lk.LookupRefused as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await db.commit()
+    return lk.present_toolbox(row)
+
+
+async def _read(db: DBSession, user: AuthUser, request_id: uuid.UUID, kind: str) -> dict[str, Any]:
+    row = await lk.read_toolbox_lookup(db, user.tenant_id, request_id)
+    if row is None or row.action != (lk.DIRECTORY if kind == "groups" else lk.RULES):
+        raise HTTPException(status_code=404, detail="No such lookup request.")
+    return lk.present_toolbox(row)
+
+
+@router.post("/groups", summary="Ask CORE for a client's groups and licenses (read only), for the group form")
+async def ask_groups(body: GroupsIn, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: DBSession) -> dict[str, Any]:
+    domains = (await _client_people(db, user.tenant_id, body.client_id))["domains"]
+    if not domains:
+        raise HTTPException(status_code=422, detail="No Microsoft 365 people are known for this client yet, so its groups cannot be asked for.")
+    return await _queue(db, user, lk.DIRECTORY, domains[0])
+
+
+@router.get("/groups/{request_id}", summary="The answer to a groups request: waiting, failed or the groups")
+async def read_groups(request_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: DBSession) -> dict[str, Any]:
+    return await _read(db, user, request_id, "groups")
+
+
+@router.post("/inbox-rules", summary="Ask CORE for one person's inbox rules (read only), so the bad ones can be picked")
+async def ask_inbox_rules(body: RulesIn, user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession) -> dict[str, Any]:
+    people = (await _client_people(db, user.tenant_id, body.client_id))["people"]
+    if body.user.strip().lower() not in {p["email"].lower() for p in people}:
+        raise HTTPException(status_code=422, detail="That person is not one of this client's Microsoft 365 users.")
+    return await _queue(db, user, lk.RULES, body.user)
+
+
+@router.get("/inbox-rules/{request_id}", summary="The answer to an inbox rules request: waiting, failed or the rules")
+async def read_inbox_rules(request_id: uuid.UUID, user: Annotated[AuthUser, Depends(require_permission("identities:bec"))], db: DBSession) -> dict[str, Any]:
+    return await _read(db, user, request_id, "rules")
 
 
 @router.post("/request", status_code=201, summary="Ask for a tool to be run for a client: creates an approval request, runs nothing")

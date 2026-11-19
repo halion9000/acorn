@@ -90,3 +90,19 @@ def test_the_pickers_list_members_first_and_the_domains_by_use():
     assert [p["email"] for p in out["people"]] == ["ann@acme.com", "bob@acme.net", "cy@acme.com", "zed@acme.com", "old@acme.com", "ext@other.org"]
     assert out["people"][1]["name"] == "bob@acme.net", "a missing name falls back to the address"
     assert out["domains"] == ["acme.com", "acme.net"], "guests do not add a domain; the most used comes first"
+
+
+def test_the_group_is_picked_from_the_clients_groups_and_the_rules_are_picked_from_the_persons_rules():
+    assert {f.key: f.kind for f in t.BY_ID["group_membership"].fields}["group"] == "group"
+    assert {f.key: f.kind for f in t.BY_ID["remove_inbox_rules"].fields} == {"user": "user", "rules": "rules", "reason": "text"}
+    assert t.BY_ID["remove_inbox_rules"].reversible is False
+
+
+def test_removing_inbox_rules_needs_at_least_one_and_at_most_thirty_and_shows_each_by_name():
+    ok = {"user": "ann@acme.com", "rules": "Forward all\nHide"}
+    tool, args, why = t.check_request("remove_inbox_rules", ok)
+    assert why is None and args == ok
+    assert "Rules to remove: Forward all; Hide" in t.approval_text(tool, "Acme", args)[1]
+    assert t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": " \n "})[2] == "Rules to remove is needed."
+    assert "between 1 and 30" in t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": "\n".join(f"r{i}" for i in range(31))})[2]
+    assert t.check_request("remove_inbox_rules", {"user": "ann@acme.com", "rules": "\n".join(f"rule number {i} " * 3 for i in range(30))})[2] is None, "a long list of long names still fits"

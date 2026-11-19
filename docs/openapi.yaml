@@ -18278,6 +18278,129 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/toolbox/groups:
+    post:
+      tags:
+      - toolbox
+      summary: Ask CORE for a client's groups and licenses (read only), for the group
+        form
+      operationId: ask_groups_api_v1_toolbox_groups_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupsIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Ask Groups Api V1 Toolbox Groups Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/toolbox/groups/{request_id}:
+    get:
+      tags:
+      - toolbox
+      summary: 'The answer to a groups request: waiting, failed or the groups'
+      operationId: read_groups_api_v1_toolbox_groups__request_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Groups Api V1 Toolbox Groups  Request Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/toolbox/inbox-rules:
+    post:
+      tags:
+      - toolbox
+      summary: Ask CORE for one person's inbox rules (read only), so the bad ones
+        can be picked
+      operationId: ask_inbox_rules_api_v1_toolbox_inbox_rules_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RulesIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Ask Inbox Rules Api V1 Toolbox Inbox Rules Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/toolbox/inbox-rules/{request_id}:
+    get:
+      tags:
+      - toolbox
+      summary: 'The answer to an inbox rules request: waiting, failed or the rules'
+      operationId: read_inbox_rules_api_v1_toolbox_inbox_rules__request_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Read Inbox Rules Api V1 Toolbox Inbox Rules  Request
+                  Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/toolbox/request:
     post:
       tags:
@@ -40886,6 +41009,8 @@ components:
           - ninja_deploy
           - halo_billing_update
           - user_lookup
+          - directory_lookup
+          - mailbox_rules_lookup
           title: Action
         incident_uid:
           type: string
@@ -49321,6 +49446,16 @@ components:
       required:
       - rows
       title: GroupsImportIn
+    GroupsIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+      type: object
+      required:
+      - client_id
+      title: GroupsIn
     HTTPValidationError:
       properties:
         detail:
@@ -59802,6 +59937,22 @@ components:
         integer the UI uses to detect "someone else saved while I was
 
         editing".'
+    RulesIn:
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          title: Client Id
+        user:
+          type: string
+          maxLength: 320
+          minLength: 3
+          title: User
+      type: object
+      required:
+      - client_id
+      - user
+      title: RulesIn
     RunDetail:
       properties:
         id:

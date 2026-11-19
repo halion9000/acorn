@@ -600,6 +600,8 @@ class ClaimedAction(BaseModel):
         "ninja_deploy",
         "halo_billing_update",
         "user_lookup",
+        "directory_lookup",
+        "mailbox_rules_lookup",
     ]
     incident_uid: str
     params: dict[str, Any]

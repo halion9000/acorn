@@ -5,7 +5,8 @@ actions (opted-in clients, protected accounts, an hourly cap, an audit file). Th
 
 Every field has a kind, so the page offers the right control and the server checks the same thing: ``user`` and ``email`` are picked from the client's own Microsoft 365 people (``email`` also takes an address
 that is not on the list, for example an outside forwarding address), ``users`` is several of those, ``choice`` is one of a fixed list, ``domain`` is one of the client's own sign-in domains, ``datetime`` is a date
-and time, ``text`` and ``longtext`` are the few things only a person can say (a reason, a message).
+and time, ``text`` and ``longtext`` are the few things only a person can say (a reason, a message). ``group`` is picked from the client's own groups (CORE reads them through CIPP) and ``rules`` is some of one
+person's inbox rules, one name per line, picked from the list CORE reads for that person.
 """
 
 from __future__ import annotations
@@ -19,7 +20,9 @@ MAX_VALUE = 500
 MAX_PEOPLE = 20
 EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
 PERSON_KINDS = ("user", "email")
-KINDS = ("user", "email", "users", "choice", "domain", "datetime", "text", "longtext")
+KINDS = ("user", "email", "users", "choice", "domain", "datetime", "text", "longtext", "group", "rules")
+MAX_RULES = 30
+MAX_RULES_CHARS = 4000
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ YES_NO = ("Yes", "No")
 GROUPS = ("User management", "Password and security", "Mail and permissions")
 
 TOOLS: tuple[Tool, ...] = (
-    Tool("group_membership", "User management", "Change group membership", "medium", True, "Add a person to a group, or take them out.", (USER, Field("change", "What to do", "choice", ("Add to the group", "Remove from the group")), Field("group", "Group name", "text", hint="Exactly as it shows in Microsoft Entra."))),
+    Tool("group_membership", "User management", "Change group membership", "medium", True, "Add a person to a group, or take them out.", (USER, Field("change", "What to do", "choice", ("Add to the group", "Remove from the group")), Field("group", "Group", "group", hint="Pick from the client's groups. If the list does not load, type the name exactly as it shows in Microsoft Entra."))),
     Tool("onedrive_permissions", "User management", "Give access to someone's OneDrive", "medium", True, "Let another person open this person's OneDrive.", (Field("user", "Whose OneDrive", "user"), Field("grantee", "Who gets access", "user"))),
     Tool(
         "user_attributes",
@@ -126,6 +129,15 @@ TOOLS: tuple[Tool, ...] = (
     Tool("out_of_office", "Mail and permissions", "Set an out of office reply", "low", True, "Turn the automatic reply on with the text to send.", (USER, Field("message", "Reply text", "longtext"), Field("until", "Until", "datetime"))),
     Tool("mailbox_permissions", "Mail and permissions", "Give access to a mailbox", "medium", True, "Full access, send as or send on behalf on a mailbox.", (Field("user", "Mailbox", "user"), Field("grantee", "Who gets access", "user"), Field("level", "Kind of access", "choice", ("Full access", "Send as", "Send on behalf")))),
     Tool("mail_forwarding", "Mail and permissions", "Forward a person's mail", "high", True, "Forward their mail to another address.", (USER, Field("to", "Forward to", "email", hint="Pick a person, or type an outside address."), Field("keep_copy", "Keep a copy in the mailbox", "choice", YES_NO))),
+    Tool(
+        "remove_inbox_rules",
+        "Mail and permissions",
+        "Remove bad inbox rules",
+        "medium",
+        False,
+        "Remove only the inbox rules chosen, such as one that forwards mail outside the client, deletes mail or hides it in a folder. Pick the person to see their rules.",
+        (Field("user", "Mailbox", "user"), Field("rules", "Rules to remove", "rules", hint="Rules that forward outside the client, delete mail or move it to a quiet folder are ticked for you."), Field("reason", "Why", "text", required=False)),
+    ),
     Tool("shared_mailbox", "Mail and permissions", "Convert a mailbox to a shared mailbox", "medium", True, "Make the mailbox shared (no license needed) and say who can use it.", (Field("user", "Mailbox", "user"), Field("members", "Who can use it", "users", required=False))),
     Tool("litigation_hold", "Mail and permissions", "Put a mailbox on litigation hold", "high", True, "Keep everything in the mailbox, including deleted items.", (Field("user", "Mailbox", "user"), Field("length", "For how long", "choice", ("Until released", "90 days", "180 days", "1 year", "7 years")), Field("reason", "Why", "text"))),
     Tool("calendar_permissions", "Mail and permissions", "Give access to a calendar", "low", True, "Let another person see or edit a calendar.", (Field("user", "Whose calendar", "user"), Field("grantee", "Who gets access", "user"), Field("level", "Kind of access", "choice", ("Free and busy times only", "Reviewer (see details)", "Editor (change items)")))),
@@ -164,6 +176,10 @@ def _check_value(f: Field, value: str) -> str | None:
         return f"{f.label} must be one of: {', '.join(f.options)}."
     if f.kind == "domain" and not re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", value):
         return f"{f.label} must be a domain name."
+    if f.kind == "rules":
+        names = [n.strip() for n in value.splitlines() if n.strip()]
+        if not names or len(names) > MAX_RULES or any(len(n) > 160 for n in names):
+            return f"{f.label}: pick between 1 and {MAX_RULES} rules."
     if f.kind == "datetime":
         try:
             datetime.fromisoformat(value)
@@ -186,7 +202,7 @@ def check_request(tool_id: str, args: dict[str, Any]) -> tuple[Tool | None, dict
             if f.required:
                 return tool, {}, f"{f.label} is needed."
             continue
-        if len(value) > MAX_VALUE:
+        if len(value) > (MAX_RULES_CHARS if f.kind == "rules" else MAX_VALUE):
             return tool, {}, f"{f.label} is too long."
         why = _check_value(f, value)
         if why:
@@ -199,7 +215,7 @@ def approval_text(tool: Tool, client: str, args: dict[str, str]) -> tuple[str, s
     """The title and summary of the approval card: what is asked, for whom, with every value shown (the approver decides on exactly this)."""
     who = args.get("user") or (f"{args['first_name']} {args['last_name']}" if "first_name" in args else "")
     title = f"{tool.label}: {who}" if who else tool.label
-    lines = [f"{tool.summary} Client: {client}."] + [f"{f.label}: {args[f.key]}" for f in tool.fields if f.key in args]
+    lines = [f"{tool.summary} Client: {client}."] + [f"{f.label}: {args[f.key].replace(chr(10), '; ')}" for f in tool.fields if f.key in args]
     lines.append("Reversible." if tool.reversible else "Not easily reversed.")
     return title[:200], "\n".join(lines)
 
