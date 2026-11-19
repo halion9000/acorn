@@ -2472,12 +2472,12 @@
   },
   {
     "status": "in_progress",
-    "needs": "hal",
+    "needs": "claude",
     "area": "Metrics",
     "key": "rewst-metrics-number-differences",
     "title": "Make the ticket numbers match Rewst's, and the pages look like Rewst's",
     "detail": "Hal signed in to the Rewst metric dashboards on 2026-11-19 to compare numbers and visuals.",
-    "note": "Compared the Ticket Summary page (docs/REWST_METRICS_COMPARISON.md). A.C.O.R.N shows about 24 percent more created tickets and 12 to 23 percent more resolved: Rewst runs SQL on HaloPSA that leaves out deleted and merged tickets, CORE counts the REST list, which includes merged duplicates (not verified against Halo). First response differs by definition (Rewst 7.7 min from HaloPSA's own field; A.C.O.R.N 1,183 min of clock time). A.C.O.R.N holds 5 months, Rewst 37. Built: the Rewst look on every Metrics page and a paired column chart with a Showing line. QUESTION FOR HAL: may CORE run the same read-only SELECT through HaloPSA's report call (what Rewst does) to match the numbers and reach 36 months, with the old read as the fallback? It needs the report permission on CORE's HaloPSA API key, which I cannot see. The other Rewst pages (labor hours, scorecard, staff metrics, pods) are not compared number by number yet.",
+    "note": "Hal said yes, with fallback (2026-11-19). Built in CORE: the ticket statistics are read through HaloPSA's report call with Rewst's exclusions (deleted and merged tickets), Rewst's first-response measure and 36 months, checked against separate counts, with the paged read as the fallback; A.C.O.R.N accepts 37 months and the Tickets page offers 24 and 36. NOT VERIFIED live: whether CORE's HaloPSA key may use the report call; CORE's log line for the ticket metrics says which read ran. Look at the Tickets page after CORE's next daily pass and compare with Rewst. The other Rewst pages (labor hours, scorecard, staff metrics, pods) are not compared number by number yet.",
     "added": "2026-11-19"
   }
 ]

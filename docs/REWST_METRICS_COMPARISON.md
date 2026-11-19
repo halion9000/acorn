@@ -30,3 +30,10 @@ Have CORE run the same query Rewst runs (a read-only SELECT through the HaloPSA 
 ## Visuals
 
 The Metrics pages now use the Rewst look: the dark teal gradient, glass cards with rounded corners, big numbers with the label under them, green bars with the value over each, and for tickets a paired column chart of created and resolved by month. The "Showing ... months" line says how many months the data holds. A light version of the same colors is used in the light theme.
+
+
+## Built 2026-11-19 (Hal: yes, with the paged read as the fallback)
+
+CORE now reads the ticket statistics first through HaloPSA's report call, with the same exclusions as Rewst (deleted and merged tickets left out), the Rewst first-response measure and 36 months (37 calendar months), and falls back to the paged read when HaloPSA refuses the call or the answer does not add up. Every answer is checked against a separate count of the same thing, so rows cut off by the report call are refused and the paged read runs instead; a mismatch is read once more first, because a ticket can arrive while the queries run. The by-type and by-engineer detail covers the newest 12 months. Closed tickets are counted by the closing engineer when HaloPSA accepts that column and by the assigned engineer when it does not. CORE's log line for the ticket metrics says which read was used and why the report call was not.
+
+NOT VERIFIED live: the report call was not run against HaloPSA, so it is not known that CORE's API key may use it. If it may not, nothing changes from before (the paged read runs) and the log line says so. After the next update the numbers should match Rewst's; if they still differ, the log line and this note are the place to look.

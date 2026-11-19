@@ -183,3 +183,27 @@ async def test_the_endpoints_are_empty_until_core_sends_then_answer_from_what_wa
     assert [c["client_name"] for c in out["clients"]] == ["Acme", "Birch"]
     sat = await with_db(tenant.id, lambda db: ep.csat(tenant.user, db, 2, "Birch Law"))
     assert sat["companies"] == ["Acme Dental, Inc.", "Birch Law"] and sat["summary"]["responses"] == 2
+
+
+def _year_of_months(n: int) -> list[str]:
+    out, y, m = [], 2023, 11
+    for _ in range(n):
+        out.append(f"{y}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def test_thirty_seven_months_are_accepted_from_core_and_the_summary_can_cover_thirty_six():
+    months = _year_of_months(37)
+    stats = {
+        "months": months,
+        "rows": [{"client_id": "5", "client_name": "Acme", "month": m, "created": 10, "resolved": 9, "responded": 10, "response_minutes": 50.0, "created_by_type": {}, "resolved_by_agent": {}, "critical": 0, "high": 0} for m in months],
+        "open_now": [],
+    }
+    kept = feed.TicketStatsIn.model_validate(stats).model_dump()
+    assert len(kept["months"]) == 37, "the 37 months of the report read are not refused"
+    out = tm.summarize(kept, 36)
+    assert out["months"] == months[1:] and out["created"] == 360 and out["first_response_minutes"] == 5.0
+    assert tm.summarize(kept, 12)["created"] == 120
+    with pytest.raises(Exception):
+        feed.TicketStatsIn.model_validate({**stats, "months": _year_of_months(41)})

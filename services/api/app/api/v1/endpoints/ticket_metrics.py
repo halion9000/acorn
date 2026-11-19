@@ -20,10 +20,10 @@ router = APIRouter(prefix="/reports/ticket-metrics", tags=["reports"])
 async def ticket_metrics(
     user: AuthUser,
     db: DBSession,
-    months: Annotated[int, Query(ge=1, le=12)] = 3,
+    months: Annotated[int, Query(ge=1, le=36)] = 3,
     client_id: Annotated[str | None, Query(max_length=20)] = None,
 ) -> dict[str, Any]:
-    """The summary for the newest ``months`` months, for one HaloPSA client (``client_id``) or all. ``received_at`` is None until CORE has sent the first one."""
+    """The summary for the newest ``months`` months (up to 36), for one HaloPSA client (``client_id``) or all. ``received_at`` is None until CORE has sent the first one."""
     row = (await db.execute(select(TicketStatsSnapshot).where(TicketStatsSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
     if row is None:
         return {"received_at": None, "clients": [], "available_months": 0, "summary": None}

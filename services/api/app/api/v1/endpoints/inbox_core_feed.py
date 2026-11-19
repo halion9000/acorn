@@ -1542,7 +1542,7 @@ class TicketOpenIn(BaseModel):
 
 
 class TicketStatsIn(BaseModel):
-    months: list[str] = Field(max_length=24)
+    months: list[str] = Field(max_length=40)
     rows: list[TicketMonthIn] = Field(max_length=60000)
     open_now: list[TicketOpenIn] = Field(max_length=5000)
 

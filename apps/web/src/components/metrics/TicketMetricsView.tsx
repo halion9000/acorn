@@ -45,7 +45,7 @@ interface CsatData {
   summary: CsatSummary | null;
 }
 
-export const PERIODS = [1, 3, 6, 12] as const;
+export const PERIODS = [1, 3, 6, 12, 24, 36] as const;
 export const num = (n: number | null | undefined, unit = ''): string => (n === null || n === undefined ? '—' : `${n.toLocaleString('en-US')}${unit}`);
 /** A wait in minutes as people say it: "18 min", "2 h 5 min", "1 d 3 h". */
 export function waitText(minutes: number | null): string {
@@ -87,7 +87,7 @@ export function TicketMetricsView() {
       const body = (await t.json()) as TicketData;
       setTickets(body);
       const chosenName = client ? (body.clients.find((c) => c.client_id === client)?.client_name ?? '') : '';
-      const sat = await authFetch(`/api/v1/reports/ticket-metrics/csat?months=${m}${client && (companyName ?? chosenName) ? `&company=${encodeURIComponent(companyName ?? chosenName)}` : ''}`);
+      const sat = await authFetch(`/api/v1/reports/ticket-metrics/csat?months=${Math.min(m, 12)}${client && (companyName ?? chosenName) ? `&company=${encodeURIComponent(companyName ?? chosenName)}` : ''}`);
       if (sat.ok) setCsat((await sat.json()) as CsatData);
       setProblem(null);
     } catch (e) {
@@ -149,7 +149,7 @@ export function TicketMetricsView() {
               {[
                 ['Created', num(s.created), `${num(s.created_per_month)} a month`],
                 ['Resolved', num(s.resolved), `${num(s.resolved_per_month)} a month`],
-                ['First response', waitText(s.first_response_minutes), 'on average'],
+                ['First response', waitText(s.first_response_minutes), 'on average, from HaloPSA'],
                 ['Open now', num(s.open_now.total), ''],
                 ['Critical open', num(s.open_now.critical), ''],
                 ['High open', num(s.open_now.high), ''],

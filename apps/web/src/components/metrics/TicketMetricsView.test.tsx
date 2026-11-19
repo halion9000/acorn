@@ -89,6 +89,15 @@ describe('TicketMetricsView', () => {
     await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/reports/ticket-metrics?months=6&client_id=5'));
   });
 
+  it('offers 24 and 36 months for tickets and asks for the satisfaction side no more than 12', async () => {
+    render(<TicketMetricsView />);
+    await screen.findByTestId('ticket-cards');
+    await userEvent.click(screen.getByRole('button', { name: 'Last 36 months' }));
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/reports/ticket-metrics?months=36'));
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/v1/reports/ticket-metrics/csat?months=12'));
+    expect(screen.getByRole('button', { name: 'Last 24 months' })).toBeInTheDocument();
+  });
+
   it('says nothing has arrived instead of showing empty cards, and that satisfaction needs SimpleSat', async () => {
     authFetch.mockImplementation((url: string) => answer(String(url).includes('/csat') ? { received_at: null, companies: [], summary: null } : { received_at: null, clients: [], summary: null }));
     render(<TicketMetricsView />);
