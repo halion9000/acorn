@@ -603,6 +603,7 @@ class ClaimedAction(BaseModel):
         "user_lookup",
         "directory_lookup",
         "mailbox_rules_lookup",
+        "toolbox_run",
     ]
     incident_uid: str
     params: dict[str, Any]

@@ -1,5 +1,5 @@
-"""A toolbox request against a REAL Postgres as the restricted role: it becomes a pending approval naming the client and every value, never runs, never auto-approves, and a client that is not the caller's is
-refused (opt in with AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL)."""
+"""A toolbox request against a REAL Postgres as the restricted role: it is queued for CORE (a ``toolbox_run`` vendor action in the client's own tenant) with the tool, the client's CIPP and HaloPSA ids and every value
+except a password, a client that is not the caller's or not linked to CIPP is refused, and the requests list shows what CORE answered (opt in with AISOC_TEST_PG_URL / AISOC_TEST_PG_APP_URL)."""
 
 import os
 import uuid
@@ -36,9 +36,9 @@ async def world():
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
             await conn.execute(text("delete from agent_approvals where tenant_id = :t"), {"t": owner})
-            await conn.execute(text("delete from vendor_actions where tenant_id = :t"), {"t": owner})
+            await conn.execute(text("delete from vendor_actions where tenant_id = any(cast(:t as uuid[]))"), {"t": [str(owner), str(acme)]})
             await conn.execute(text("alter table audit_log disable trigger user"))
-            await conn.execute(text("delete from audit_log where tenant_id = :t"), {"t": owner})
+            await conn.execute(text("delete from audit_log where tenant_id = any(cast(:t as uuid[]))"), {"t": [str(owner), str(acme)]})
             await conn.execute(text("alter table audit_log enable trigger user"))
             await conn.execute(text("delete from tenants where parent_tenant_id = :t"), {"t": owner})
             await conn.execute(text("delete from tenants where id = any(cast(:t as uuid[]))"), {"t": [str(owner), str(stranger)]})
@@ -56,34 +56,58 @@ async def call(w, client, tool, args):
         await engine.dispose()
 
 
-async def approvals(w):
+async def link(w, client, vendor, vendor_id):
     engine = create_async_engine(PG_URL)
     try:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            return (await conn.execute(text("select status, risk_level, requested_by, title, action from agent_approvals where tenant_id = :t"), {"t": w.owner})).all()
+            await conn.execute(
+                text("insert into client_aliases (id, tenant_id, vendor, vendor_client_id, vendor_client_name, normalized_name, child_tenant_id, ignored, match_source) values (:i, :t, :v, :vid, 'Acme', 'acme', :c, false, 'manual')"),
+                {"i": uuid.uuid4(), "t": w.owner, "v": vendor, "vid": vendor_id, "c": client},
+            )
     finally:
         await engine.dispose()
 
 
-async def test_a_press_creates_one_pending_approval_with_every_value_and_runs_nothing(world):
+async def runs(w):
+    engine = create_async_engine(PG_URL)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            return (await conn.execute(text("select tenant_id, vendor, action, status, params from vendor_actions where action = 'toolbox_run' and tenant_id in (:a, :o)"), {"a": w.acme, "o": w.owner})).all()
+    finally:
+        await engine.dispose()
+
+
+async def test_a_press_queues_one_run_for_core_in_the_clients_tenant_with_every_value_and_the_mapped_ids(world):
+    await link(world, world.acme, "cipp", "acme.onmicrosoft.com")
+    await link(world, world.acme, "halopsa", "77")
     out = await call(world, world.acme, "reset_mfa", {"user": "ann@acme.com", "reason": "lost phone"})
-    assert out["status"] == "pending" and out["risk"] == "high" and "Nothing has been run" in out["note"]
-    rows = await approvals(world)
+    assert out["status"] == "waiting" and out["risk"] == "high" and "Queued" in out["note"]
+    rows = await runs(world)
     assert len(rows) == 1
-    status, risk, by, title, action = rows[0]
-    assert (status, risk, by, title) == ("pending", "high", "toolbox:tech@liveoakit.com", "Reset a person's MFA: ann@acme.com")
-    assert action == {"kind": "toolbox", "tool": "reset_mfa", "client_id": str(world.acme), "client": "Acme", "args": {"user": "ann@acme.com", "reason": "lost phone"}, "secret_args": []}
+    tenant, vendor, action, status, params = rows[0]
+    assert (tenant, vendor, action, status) == (world.acme, "core", "toolbox_run", "pending")
+    assert params == {"tool": "reset_mfa", "label": "Reset a person's MFA", "client": "Acme", "client_id": "acme.onmicrosoft.com", "halo_client_id": "77", "args": {"user": "ann@acme.com", "reason": "lost phone"}, "requested_by_name": "tech@liveoakit.com"}
 
 
-async def test_a_bad_request_or_a_foreign_client_creates_nothing(world):
+async def test_a_bad_request_a_foreign_client_or_a_client_not_linked_to_cipp_queues_nothing(world):
     with pytest.raises(HTTPException) as e:
         await call(world, world.acme, "reset_mfa", {"user": "ann@acme.com"})
     assert e.value.status_code == 422
     with pytest.raises(HTTPException) as e2:
         await call(world, world.stranger, "reset_mfa", {"user": "a@b.co", "reason": "x"})
     assert e2.value.status_code == 404
-    assert await approvals(world) == []
+    with pytest.raises(HTTPException) as e3:
+        await call(world, world.acme, "reset_mfa", {"user": "ann@acme.com", "reason": "x"})
+    assert e3.value.status_code == 409 and "CIPP" in e3.value.detail
+    await link(world, world.acme, "cipp", "acme.onmicrosoft.com")
+    with pytest.raises(HTTPException) as e4:
+        await call(world, world.acme, "reset_mfa", {"user": "ann@acme.com", "reason": "x"})
+    assert e4.value.status_code == 409 and "HaloPSA" in e4.value.detail, "no ticket number and no Halo client: a ticket cannot be opened"
+    await call(world, world.acme, "reset_mfa", {"user": "ann@acme.com", "reason": "x", "ticket": "4711"})
+    assert len(await runs(world)) == 1
+    assert (await runs(world))[0][4]["args"]["ticket"] == "4711" and "halo_client_id" not in (await runs(world))[0][4]
 
 
 async def lookups_for(w, client):
@@ -202,22 +226,23 @@ async def test_inbox_rules_are_asked_only_for_a_person_of_that_client(world):
     assert [(r[0], r[1]) for r in rows] == [("mailbox_rules_lookup", {"upn": "ann@acme.com"})]
 
 
-async def test_a_typed_password_is_stored_encrypted_named_as_a_secret_and_never_in_the_summary_or_the_audit(world):
-    from app.security.credential_vault import get_vault
-
+async def test_a_typed_password_is_never_queued_or_audited_and_the_list_shows_what_core_answered(world):
+    await link(world, world.acme, "cipp", "acme.onmicrosoft.com")
+    await link(world, world.acme, "halopsa", "77")
     out = await call(world, world.acme, "change_password", {"user": "ann@acme.com", "password": "Correct-Horse-9", "ticket": "4711"})
-    assert out["status"] == "pending"
+    assert out["status"] == "waiting"
+    (_, _, _, _, params), = await runs(world)
+    assert "password" not in params["args"] and params["args"]["require_change"] == "Yes" and "Correct-Horse-9" not in str(params)
     engine = create_async_engine(PG_URL)
     try:
         async with engine.begin() as conn:
             await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
-            row = (await conn.execute(text("select summary, action from agent_approvals where tenant_id = :t"), {"t": world.owner})).one()
-            audit = (await conn.execute(text("select changes::text from audit_log where tenant_id = :t"), {"t": world.owner})).scalars().all()
+            audit = (await conn.execute(text("select changes::text from audit_log where tenant_id = :t"), {"t": world.acme})).scalars().all()
+            await conn.execute(text("update vendor_actions set status = 'done', result_message = 'Password reset. The new password is in ticket 4711.', result_data = cast(:d as jsonb), finished_at = now() where tenant_id = :t and action = 'toolbox_run'"), {"t": world.acme, "d": '{"ticket": "4711", "steps": [{"step": "Reset the password", "ok": true}]}'})
     finally:
         await engine.dispose()
-    summary, action = row
-    assert "Correct-Horse-9" not in summary and "Password: set (hidden)" in summary
-    assert action["secret_args"] == ["password"] and action["args"]["password"] != "Correct-Horse-9"
-    assert get_vault().decrypt(action["args"]["password"]) == "Correct-Horse-9", "kept so a later run can use it"
-    assert action["args"]["ticket"] == "4711" and action["args"]["require_change"] == "Yes"
-    assert not any("Correct-Horse-9" in str(c) for c in audit)
+    assert audit and not any("Correct-Horse-9" in str(c) for c in audit)
+    listed = await with_db(world, lambda db: ep.recent_requests(_user(world), db))
+    (one,) = listed["requests"]
+    assert (one["tool"], one["client"], one["person"], one["status"], one["ticket"], one["message"]) == ("change_password", "Acme", "ann@acme.com", "done", "4711", "Password reset. The new password is in ticket 4711.")
+    assert one["steps"] == [{"step": "Reset the password", "ok": True}]

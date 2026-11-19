@@ -18471,8 +18471,8 @@ paths:
     post:
       tags:
       - toolbox
-      summary: 'Ask for a tool to be run for a client: creates an approval request,
-        runs nothing'
+      summary: 'Ask for a tool to be run for a client: queued for CORE, which does
+        it through CIPP and writes the result into the ticket'
       operationId: make_request_api_v1_toolbox_request_post
       requestBody:
         content:
@@ -18481,7 +18481,7 @@ paths:
               $ref: '#/components/schemas/app__api__v1__endpoints__toolbox__RequestIn'
         required: true
       responses:
-        '201':
+        '202':
           description: Successful Response
           content:
             application/json:
@@ -18495,6 +18495,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/toolbox/requests:
+    get:
+      tags:
+      - toolbox
+      summary: The recent toolbox requests of this company's clients, newest first,
+        with what CORE did
+      operationId: recent_requests_api_v1_toolbox_requests_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Recent Requests Api V1 Toolbox Requests Get
       security:
       - HTTPBearer: []
   /api/v1/compliance/trust-center:
@@ -25564,6 +25582,55 @@ paths:
                 type: object
                 additionalProperties: true
                 title: Response Staff Hours Api V1 Reports Metrics Staff Hours Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/scorecard-template:
+    get:
+      tags:
+      - reports
+      summary: Scorecard Template
+      description: The weights, brackets and grade cut-offs the scorecard is worked
+        out with (read only).
+      operationId: scorecard_template_api_v1_reports_metrics_scorecard_template_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Scorecard Template Api V1 Reports Metrics Scorecard
+                  Template Get
         '422':
           description: Validation Error
           content:
@@ -41401,6 +41468,7 @@ components:
           - user_lookup
           - directory_lookup
           - mailbox_rules_lookup
+          - toolbox_run
           title: Action
         incident_uid:
           type: string

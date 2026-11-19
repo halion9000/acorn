@@ -136,7 +136,7 @@ _TOOLS: tuple[Tool, ...] = (
             USER,
             Field("entra_override", "User Entra override", "email", required=False, hint="Only for hybrid environments that are not synced, where the person's username in Entra differs from on-prem."),
             Field("require_change", "Require a password change at next sign-in", "choice", YES_NO, default="Yes"),
-            Field("password", "Password", "secret", hint="Use the generated password or type one (at least 8 characters). It is kept encrypted and never shown again."),
+            Field("password", "Password", "secret", hint="CIPP cannot set a chosen password yet: when this runs CIPP creates the password and CORE writes it into the ticket. What is typed here is not sent anywhere."),
         ),
     ),
     Tool("compromised_user", "Password and security", "Remediate a compromised user", "high", False, "Reset the password, end all sessions, reset MFA and remove inbox rules and forwarding.", (USER, Field("reason", "What happened", "longtext"))),
@@ -259,3 +259,42 @@ def people_and_domains(rows: list[tuple[str, str | None, bool, str | None]]) -> 
             counts[d] = counts.get(d, 0) + 1
     domains = [d for d, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
     return {"people": people, "domains": domains}
+
+
+# --- Running a request ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RUN_ACTION = "toolbox_run"
+RUN_STATUS = {"pending": "waiting", "claimed": "running", "done": "done", "failed": "failed"}
+
+
+def run_params(tool: Tool, client: str, args: dict[str, str], cipp: str, halo: str | None, requested_by: str | None) -> dict[str, Any]:
+    """What CORE is told to run (pure): the tool, the client's CIPP customer id and HaloPSA client id, and every value except a secret (CIPP cannot take a typed password, so none is queued)."""
+    secrets = {f.key for f in tool.fields if f.kind == "secret"}
+    return {
+        "tool": tool.id,
+        "label": tool.label,
+        "client": client,
+        "client_id": cipp,
+        **({"halo_client_id": halo} if halo else {}),
+        "args": {k: v for k, v in args.items() if k not in secrets},
+        "requested_by_name": (requested_by or "")[:200] or None,
+    }
+
+
+def present_run(row: Any, client: str | None) -> dict[str, Any]:
+    """One request as the page lists it (pure): what was asked, for which client, how far it is, and what CORE said, with the ticket CORE used."""
+    p = row.params or {}
+    data = row.result_data or {}
+    return {
+        "request_id": str(row.id),
+        "tool": p.get("tool"),
+        "label": p.get("label") or p.get("tool"),
+        "client": client or p.get("client"),
+        "person": (p.get("args") or {}).get("user") or ((p.get("args") or {}).get("first_name") or ""),
+        "status": RUN_STATUS.get(row.status, row.status),
+        "message": row.result_message,
+        "ticket": data.get("ticket") or (p.get("args") or {}).get("ticket"),
+        "steps": data.get("steps") or [],
+        "requested_by": p.get("requested_by_name"),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+    }

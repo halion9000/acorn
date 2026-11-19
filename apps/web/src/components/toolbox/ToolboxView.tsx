@@ -321,6 +321,84 @@ function FieldControl({ f, value, onChange, lookups, groups, rules, person }: { 
 const RISK_TEXT: Record<ToolInfo['risk'], string> = { low: 'low risk', medium: 'medium risk', high: 'high risk' };
 const RISK_CLASS: Record<ToolInfo['risk'], string> = { low: 'text-emerald-300', medium: 'text-amber-300', high: 'text-red-300' };
 
+export interface RunItem {
+  request_id: string;
+  label: string;
+  client: string | null;
+  person: string;
+  status: 'waiting' | 'running' | 'done' | 'failed';
+  message: string | null;
+  ticket: string | null;
+  steps: { step: string; ok: boolean }[];
+  requested_by: string | null;
+  created_at: string | null;
+}
+
+export const RUN_TEXT: Record<RunItem['status'], { text: string; cls: string }> = {
+  waiting: { text: 'Waiting for CORE', cls: 'text-gray-300' },
+  running: { text: 'Running', cls: 'text-blue-300' },
+  done: { text: 'Done', cls: 'text-emerald-300' },
+  failed: { text: 'Failed', cls: 'text-red-300' },
+};
+
+/** Whether any request is still on its way, so the list keeps asking. */
+export const stillOpen = (items: RunItem[]): boolean => items.some((i) => i.status === 'waiting' || i.status === 'running');
+
+function RecentRequests({ reloadAt }: { reloadAt: number }) {
+  const [items, setItems] = useState<RunItem[] | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res = await authFetch('/api/v1/toolbox/requests');
+        if (!res.ok) return;
+        const list = ((await res.json()) as { requests?: RunItem[] }).requests ?? [];
+        if (live) setItems(list);
+      } catch {
+        /* the list stays as it was */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [reloadAt, tick]);
+  useEffect(() => {
+    if (!items || !stillOpen(items)) return;
+    const timer = setTimeout(() => setTick((n) => n + 1), 8000);
+    return () => clearTimeout(timer);
+  }, [items, tick]);
+  if (!items || items.length === 0) return null;
+  return (
+    <section aria-label="Recent requests" className="space-y-2" data-testid="recent-requests">
+      <h2 className="text-sm font-semibold text-white">Recent requests</h2>
+      <ul className="space-y-2">
+        {items.map((r) => (
+          <li key={r.request_id} className="rounded-lg border border-gray-800 bg-gray-900 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-medium text-white">{r.label}</span>
+              {r.person ? <span className="text-gray-400">{r.person}</span> : null}
+              <span className="text-gray-500">{r.client}</span>
+              <span className={`ml-auto text-xs font-semibold ${RUN_TEXT[r.status].cls}`}>{RUN_TEXT[r.status].text}</span>
+            </div>
+            {r.message ? <p className="mt-1 text-xs text-gray-300">{r.message}</p> : null}
+            {r.ticket ? <p className="mt-0.5 text-xs text-gray-400">Ticket {r.ticket}</p> : null}
+            {r.steps.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-xs">
+                {r.steps.map((st) => (
+                  <li key={st.step} className={st.ok ? 'text-emerald-300' : 'text-red-300'}>
+                    {st.ok ? '✓' : '✗'} {st.step}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ToolboxView() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [clients, setClients] = useState<ChildTenant[]>([]);
@@ -363,6 +441,8 @@ export function ToolboxView() {
     };
   }, [clientId]);
 
+  const [reloadAt, setReloadAt] = useState(0);
+
   const choose = (t: ToolInfo) => {
     setTool(t);
     setValues(startingValues(t));
@@ -379,7 +459,8 @@ export function ToolboxView() {
       const body = (await res.json().catch(() => ({}))) as { detail?: string; note?: string; title?: string };
       if (!res.ok) setMessage({ ok: false, text: typeof body.detail === 'string' ? body.detail : 'The request was not made.' });
       else {
-        setMessage({ ok: true, text: `${body.title ?? 'Request'} was recorded. ${body.note ?? ''}`.trim() });
+        setMessage({ ok: true, text: `${body.title ?? 'Request'}: ${body.note ?? 'queued.'}`.trim() });
+        setReloadAt(Date.now());
         setValues(startingValues(tool));
       }
     } catch {
@@ -401,7 +482,7 @@ export function ToolboxView() {
 
   return (
     <div className="space-y-6 p-6" data-testid="toolbox">
-      <PageHeader title="Toolbox" subtitle="Ask for a Microsoft 365 action for a client. Pressing Save request asks you to confirm first. The request is recorded; nothing runs against the client yet because running it through CIPP is the next stage." />
+      <PageHeader title="Toolbox" subtitle="Run a Microsoft 365 action for a client. Pressing Run request asks you to confirm first. CORE does the work through CIPP, writes it into the ticket (a new ticket is opened when none is given) and the result shows under Recent requests." />
       {error && (
         <p role="alert" className="text-sm text-red-300">
           {error}
@@ -459,7 +540,7 @@ export function ToolboxView() {
             </div>
           ))}
           <button type="button" disabled={!complete || busy} onClick={() => setConfirming(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
-            Save request
+            Run request
           </button>
           {message && (
             <p role={message.ok ? 'status' : 'alert'} className={`text-sm ${message.ok ? 'text-emerald-300' : 'text-red-300'}`}>
@@ -468,6 +549,7 @@ export function ToolboxView() {
           )}
         </section>
       )}
+      <RecentRequests reloadAt={reloadAt} />
       {confirming && tool ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div role="dialog" aria-modal="true" aria-label="Are you sure?" className="w-full max-w-md space-y-3 rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-xl">
@@ -492,7 +574,7 @@ export function ToolboxView() {
                 Cancel
               </button>
               <button type="button" onClick={() => void send()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white">
-                Yes, save it
+                Yes, run it
               </button>
             </div>
           </div>

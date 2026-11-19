@@ -103,12 +103,12 @@ describe('the Change a password form', () => {
     await userEvent.selectOptions(screen.getByLabelText('Require a password change at next sign-in'), 'No');
     await userEvent.clear(screen.getByLabelText('Password'));
     await userEvent.type(screen.getByLabelText('Password'), 'My-Own-Pass-77');
-    await userEvent.click(screen.getByRole('button', { name: 'Save request' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Run request' }));
     const dialog = screen.getByRole('dialog');
     expect(dialog.textContent).toContain('(hidden)');
     expect(dialog.textContent).not.toContain('My-Own-Pass-77');
     expect(dialog.textContent).toContain('4711');
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, save it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, run it' }));
     await waitFor(() => expect(authFetch.mock.calls.some((c) => String(c[0]).endsWith('/request'))).toBe(true));
     const sent = JSON.parse((authFetch.mock.calls.find((c) => String(c[0]).endsWith('/request'))![1] as RequestInit).body as string);
     expect(sent.args).toMatchObject({ ticket: '4711', user: 'ann@acme.com', require_change: 'No', password: 'My-Own-Pass-77' });

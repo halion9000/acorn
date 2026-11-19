@@ -1,7 +1,7 @@
-"""The employee toolbox, stage 1 (roadmap rw-toolbox): list the Microsoft 365 tools and make a request for one, which becomes an approval card. Nothing runs against a client's tenant.
+"""The employee toolbox (roadmap rw-toolbox): list the Microsoft 365 tools and make a request for one, which is queued for CORE to run through CIPP.
 
-Read the tools with ``alerts:read``; make a request with ``cases:write``. The request is an ordinary approval (``/approvals``) owned by the organization, naming the client, the tool and every value, so a
-person with the right to decide sees exactly what was asked. Running an approved request through CIPP is a later stage.
+Read the tools with ``alerts:read``; make a request with ``cases:write`` (the person confirms on the page first). The request is a ``toolbox_run`` vendor action for CORE in the client's own tenant, naming the
+tool and its values (a typed password is never queued); CORE runs it under its CIPP safety rules, opens or updates the ticket and reports what happened, shown on ``GET /toolbox/requests``.
 """
 
 from __future__ import annotations
@@ -15,21 +15,23 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
-from app.api.v1.endpoints.devices import _scope
+from app.api.v1.endpoints.devices import _as, _scope
+from app.api.v1.endpoints.identity_actions import cipp_customer
+from app.api.v1.endpoints.identity_halo_user import halo_client
 from app.db.rls_scope import cross_tenant_reads
-from app.models.responder import AgentApproval
+from app.models.vendor_action import VendorAction
 from app.models.signin import IdentityMfaUser
 from app.services import core_lookup as lk
 from app.services import toolbox as tb
 from app.services.audit import emit_audit
-from app.security.credential_vault import get_vault
 from app.services.identity_people import MICROSOFT
 
 router = APIRouter(prefix="/toolbox", tags=["toolbox"])
 
 MAX_LOOKUP_ROWS = 5000
 
-EXPIRES_AFTER = timedelta(days=7)
+RECENT_FOR = timedelta(days=14)
+RECENT_LIMIT = 40
 
 
 class RequestIn(BaseModel):
@@ -40,7 +42,7 @@ class RequestIn(BaseModel):
 
 @router.get("/tools", summary="The Microsoft 365 tools a technician can ask for, in groups")
 async def tools(user: Annotated[AuthUser, Depends(require_permission("alerts:read"))]) -> dict[str, Any]:
-    return {"groups": list(tb.GROUPS), "tools": tb.catalog(), "stage": "Requests are recorded for approval. Running an approved request is the next stage."}
+    return {"groups": list(tb.GROUPS), "tools": tb.catalog(), "stage": "A request is queued for CORE, which runs it through CIPP and writes the result into the ticket."}
 
 
 async def _client_people(db: DBSession, owner: uuid.UUID, client_id: uuid.UUID) -> dict[str, Any]:
@@ -116,37 +118,58 @@ async def read_inbox_rules(request_id: uuid.UUID, user: Annotated[AuthUser, Depe
     return await _read(db, user, request_id, "rules")
 
 
-@router.post("/request", status_code=201, summary="Ask for a tool to be run for a client: creates an approval request, runs nothing")
+@router.post("/request", status_code=202, summary="Ask for a tool to be run for a client: queued for CORE, which does it through CIPP and writes the result into the ticket")
 async def make_request(body: RequestIn, user: Annotated[AuthUser, Depends(require_permission("cases:write"))], db: DBSession) -> dict[str, Any]:
     scope, names = await _scope(db, user.tenant_id, body.client_id)
-    if body.client_id not in scope or body.client_id not in names:
+    if body.client_id not in scope or body.client_id not in names or body.client_id == user.tenant_id:
         raise HTTPException(status_code=404, detail="Client not found")
     tool, args, why = tb.check_request(body.tool, body.args)
     if why or tool is None:
         raise HTTPException(status_code=422, detail=why or "That request cannot be made.")
+    cipp = await cipp_customer(db, user.tenant_id, body.client_id)
+    if not cipp:
+        raise HTTPException(status_code=409, detail="This client is not linked to CIPP (Settings, Client mapping), so there is no Microsoft 365 tenant to work in.")
+    halo = await halo_client(db, user.tenant_id, body.client_id)
+    if not halo and not args.get("ticket"):
+        raise HTTPException(status_code=409, detail="This client is not linked to a HaloPSA client, so a new ticket cannot be opened. Give an existing ticket number or link the client (Settings, Client mapping).")
     client = names[body.client_id]
-    secrets = {f.key for f in tool.fields if f.kind == "secret" and f.key in args}
-    title, summary = tb.approval_text(tool, client, args)
-    row = AgentApproval(
-        tenant_id=user.tenant_id,
-        requested_by=f"toolbox:{user.email}"[:120],
-        title=title,
-        summary=summary,
-        risk_level=tool.risk,
-        # A secret (a typed password) is kept encrypted, named in secret_args, and never written to the summary or the audit.
-        action={
-            "kind": "toolbox",
-            "tool": tool.id,
-            "client_id": str(body.client_id),
-            "client": client,
-            "args": {k: (get_vault().encrypt(v) if k in secrets else v) for k, v in args.items()},
-            "secret_args": sorted(secrets),
-        },
-        expires_at=datetime.now(UTC) + EXPIRES_AFTER,
-        status="pending",
-    )
-    db.add(row)
-    await db.flush()
-    await emit_audit(db=db, tenant_id=user.tenant_id, actor_id=user.user_id, action="toolbox:request", resource="agent_approval", resource_id=str(row.id), changes={"tool": tool.id, "client": client})
-    await db.commit()
-    return {"approval_id": str(row.id), "status": "pending", "title": title, "risk": tool.risk, "note": "Recorded. Nothing has been run yet."}
+    title, _summary = tb.approval_text(tool, client, args)
+    now = datetime.now(UTC)
+    async with _as(db, user.tenant_id, body.client_id):
+        row = VendorAction(
+            id=uuid.uuid4(),
+            tenant_id=body.client_id,
+            alert_id=None,
+            vendor="core",
+            incident_uid=f"toolbox:{uuid.uuid4().hex[:12]}",
+            action=tb.RUN_ACTION,
+            params=tb.run_params(tool, client, args, cipp, halo, user.email),
+            status="pending",
+            requested_by=user.user_id,
+            created_at=now,
+        )
+        db.add(row)
+        await db.flush()
+        # The audit names the tool and the client only: never the values.
+        await emit_audit(db=db, tenant_id=body.client_id, actor_id=user.user_id, action="toolbox:request", resource="vendor_action", resource_id=str(row.id), changes={"tool": tool.id, "client": client})
+        await db.commit()
+    return {"request_id": str(row.id), "status": "waiting", "title": title, "risk": tool.risk, "note": "Queued. CORE picks it up within a minute, does the work through CIPP and writes the result into the ticket."}
+
+
+@router.get("/requests", summary="The recent toolbox requests of this company's clients, newest first, with what CORE did")
+async def recent_requests(user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession) -> dict[str, Any]:
+    scope, names = await _scope(db, user.tenant_id, None)
+    async with cross_tenant_reads(db):
+        rows = (
+            (
+                await db.execute(
+                    select(VendorAction)
+                    .where(VendorAction.tenant_id.in_(list(scope)), VendorAction.vendor == "core", VendorAction.action == tb.RUN_ACTION, VendorAction.created_at >= datetime.now(UTC) - RECENT_FOR)
+                    .order_by(VendorAction.created_at.desc())
+                    .limit(RECENT_LIMIT)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return {"requests": [tb.present_run(r, names.get(r.tenant_id)) for r in rows]}
