@@ -48,6 +48,7 @@ from app.services.core_feed_cases import close_finished_cases, open_cases_for_ne
 from app.services.core_feed_sla import record_closure_events
 from app.services.iocs_from_alerts import sync_children_throttled as sync_iocs_throttled
 from app.services.mssp_snapshots import snapshot_children_throttled
+from app.services.profit_merge import held_months, merge_profit
 from app.services.quarantine_release import ELSEWHERE, UID_PREFIX, note_quarantine_released, note_sender_allowed, store_quarantine_check
 from app.services.vendor_actions import CLAIMED_TTL, PENDING_TTL
 
@@ -1232,7 +1233,7 @@ class ProfitAgentIn(BaseModel):
 
 
 class ProfitSnapshotIn(BaseModel):
-    months: list[str] = Field(max_length=24)
+    months: list[str] = Field(max_length=240)
     invoices: list[ProfitInvoiceMonthIn] = Field(max_length=20000)
     hours: list[ProfitHoursIn] = Field(max_length=250000)
     # The tickets the hours went on (the most-worked per client and month). Absent from an older CORE: the breakdown then says they are not sent yet.
@@ -1505,7 +1506,8 @@ async def report_core_feed_profit_tickets(tenant_token: str, body: ProfitTickets
 
 @router.post("/core-feed/{tenant_token}/profitability", response_model=ProfitSnapshotOut)
 async def report_core_feed_profitability(tenant_token: str, body: ProfitSnapshotIn, db: DBSession) -> ProfitSnapshotOut:
-    """Keep the latest HaloPSA profitability summary CORE read (invoiced revenue per client per month, hours per client, the agents). It replaces the one before; profit is worked out when a person with the finance permissions asks."""
+    """Keep the HaloPSA profitability summary CORE read (invoiced revenue per client per month, hours per client, the agents). It is MERGED into what is held: the months it lists are replaced, every other month
+    stays (so CORE reads an older month once and A.C.O.R.N keeps it), and the agents are the newest. Profit is worked out when a person wants it."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, tenant_id)
     now = datetime.now(UTC)
@@ -1514,9 +1516,23 @@ async def report_core_feed_profitability(tenant_token: str, body: ProfitSnapshot
     if row is None:
         db.add(FinanceProfitSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
     else:
-        row.payload, row.received_at = payload, now
+        row.payload, row.received_at = merge_profit(row.payload, payload), now
     await db.commit()
     return ProfitSnapshotOut(invoices=len(body.invoices), hours=len(body.hours), agents=len(body.agents))
+
+
+class ProfitHeldOut(BaseModel):
+    months: list[str]
+
+
+@router.get("/core-feed/{tenant_token}/profit-held", response_model=ProfitHeldOut)
+async def core_feed_profit_held(tenant_token: str, db: DBSession) -> ProfitHeldOut:
+    """The months of profitability data A.C.O.R.N already holds, with their tickets, so CORE reads only the others (the newest months it always reads again, because they still change)."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == tenant_id))).scalar_one_or_none()
+    ticket_months = set((await db.execute(select(FinanceProfitTickets.month).where(FinanceProfitTickets.tenant_id == tenant_id))).scalars().all())
+    return ProfitHeldOut(months=held_months(row.payload if row else None, ticket_months))
 
 
 class TicketMonthIn(BaseModel):

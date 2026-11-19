@@ -2479,5 +2479,15 @@
     "detail": "Hal signed in to the Rewst metric dashboards on 2026-11-19 to compare numbers and visuals.",
     "note": "Hal said yes, with fallback (2026-11-19). Built in CORE: the ticket statistics are read through HaloPSA's report call with Rewst's exclusions (deleted and merged tickets), Rewst's first-response measure and 36 months, checked against separate counts, with the paged read as the fallback; A.C.O.R.N accepts 37 months and the Tickets page offers 24 and 36. NOT VERIFIED live: whether CORE's HaloPSA key may use the report call; CORE's log line for the ticket metrics says which read ran. Look at the Tickets page after CORE's next daily pass and compare with Rewst. The other Rewst pages (labor hours, scorecard, staff metrics, pods) are not compared number by number yet.",
     "added": "2026-11-19"
+  },
+  {
+    "status": "in_progress",
+    "needs": "claude",
+    "area": "Sales and Finance",
+    "key": "finance-history-held",
+    "title": "Net income and Profitability: go back as far as HaloPSA goes and keep every month in A.C.O.R.N",
+    "detail": "Hal 2026-11-19: go back as far as possible; can A.C.O.R.N hold it in the database and only update what changes?",
+    "note": "Built: A.C.O.R.N merges each summary into what it holds (the months sent are replaced, every other month stays) and answers which months it holds with their tickets (GET profit-held); CORE reads only the months not held, plus the newest four that still change, so a restart costs nothing; the history now starts at November 2023, the first month HaloPSA holds usable data (tickets before that are imports). The month picker is a Month and a Year dropdown on Net income, Profitability and Monthly licensing. NOT VERIFIED live: after the next CORE pass the page should list every month from Nov 2023 as the older ones fill in, six per pass every ten minutes. Months before Nov 2023 would need QuickBooks (sales by customer) as their revenue source: say if you want that.",
+    "added": "2026-11-19"
   }
 ]

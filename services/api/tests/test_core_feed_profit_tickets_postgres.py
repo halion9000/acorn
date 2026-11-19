@@ -104,3 +104,40 @@ async def test_the_client_detail_lists_every_ticket_of_the_month_it_shows(world)
     listed = out["tickets"]["rows"]
     assert len(listed) == 121 and listed[0]["ticket_id"] == "500", "all of this client's tickets, most hours first, none of another client's"
     assert out["tickets"]["other_hours"] == 0.0, "the hours listed are at least all the hours worked: nothing is left over"
+
+
+async def send_snapshot(app, token, months, revenue):
+    body = feed.ProfitSnapshotIn(
+        months=months,
+        invoices=[feed.ProfitInvoiceMonthIn(client_id="5", client_name="Acme Dental, Inc.", month=m, revenue=revenue, invoices=1) for m in months],
+        hours=[feed.ProfitHoursIn(client="Acme Dental, Inc.", month=m, agent_id="40", charge_type="Remote Support", hours=1) for m in months],
+        agents=[feed.ProfitAgentIn(id="40", name="Dan Kemp")],
+    )
+    async with AsyncSession(app) as db:
+        return await feed.report_core_feed_profitability(token, body, db)
+
+
+async def held(app, token):
+    async with AsyncSession(app) as db:
+        return (await feed.core_feed_profit_held(token, db)).months
+
+
+async def stored_months(app, tenant):
+    async with AsyncSession(app) as db:
+        await adopt_tenant(db, tenant)
+        snap = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == tenant))).scalar_one()
+        return snap.payload["months"], sorted((r["month"], r["revenue"]) for r in snap.payload["invoices"])
+
+
+async def test_a_later_summary_adds_months_without_dropping_the_ones_held_and_only_months_with_tickets_count_as_held(world):
+    app, w = world
+    await send_snapshot(app, "tok-mine", ["2025-01", "2025-02", "2026-10"], 10)
+    await send_snapshot(app, "tok-mine", ["2026-10", "2026-11"], 99)  # CORE restarted and sent only the newest months
+    months, revenue = await stored_months(app, w.mine)
+    assert months == ["2025-01", "2025-02", "2026-10", "2026-11"], "the older months are still there"
+    assert revenue == [("2025-01", 10), ("2025-02", 10), ("2026-10", 99), ("2026-11", 99)], "the months sent were replaced"
+    assert await held(app, "tok-mine") == [], "no month counts as held until its tickets arrived"
+    await send(app, "tok-mine", "2025-01", [tk(1, 2, "2025-01")])
+    await send(app, "tok-mine", "2026-11", [tk(2, 2, "2026-11")])
+    assert await held(app, "tok-mine") == ["2025-01", "2026-11"]
+    assert await held(app, "tok-other") == [], "another organization holds nothing"

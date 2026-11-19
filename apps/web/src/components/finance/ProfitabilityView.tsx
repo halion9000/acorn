@@ -4,6 +4,7 @@
  * Sales and Finance > Profitability: for one month, what each client was invoiced, the hours worked for them, what those hours cost and what is left after labor. The numbers come from the HaloPSA summary
  * CORE sends about once a day. Software, hardware, travel and overhead are not in it (the page says so). Needs the finance permission; without it the API answers 403 and this says so.
  */
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { sortedBy, type SortValue } from '@/lib/tableSort';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -160,16 +161,10 @@ export function ProfitabilityView() {
       {data?.report && (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              Month
-              <select aria-label="Month" className={input} value={month} onChange={(e) => { setMonth(e.target.value); void load(e.target.value); }}>
-                {[...data.months].reverse().map((m) => (
-                  <option key={m} value={m}>
-                    {monthLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <span>Month</span>
+              <MonthYearPicker months={data.months} value={month} onChange={(m) => { setMonth(m); void load(m); }} className={input} />
+            </div>
             <button type="button" className={ghost} onClick={() => void download()}>
               Export CSV
             </button>

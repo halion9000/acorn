@@ -116,6 +116,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/vendor-costs"): (
         "CORE's daily summary of what each software vendor billed per month (vendor name and amount, no invoice detail), read from QuickBooks: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own bills for the months sent.",
     ),
+    ("GET", "/api/v1/inbox/core-feed/{tenant_token}/profit-held"): (
+        "The months of profitability data A.C.O.R.N already holds (month names only, no amounts), so CORE reads only the others: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it reads only that organization's own rows",
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/profit-tickets"): (
         "CORE's daily list of the tickets each client's HaloPSA hours in one month went on (ticket number, subject, hours, who): authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own list for the month sent.",
     ),

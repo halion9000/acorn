@@ -34038,10 +34038,12 @@ paths:
       tags:
       - inbox-core-feed
       summary: Report Core Feed Profitability
-      description: Keep the latest HaloPSA profitability summary CORE read (invoiced
-        revenue per client per month, hours per client, the agents). It replaces the
-        one before; profit is worked out when a person with the finance permissions
-        asks.
+      description: 'Keep the HaloPSA profitability summary CORE read (invoiced revenue
+        per client per month, hours per client, the agents). It is MERGED into what
+        is held: the months it lists are replaced, every other month
+
+        stays (so CORE reads an older month once and A.C.O.R.N keeps it), and the
+        agents are the newest. Profit is worked out when a person wants it.'
       operationId: report_core_feed_profitability_api_v1_inbox_core_feed__tenant_token__profitability_post
       parameters:
       - name: tenant_token
@@ -34063,6 +34065,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProfitSnapshotOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/profit-held:
+    get:
+      tags:
+      - inbox-core-feed
+      summary: Core Feed Profit Held
+      description: The months of profitability data A.C.O.R.N already holds, with
+        their tickets, so CORE reads only the others (the newest months it always
+        reads again, because they still change).
+      operationId: core_feed_profit_held_api_v1_inbox_core_feed__tenant_token__profit_held_get
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitHeldOut'
         '422':
           description: Validation Error
           content:
@@ -56295,6 +56326,17 @@ components:
       - id
       - name
       title: ProfitAgentIn
+    ProfitHeldOut:
+      properties:
+        months:
+          items:
+            type: string
+          type: array
+          title: Months
+      type: object
+      required:
+      - months
+      title: ProfitHeldOut
     ProfitHoursIn:
       properties:
         client:
@@ -56363,7 +56405,7 @@ components:
           items:
             type: string
           type: array
-          maxItems: 24
+          maxItems: 240
           title: Months
         invoices:
           items:

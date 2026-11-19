@@ -4,6 +4,7 @@
  * Metrics > Customer Insights (the Rewst metric dashboards, rebuilt): Customer Experience, Monthly Licensing and User Roles. Satisfaction comes from SimpleSat, license counts from the tools, and Microsoft 365
  * roles from CIPP: CORE sends them about once a day and A.C.O.R.N reads its own copy.
  */
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useState } from 'react';
 import { MetricPicker } from './MetricPicker';
 
@@ -113,16 +114,10 @@ export function MonthlyLicensingView() {
   return (
     <Page title="Monthly licensing" subtitle="What each client had of each license and counted item, as of the end of the month chosen (this month is what is counted now)." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={null}>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-300">
-          Month
-          <select aria-label="Month" className={selectClass} value={month} onChange={(e) => setMonth(e.target.value)}>
-            {recentMonths().map((m) => (
-              <option key={m} value={m}>
-                {monthShort(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <span>Month</span>
+          <MonthYearPicker months={recentMonths()} value={month} onChange={setMonth} className={selectClass} />
+        </div>
         <MetricPicker
           noun="items"
           options={(data?.items ?? []).map((i) => ({ value: i.key, label: i.item, hint: i.source }))}

@@ -5,6 +5,7 @@
  * sales and marketing, overhead), then new clients, the summary by industry, hours by function and utilization, and the twelve-month ranking. The cost lines are typed in on the Inputs tab (QuickBooks fills
  * them when it is connected); a cost that has not been entered is zero and the page says which. Needs the finance permission; without it the API answers 403 and this says so.
  */
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { sortedBy, type SortState, type SortValue } from '@/lib/tableSort';
 import { SortHeader } from './SortHeader';
 import { useCallback, useEffect, useState } from 'react';
@@ -251,16 +252,10 @@ export function NetIncomeView() {
       )}
       <div className="flex flex-wrap items-center gap-3">
         {report && data && tab !== 'summary' && tab !== 'pnl' && tab !== 'qbo' && tab !== 'history' && tab !== 'travel' && tab !== 'hardware' && tab !== 'forecast' && (
-          <label className="flex items-center gap-2 text-sm text-gray-300">
-            Month
-            <select aria-label="Month" className={input} value={month} onChange={(e) => { setMonth(e.target.value); void load(e.target.value); }}>
-              {[...data.months].reverse().map((m) => (
-                <option key={m} value={m}>
-                  {monthLabel(m)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <span>Month</span>
+            <MonthYearPicker months={data.months} value={month} onChange={(m) => { setMonth(m); void load(m); }} className={input} />
+          </div>
         )}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist" data-testid="net-tabs">
           {TAB_GROUPS.map((g) => (
