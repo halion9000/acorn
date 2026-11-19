@@ -1,4 +1,4 @@
-"""Fleet reports from what the tools already tell A.C.O.R.N about each device: Huntress agent versions and network device firmware (Auvik).
+"""Fleet reports from what the tools already tell A.C.O.R.N about each device: Huntress agent versions, network device firmware (Auvik) and devices offline for more than a week.
 
 Read with ``alerts:read``, like the Devices page. Nothing is changed. The newest version is the newest the fleet itself runs: there is no list of the vendors' releases (see ``app.services.device_reports``).
 """
@@ -6,6 +6,7 @@ Read with ``alerts:read``, like the Devices page. Nothing is changed. The newest
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
@@ -41,6 +42,15 @@ async def huntress_versions(
     return rep.huntress_versions(
         [{"client": c, "hostname": n, "version": d.get("agent_version"), "last_callback": d.get("last_callback_at")} for c, n, d, _h, _m, _mo in rows]
     )
+
+
+@router.get("/offline", summary="Devices a tool has shown as offline for more than a week (the clock starts when A.C.O.R.N first sees the device offline)")
+async def offline_devices(
+    user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, client_id: uuid.UUID | None = None, vendor: str = "unifi", days: int = 7
+) -> dict[str, Any]:
+    rows = await _rows(db, user.tenant_id, client_id, vendor)
+    known = [{"client": c, "hostname": n, "model": mo, "offline_since": d.get("offline_since")} for c, n, d, _h, _m, mo in rows if rep.is_offline(d)]
+    return {"vendor": vendor, "days": days, "offline_now": len(known), "devices": rep.offline_for_days(known, datetime.now(UTC), max(1, min(days, 365)))}
 
 
 @router.get("/network-firmware", summary="Network devices (Auvik) running older firmware than another device of the same make and model")

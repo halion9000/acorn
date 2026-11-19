@@ -17,10 +17,11 @@ const FIRMWARE = {
   models: [{ manufacturer: 'Cisco', model: 'C9200', newest: '17.12.1', devices: 4, behind: 2, versions: ['17.12.1', '17.9.4'] }],
   devices: [{ client: 'Acme Dental', hostname: 'sw1', manufacturer: 'Cisco', model: 'C9200', device_type: 'switch', firmware: '17.9.4', newest: '17.12.1' }],
 };
+const OFFLINE = { vendor: 'unifi', days: 7, offline_now: 3, devices: [{ client: 'Birch Law', hostname: 'AP-2', model: 'U6 Pro', offline_since: '2026-10-01T00:00:00+00:00', days_offline: 48 }] };
 
 beforeEach(() => {
   authFetch.mockReset();
-  authFetch.mockImplementation((url: string) => ok(url.includes('huntress') ? HUNTRESS : FIRMWARE));
+  authFetch.mockImplementation((url: string) => ok(url.includes('huntress') ? HUNTRESS : url.includes('offline') ? OFFLINE : FIRMWARE));
 });
 
 describe('behindText', () => {
@@ -49,8 +50,16 @@ describe('DeviceVersions', () => {
     expect(within(await screen.findByTestId('firmware-models')).getByText('17.12.1, 17.9.4')).toBeTruthy();
   });
 
+  it('lists UniFi devices offline for more than a week and says when the count started', async () => {
+    render(<DeviceVersions />);
+    const table = await screen.findByTestId('unifi-offline-table');
+    expect(within(table).getByText('AP-2')).toBeTruthy();
+    expect(within(table).getByText('48')).toBeTruthy();
+    expect(within(screen.getByTestId('unifi-offline')).getByText(/3 offline now/)).toBeTruthy();
+  });
+
   it('says so when nothing is behind or no agent has a version, and shows a failed read', async () => {
-    authFetch.mockImplementation((url: string) => (url.includes('huntress') ? ok({ newest: null, agents: 0, without_version: 0, spread: [], old: [] }) : Promise.resolve({ ok: false, status: 500, json: async () => ({}) })));
+    authFetch.mockImplementation((url: string) => (url.includes('huntress') ? ok({ newest: null, agents: 0, without_version: 0, spread: [], old: [] }) : url.includes('offline') ? ok(OFFLINE) : Promise.resolve({ ok: false, status: 500, json: async () => ({}) })));
     render(<DeviceVersions />);
     expect(await screen.findByText('No Huntress agent has reported a version yet.')).toBeTruthy();
     expect(await screen.findByText('The API answered 500')).toBeTruthy();

@@ -38,3 +38,30 @@ def test_network_devices_behind_are_those_older_than_another_of_the_same_make_an
     assert [(m["manufacturer"], m["model"], m["newest"], m["devices"], m["behind"]) for m in out["models"]] == [("Cisco", "C9200", "17.12.1", 4, 2)], "one version only, no firmware and a different make are not compared"
     assert [(d["hostname"], d["firmware"], d["newest"]) for d in out["devices"]] == [("a", "17.9.4", "17.12.1"), ("d", "17.9.4", "17.12.1")]
     assert r.firmware_behind([]) == {"models": [], "devices": []}
+
+
+def test_offline_since_starts_when_first_seen_offline_is_kept_while_offline_and_cleared_when_back():
+    from datetime import UTC, datetime
+
+    t0, t1, t2 = datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 5, tzinfo=UTC), datetime(2026, 11, 9, tzinfo=UTC)
+    first = r.carry_offline_since(None, {"status": "OFFLINE", "mac": "aa"}, t0)
+    assert first["offline_since"] == t0.isoformat() and first["mac"] == "aa"
+    again = r.carry_offline_since(first, {"status": "offline"}, t1)
+    assert again["offline_since"] == t0.isoformat(), "still offline: the clock keeps its first time"
+    assert "offline_since" not in r.carry_offline_since(again, {"status": "online"}, t2), "back online clears it"
+    assert r.carry_offline_since({"offline_since": "stale"}, {"status": "online"}, t2) == {"status": "online"}
+    forged = r.carry_offline_since(None, {"status": "online", "offline_since": "2020-01-01T00:00:00+00:00"}, t2)
+    assert "offline_since" not in forged, "a tool cannot set the clock itself"
+    assert not r.is_offline(None) and not r.is_offline({"status": None}) and r.is_offline({"status": " Disconnected "})
+
+
+def test_devices_offline_for_more_than_a_week_are_listed_longest_first():
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 11, 18, tzinfo=UTC)
+
+    def dev(host, since, client="Acme"):
+        return {"client": client, "hostname": host, "model": "U6", "offline_since": since}
+
+    out = r.offline_for_days([dev("new", "2026-11-14T00:00:00+00:00"), dev("old", "2026-10-01T00:00:00+00:00"), dev("mid", "2026-11-05T00:00:00Z", "Birch"), dev("none", None), dev("bad", "x"), dev("edge", "2026-11-11T00:00:00+00:00")], now)
+    assert [(d["hostname"], d["days_offline"]) for d in out] == [("old", 48), ("mid", 13)], "exactly seven days is not more than a week; no usable time is left out"

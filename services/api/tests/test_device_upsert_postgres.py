@@ -230,3 +230,15 @@ async def test_the_client_check_holds_even_without_row_level_security(tenants):
                 await dismiss_pair(db, acme, a, b)
     finally:
         await engine.dispose()
+
+
+async def test_a_device_a_tool_calls_offline_keeps_its_first_offline_time_until_it_comes_back(tenants):
+    t = tenants["acme"]
+    sql = "select details->>'offline_since' from device_sources where tenant_id = :t"
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("unifi", "u1", "AP-1", details={"status": "offline"})))
+    first = await scalar(t, sql)
+    assert first
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("unifi", "u1", "AP-1", details={"status": "offline"})))
+    assert await scalar(t, sql) == first, "reported offline again: the clock is not restarted"
+    await run(t, lambda db: upsert_device(db, t, DeviceReport("unifi", "u1", "AP-1", details={"status": "online"})))
+    assert await scalar(t, sql) is None

@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import delete, func, or_, select, tuple_
 
 from app.models.device import Device, DeviceSource
+from app.services.device_reports import carry_offline_since
 from app.services.device_identity import (
     DISCOVERY_TOOLS,
     could_be_same_machine,
@@ -185,7 +186,7 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
             vendor=report.vendor,
             external_id=report.external_id,
             name=(report.hostname or None),
-            details=report.details,
+            details=carry_offline_since(None, report.details, datetime.now(UTC)),
         )
         db.add(new_source)
         if known is not None:
@@ -193,7 +194,7 @@ async def upsert_device(db: Any, tenant_id: uuid.UUID, report: DeviceReport, kno
     else:
         source.device_id = device.id
         source.name = report.hostname or source.name
-        source.details = report.details
+        source.details = carry_offline_since(source.details, report.details, datetime.now(UTC))
         source.last_seen = datetime.now(UTC)
     await db.flush()
     if previous_id is not None and previous_id != device.id:

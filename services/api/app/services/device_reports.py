@@ -8,9 +8,46 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 OLD_AFTER_RELEASES = 3  # index in the newest-first list of versions: 0 current, 1 and 2 one and two behind, 3 or more is more than two releases old
+
+
+OFFLINE_WORDS = frozenset({"offline", "disconnected", "down"})
+OFFLINE_DAYS = 7
+
+
+def is_offline(details: dict[str, Any] | None) -> bool:
+    """A tool says the device is offline (pure): its ``status`` is one of the offline words, in any case."""
+    return str((details or {}).get("status") or "").strip().lower() in OFFLINE_WORDS
+
+
+def carry_offline_since(old: dict[str, Any] | None, new: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """The details a tool just sent, with ``offline_since`` kept for as long as the device stays offline (pure). A device first seen offline starts the clock now; one back online loses it.
+    The tool only says "offline", never since when, so the clock starts when A.C.O.R.N first sees it so."""
+    out = dict(new)
+    out.pop("offline_since", None)
+    if is_offline(new):
+        before = (old or {}).get("offline_since")
+        out["offline_since"] = before if isinstance(before, str) and before else now.astimezone(UTC).isoformat()
+    return out
+
+
+def offline_for_days(devices: list[dict[str, Any]], now: datetime, days: int = OFFLINE_DAYS) -> list[dict[str, Any]]:
+    """Devices offline for more than ``days`` days, longest first (pure). Each device has ``client``, ``hostname``, ``model`` and ``offline_since`` (an ISO time); a device with no usable time is left out."""
+    out = []
+    for d in devices:
+        try:
+            since = datetime.fromisoformat(str(d.get("offline_since")).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=UTC)
+        if now - since > timedelta(days=days):
+            out.append({"client": d.get("client") or "", "hostname": d.get("hostname") or "", "model": d.get("model") or "", "offline_since": since.isoformat(), "days_offline": (now - since).days})
+    out.sort(key=lambda r: (-r["days_offline"], r["client"].lower(), r["hostname"].lower()))
+    return out
 
 
 def version_key(version: str | None) -> tuple[int, ...]:

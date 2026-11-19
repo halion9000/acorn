@@ -22,6 +22,13 @@ export interface FirmwareReport {
   devices: { client: string; hostname: string; manufacturer: string; model: string; device_type: string; firmware: string; newest: string }[];
 }
 
+export interface OfflineReport {
+  vendor: string;
+  days: number;
+  offline_now: number;
+  devices: { client: string; hostname: string; model: string; offline_since: string; days_offline: number }[];
+}
+
 /** How far behind an agent is, in words (pure). */
 export function behindText(n: number): string {
   return n === 0 ? 'Current' : n === 1 ? '1 release behind' : `${n} releases behind`;
@@ -83,6 +90,7 @@ function Sorted<T extends object>({ rows, cols, testId }: { rows: T[]; cols: { l
 export function DeviceVersions() {
   const h = useRead<HuntressReport>('/api/v1/device-reports/huntress-versions');
   const f = useRead<FirmwareReport>('/api/v1/device-reports/network-firmware');
+  const o = useRead<OfflineReport>('/api/v1/device-reports/offline');
   return (
     <div className="space-y-8 p-6">
       <div>
@@ -126,6 +134,21 @@ export function DeviceVersions() {
               <Sorted rows={f.data.devices} cols={[{ label: 'Client', field: 'client' }, { label: 'Device', field: 'hostname' }, { label: 'Type', field: 'device_type' }, { label: 'Make', field: 'manufacturer' }, { label: 'Model', field: 'model' }, { label: 'Firmware', field: 'firmware' }, { label: 'Newest', field: 'newest' }]} testId="firmware-devices" />
             </>
           )
+        ) : null}
+      </section>
+
+      <section className="space-y-3" data-testid="unifi-offline">
+        <h2 className="text-lg font-semibold text-white">UniFi devices offline for more than a week</h2>
+        {o.problem ? <p className="text-sm text-amber-300">{o.problem}</p> : null}
+        {o.data ? (
+          <>
+            <p className="text-sm text-gray-400">UniFi says whether a device is offline but not since when, so the count starts the day A.C.O.R.N first saw it offline. {o.data.offline_now} offline now.</p>
+            {o.data.devices.length === 0 ? (
+              <p className="text-sm text-gray-400">No UniFi device has been offline for more than a week.</p>
+            ) : (
+              <Sorted rows={o.data.devices} cols={[{ label: 'Client', field: 'client' }, { label: 'Device', field: 'hostname' }, { label: 'Model', field: 'model' }, { label: 'Offline since', field: 'offline_since' }, { label: 'Days offline', field: 'days_offline', numeric: true }]} testId="unifi-offline-table" />
+            )}
+          </>
         ) : null}
       </section>
     </div>
