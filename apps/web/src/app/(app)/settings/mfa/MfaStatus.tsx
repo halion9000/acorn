@@ -35,7 +35,7 @@ export interface MfaPerson {
   methods: string | null;
 }
 
-export type SortKey = "client" | "people" | "covered" | "not_required" | "without" | "admins";
+export type SortKey = "client" | "tools" | "people" | "covered" | "not_required" | "without" | "admins";
 export type Sort = { key: SortKey; dir: "asc" | "desc" } | null;
 
 type Which = "without" | "not_required" | "admins";
@@ -51,7 +51,7 @@ export function visibleClients(clients: MfaClient[], opts: { query?: string; adm
       const byName = nameOf(a).localeCompare(nameOf(b), undefined, { sensitivity: "base", numeric: true });
       const s = opts.sort;
       if (!s || s.key === "client") return s?.dir === "desc" ? -byName : byName;
-      const value = (c: MfaClient) => (s.key === "people" ? c.people : s.key === "covered" ? (c.people === 0 ? -1 : c.with_mfa / c.people) : s.key === "not_required" ? c.not_required : s.key === "without" ? c.without_mfa : c.admins_without_mfa);
+      const value = (c: MfaClient) => (s.key === "tools" ? (c.directories ?? []).length : s.key === "people" ? c.people : s.key === "covered" ? (c.people === 0 ? -1 : c.with_mfa / c.people) : s.key === "not_required" ? c.not_required : s.key === "without" ? c.without_mfa : c.admins_without_mfa);
       const diff = value(a) - value(b);
       return (s.dir === "desc" ? -diff : diff) || byName;
     });
@@ -211,7 +211,7 @@ export function MfaStatus() {
   // First click: biggest first (a name: A to Z); second: the other way; third: back to A to Z.
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s?.key !== key ? { key, dir: key === "client" ? "asc" : "desc" } : s.dir === (key === "client" ? "asc" : "desc") ? { key, dir: key === "client" ? "desc" : "asc" } : null));
-  const arrow = (key: SortKey) => (sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
+  const arrow = (key: SortKey) => (sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : " ↕");
 
   const totals = (clients ?? []).reduce((t, c) => ({ people: t.people + c.people, without: t.without + c.without_mfa, admins: t.admins + c.admins_without_mfa }), { people: 0, without: 0, admins: 0 });
 
@@ -266,8 +266,10 @@ export function MfaStatus() {
                     Client{arrow("client")}
                   </button>
                 </th>
-                <th className="font-medium" data-testid="tools-header">
-                  Tools
+                <th className="" data-testid="tools-header" aria-sort={sort?.key === "tools" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => toggleSort("tools")} className="font-medium hover:text-gray-200" data-testid="sort-tools">
+                    Tools{arrow("tools")}
+                  </button>
                 </th>
                 <th className="" aria-sort={sort?.key === "people" ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
                   <button type="button" onClick={() => toggleSort("people")} className="font-medium hover:text-gray-200" data-testid="sort-people">

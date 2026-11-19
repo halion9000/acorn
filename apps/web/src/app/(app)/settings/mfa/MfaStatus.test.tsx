@@ -253,3 +253,24 @@ describe('MfaStatus: registration not reported', () => {
     expect(marks[0].closest('tr')).toHaveTextContent('100%');
   });
 });
+
+describe('sort controls', () => {
+  it('shows every sortable column as sortable before any click, and sorts Tools by how many directories a client has', async () => {
+    authFetch.mockResolvedValue(
+      reply([
+        client({ client_id: 'a', client_name: 'Acme', directories: ['Microsoft 365'] }),
+        client({ client_id: 'b', client_name: 'Birch', directories: ['Microsoft 365', 'Google Workspace'] }),
+        client({ client_id: 'c', client_name: 'Cedar', directories: [] }),
+      ]),
+    );
+    render(<MfaStatus />);
+    await screen.findByTestId('totals');
+    for (const id of ['client', 'tools', 'people', 'covered', 'not_required', 'without', 'admins']) {
+      expect(screen.getByTestId(`sort-${id}`).textContent).toMatch(/↕$/);
+    }
+    const names = () => screen.getAllByTestId('client-row').map((r) => (r.textContent ?? '').slice(0, 5));
+    await userEvent.click(screen.getByTestId('sort-tools'));
+    expect(names().map((n) => n.slice(0, 4))).toEqual(['Birc', 'Acme', 'Ceda']);
+    expect(screen.getByTestId('sort-tools').textContent).toMatch(/▼$/);
+  });
+});
