@@ -8067,6 +8067,26 @@ export const auditsApi = {
     request<AuditDetail>(`/api/v1/compliance/audits/${encodeURIComponent(id)}/requests/${encodeURIComponent(requestId)}?${riskQs(clientId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 
+/** Saved remote scripts sent to machines through ScreenConnect (/api/v1/remote-scripts). Running needs the scripts:run permission. */
+export interface SavedScript {
+  id: string;
+  name: string;
+  command: string;
+  enabled: boolean;
+}
+export interface SavedScriptRun {
+  device_id: string;
+  line: ConsoleLine | null;
+  refused: string | null;
+}
+export const savedScriptsApi = {
+  list: () => request<SavedScript[]>('/api/v1/remote-scripts'),
+  create: (body: { name: string; command: string; enabled?: boolean }) => request<SavedScript>('/api/v1/remote-scripts', { method: 'POST', body: JSON.stringify(body) }),
+  patch: (id: string, body: { name?: string; command?: string; enabled?: boolean }) => request<SavedScript>(`/api/v1/remote-scripts/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  remove: (id: string) => request<void>(`/api/v1/remote-scripts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  run: (id: string, deviceIds: string[]) => request<SavedScriptRun[]>(`/api/v1/remote-scripts/${encodeURIComponent(id)}/run`, { method: 'POST', body: JSON.stringify({ device_ids: deviceIds, confirm: true }) }),
+};
+
 /** The auditors who may open an audit, and the files an audit keeps (/api/v1/compliance/audits/{id}/auditors and /files for staff, /api/v1/audit-portal for the auditor). */
 export interface AuditFileRow {
   id: string;

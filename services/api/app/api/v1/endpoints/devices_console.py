@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Any, Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -129,7 +129,12 @@ async def console_send(
     current_user: Annotated[AuthUser, Depends(require_permission("connectors:write"))],
     db: DBSession,
 ) -> ConsoleLine:
-    command = body.command.strip()
+    return await queue_command(db, current_user, request, device_id, body.command)
+
+
+async def queue_command(db: Any, current_user: Any, request: Any, device_id: uuid.UUID, text: str, label: str = "devices:console_command") -> ConsoleLine:
+    """Queue one ScreenConnect command for one machine (also used by the saved scripts). Raises 409 when ScreenConnect has no record of the machine or an earlier command still waits."""
+    command = text.strip()
     if not command:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Type a command.")
     owner = current_user.tenant_id
@@ -172,7 +177,7 @@ async def console_send(
             db=db,
             tenant_id=tid,
             actor_id=current_user.user_id,
-            action="devices:console_command",
+            action=label,
             resource="device",
             resource_id=str(device_id),
             changes={"device": device.hostname, "command": command[:500]},

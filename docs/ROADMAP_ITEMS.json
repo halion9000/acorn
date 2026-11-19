@@ -1327,19 +1327,19 @@
     "key": "r7-cf-04",
     "title": "Send a ScreenConnect command to several machines at once with each answer listed",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): same as r7-cf-05: a role permission; whoever holds it gets any scripts that are enabled. Approved: I build it (Hal does not need to act)."
+    "note": "Built on the server side: one saved script can go to up to 25 machines in one request, each machine answering on its own. The Devices page sends to one machine at a time for now; the multi-machine picker on the list is not built yet (the NinjaOne bulk run on the Devices page already does many)."
   },
   {
     "key": "r7-cf-05",
     "title": "Saved ScreenConnect commands (reboot, flush DNS, gpupdate) with a confirm step",
     "area": "Round 7: CORE feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): make a permission that can be added to roles for ScreenConnect commands; holders get any scripts available if enabled. Approved: I build it (Hal does not need to act)."
+    "note": "Built: saved scripts (Devices, open a machine, Saved scripts). New permission scripts:run (Settings > Roles): holders can run any script that is switched on and cannot type commands; managers (console permission) add and switch scripts. Confirm before each run, audited. NOT seen live. Question: which scripts do you want saved first (reboot, flush DNS, gpupdate)? I saved none."
   },
   {
     "key": "r7-cf-06",

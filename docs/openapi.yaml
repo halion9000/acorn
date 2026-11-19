@@ -14522,6 +14522,149 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/remote-scripts:
+    get:
+      tags:
+      - devices
+      summary: The saved scripts (people who may only run them see the ones that are
+        switched on)
+      operationId: list_scripts_api_v1_remote_scripts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ScriptOut'
+                type: array
+                title: Response List Scripts Api V1 Remote Scripts Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - devices
+      summary: Save a script
+      operationId: create_script_api_v1_remote_scripts_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScriptIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/remote-scripts/{script_id}:
+    patch:
+      tags:
+      - devices
+      summary: Change a script or switch it on or off
+      operationId: patch_script_api_v1_remote_scripts__script_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: script_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Script Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScriptPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - devices
+      summary: Delete a script
+      operationId: delete_script_api_v1_remote_scripts__script_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: script_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Script Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/remote-scripts/{script_id}/run:
+    post:
+      tags:
+      - devices
+      summary: Send a saved script to up to 25 machines; each machine answers on its
+        own
+      operationId: run_script_api_v1_remote_scripts__script_id__run_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: script_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Script Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RunResult'
+                title: Response Run Script Api V1 Remote Scripts  Script Id  Run Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/devices/{device_id}/console:
     get:
       tags:
@@ -59067,6 +59210,24 @@ components:
           default: esql
       type: object
       title: RunHuntRequest
+    RunIn:
+      properties:
+        device_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 25
+          minItems: 1
+          title: Device Ids
+        confirm:
+          type: boolean
+          title: Confirm
+          default: false
+      type: object
+      required:
+      - device_ids
+      title: RunIn
     RunLogEntry:
       properties:
         at:
@@ -59124,6 +59285,25 @@ components:
       - plugin_id
       - result
       title: RunResponse
+    RunResult:
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          title: Device Id
+        line:
+          anyOf:
+          - $ref: '#/components/schemas/ConsoleLine'
+          - type: 'null'
+        refused:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Refused
+      type: object
+      required:
+      - device_id
+      title: RunResult
     RunSavedHuntResponse:
       properties:
         id:
@@ -60252,6 +60432,27 @@ components:
       - mfa
       - risk
       title: ScoredSignin
+    ScriptIn:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          minLength: 2
+          title: Name
+        command:
+          type: string
+          maxLength: 1000
+          minLength: 1
+          title: Command
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      type: object
+      required:
+      - name
+      - command
+      title: ScriptIn
     ScriptItem:
       properties:
         id:
@@ -60335,6 +60536,51 @@ components:
       - scripts
       - tickets
       title: ScriptOptions
+    ScriptOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        command:
+          type: string
+          title: Command
+        enabled:
+          type: boolean
+          title: Enabled
+      type: object
+      required:
+      - id
+      - name
+      - command
+      - enabled
+      title: ScriptOut
+    ScriptPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 2
+          - type: 'null'
+          title: Name
+        command:
+          anyOf:
+          - type: string
+            maxLength: 1000
+            minLength: 1
+          - type: 'null'
+          title: Command
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+      type: object
+      title: ScriptPatch
     ScriptRuleIn:
       properties:
         alert_id:

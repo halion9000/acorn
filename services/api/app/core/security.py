@@ -342,6 +342,7 @@ def verify_ed25519_signature(public_key_bytes: bytes, message: bytes, signature:
 _UNGRANTED_PERMISSIONS = frozenset(
     {
         "sla:write",
+        "scripts:run",  # send the saved remote scripts to machines (Devices > Saved scripts); give it to a role to allow it
         "mssp:onboard",
         "hunts:read",
         "intel:read",

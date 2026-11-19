@@ -5,6 +5,7 @@
  * machine printed (usually within a few seconds, up to half a minute). The machine runs it as SYSTEM, so every command is written to the audit log and one waits at a time.
  */
 import { useEffect, useRef, useState } from 'react';
+import { SavedScripts } from '@/components/devices/SavedScripts';
 import { apiErrorDetail, devicesApi, type ConsoleLine } from '@/lib/api';
 
 const POLL_MS = 2000;
@@ -91,6 +92,9 @@ export function CommandPrompt({ deviceId, hostname }: { deviceId: string; hostna
         <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(true); }} className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-500/20">
           Open command prompt
         </button>
+        <div className="mt-2">
+          <SavedScripts deviceId={deviceId} hostname={hostname} />
+        </div>
       </div>
     );
   }
