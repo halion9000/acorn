@@ -1932,10 +1932,10 @@
     "key": "r7-af-25",
     "title": "Identities: a joiner and leaver report from the directory",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "not_started",
-    "needs": "claude",
+    "status": "in_progress",
+    "needs": "hal",
     "added": "2026-11-14",
-    "note": "Hal (core2.docx, 2026-11-18): ok: joiner and leaver report starting from first seen, leavers recorded from now on. Approved: I build it (Hal does not need to act)."
+    "note": "Built: Identities page has a new Joiners and leavers section (7/30/90/365 days). Join day = the day A.C.O.R.N first saw the account (accounts already there at the first report are not joiners); leavers = disabled or no longer listed, recorded from the first report. It starts empty and fills as snapshots arrive. NOT seen live: check in a few days."
   },
   {
     "key": "r7-af-26",

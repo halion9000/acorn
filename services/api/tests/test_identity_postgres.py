@@ -359,3 +359,28 @@ async def test_the_sign_in_state_is_stored_as_active_inactive_never_or_unknown(w
 
     with pytest.raises(ValidationError):
         mfa("5", "bad@x.com", signin_state="banana")
+
+
+async def test_joiners_and_leavers_start_from_a_baseline_and_follow_each_later_snapshot(world):
+    class User:
+        tenant_id = world["msp"]
+
+    day = timedelta(days=1)
+    t0 = datetime.now(UTC) - 10 * day  # the report counts back from the real now
+    first = uuid.uuid4()
+    await run(world["msp"], lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(first, [mfa("1", "old@x.com"), mfa("2", "stays@x.com")]), t0))
+    none_yet = await run(world["msp"], lambda db: ep.joiners_leavers(User(), db, days=30))
+    assert none_yet["joiners"] == [] and none_yet["leavers"] == [], "the first snapshot is the baseline: nobody is a joiner"
+
+    second = uuid.uuid4()
+    await run(world["msp"], lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(second, [mfa("2", "stays@x.com"), mfa("3", "new@x.com"), mfa("4", "off@x.com", enabled=False)]), t0 + 3 * day))
+    out = await run(world["msp"], lambda db: ep.joiners_leavers(User(), db, days=30))
+    assert sorted(j["upn"] for j in out["joiners"]) == ["new@x.com", "off@x.com"]
+    assert sorted(left["upn"] for left in out["leavers"]) == ["off@x.com", "old@x.com"], "one is gone from the list, one is disabled"
+
+    third = uuid.uuid4()
+    await run(world["msp"], lambda db: ep.apply_mfa_users(db, world["msp"], snapshot(third, [mfa("2", "stays@x.com"), mfa("3", "new@x.com"), mfa("4", "off@x.com")]), t0 + 6 * day))
+    back = await run(world["msp"], lambda db: ep.joiners_leavers(User(), db, days=30))
+    assert [left["upn"] for left in back["leavers"]] == ["old@x.com"], "an account that comes back is no longer a leaver"
+    short = await run(world["msp"], lambda db: ep.joiners_leavers(User(), db, days=2))
+    assert short["joiners"] == [] and short["leavers"] == [], "only the last two days are shown"

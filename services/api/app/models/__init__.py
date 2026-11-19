@@ -62,6 +62,7 @@ from app.models.stix_object import StixObject
 from app.models.tenant import ApiKey, Tenant, User
 from app.models.tenant_access import AllTenantAccessGrant, TenantAccessGrant
 from app.models.threat_intel import ThreatActor, ThreatIntelFeed, ThreatIntelIOC
+from app.models.identity_history import IdentityHistory
 from app.models.trust_audit import Audit, AuditAuditor, AuditFile, AuditRequest, TrustCenterSettings
 from app.models.vcio_risk_assessment import VcioRiskAssessment
 from app.models.vcio_risk_ticket import VcioRiskTicket
@@ -155,6 +156,7 @@ __all__ = [
     "RiskRegisterItem",
     "AccessReview",
     "Audit",
+    "IdentityHistory",
     "AuditAuditor",
     "AuditFile",
     "AuditRequest",

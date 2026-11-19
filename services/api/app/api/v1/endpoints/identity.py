@@ -25,8 +25,10 @@ from app.api.v1.endpoints.inbox_core_feed import _verify_core_feed_token
 from app.api.v1.endpoints.signins import targets_by_tenant
 from app.db.rls_scope import acting_as_tenant
 from app.db.rls_sessions import adopt_tenant
+from app.models.identity_history import IdentityHistory
 from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
+from app.services import identity_history
 from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.identity_detections import run_audit_detections, run_mfa_detections
 from app.services.mfa_registration import (
@@ -352,7 +354,9 @@ async def apply_mfa_users(db: Any, owner: uuid.UUID, report: MfaUsersReport, now
                 update = {c: stmt.excluded[c] for c in values[0] if c not in ("tenant_id", "source", "user_id")}
                 await db.execute(stmt.on_conflict_do_update(index_elements=["tenant_id", "source", "user_id"], set_=update))
                 accepted += len(values)
+                await identity_history.record_snapshot(db, tid, source, report.items, report.snapshot_id, False, now)
             if report.last:
+                await identity_history.record_snapshot(db, tid, source, [], report.snapshot_id, True, now)
                 res = await db.execute(
                     delete(IdentityMfaUser).where(
                         IdentityMfaUser.tenant_id == tid,
@@ -441,6 +445,25 @@ async def mfa_summary(
             )
         )
     out.sort(key=lambda s: (-s.admins_without_mfa, -s.without_mfa, (s.client_name or "").lower()))
+    return out
+
+
+@router.get("/joiners-leavers", summary="Directory accounts first seen and accounts disabled or gone in the last days, across the clients")
+async def joiners_leavers(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))], db: DBSession, days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> dict[str, Any]:
+    """Join day is the day A.C.O.R.N first saw the account (accounts there when a source first reported are not joiners); leaving is the day it was disabled or no longer listed. Recorded from the first snapshot after this was added."""
+    owner = current_user.tenant_id
+    names = {r.id: r.name for r in (await db.execute(select(Tenant.id, Tenant.name).where(Tenant.parent_tenant_id == owner))).all()}
+    rows: list[dict[str, Any]] = []
+    for tid in [owner, *names]:
+        async with contextlib.nullcontext() if tid == owner else acting_as_tenant(db, tid):
+            found = (await db.execute(select(IdentityHistory).where(IdentityHistory.tenant_id == tid))).scalars().all()
+        rows += [
+            {"client": names.get(tid) or "", "upn": h.upn, "name": h.display_name, "first_seen": h.first_seen, "baseline": h.baseline, "left_at": h.left_at} for h in found
+        ]
+    out = identity_history.report(rows, datetime.now(UTC), days)
+    out["recorded_since"] = min((r["first_seen"] for r in rows), default=None)
     return out
 
 

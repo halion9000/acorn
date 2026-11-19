@@ -21125,6 +21125,43 @@ paths:
                 title: Response Mfa Summary Api V1 Identity Mfa Summary Get
       security:
       - HTTPBearer: []
+  /api/v1/identity/joiners-leavers:
+    get:
+      tags:
+      - identity
+      summary: Directory accounts first seen and accounts disabled or gone in the
+        last days, across the clients
+      description: Join day is the day A.C.O.R.N first saw the account (accounts there
+        when a source first reported are not joiners); leaving is the day it was disabled
+        or no longer listed. Recorded from the first snapshot after this was added.
+      operationId: joiners_leavers_api_v1_identity_joiners_leavers_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 365
+          minimum: 1
+          default: 30
+          title: Days
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Joiners Leavers Api V1 Identity Joiners Leavers Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/identity/mfa-users:
     get:
       tags:
