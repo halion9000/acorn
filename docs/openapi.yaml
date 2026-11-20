@@ -25328,6 +25328,55 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/reports/metrics/refresh:
+    post:
+      tags:
+      - reports
+      summary: Ask CORE to read the weekly staff, ticket and invoice facts again now
+      description: Leave a request for CORE on the organization's settings (CORE collects
+        it about every 15 seconds and sends every Metrics dataset at once, instead
+        of at its next hourly round). One atomic update.
+      operationId: request_refresh_api_v1_reports_metrics_refresh_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Request Refresh Api V1 Reports Metrics Refresh Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/reports/metrics/excluded:
     get:
       tags:

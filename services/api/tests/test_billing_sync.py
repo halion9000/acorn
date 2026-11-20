@@ -228,6 +228,24 @@ async def test_refresh_leaves_one_request_for_core_that_its_usual_claim_hands_ov
     assert hasattr(out, "counts_read_at"), "the list carries the time the counts were last read (empty when no client has any)"
 
 
+@needs_pg
+@pytest.mark.asyncio
+async def test_refresh_on_the_metrics_pages_leaves_a_request_named_metrics_that_core_claims_once(world):
+    from app.api.v1.endpoints import metrics_pages
+    from app.api.v1.endpoints.inbox_core_feed import claim_sync_requests_for
+
+    asked = await with_db(world.owner, lambda db: metrics_pages.request_refresh(world.user, db))
+    assert asked["vendor"] == "metrics"
+
+    async def claim(db):
+        got = await claim_sync_requests_for(db, world.owner)
+        await db.commit()
+        return got
+
+    assert "metrics" in await with_db(world.owner, claim)
+    assert "metrics" not in await with_db(world.owner, claim), "and only once"
+
+
 def test_the_link_of_a_row_is_linked_when_a_line_carries_a_license_not_linked_when_only_a_license_has_the_name_and_na_when_there_is_none():
     from app.api.v1.endpoints.billing_sync import link_status
 

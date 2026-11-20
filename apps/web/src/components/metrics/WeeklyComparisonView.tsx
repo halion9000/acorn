@@ -4,9 +4,10 @@
  * Metrics > Weekly Tech Comparison: one week, each engineer under their pod: days worked, tickets new, opened and closed in the week, older tickets closed, closed in all, net (closed less new), new and closed per day worked,
  * and the Dialpad call tickets left out of those counts; and a line for all pods. Days worked is Monday to Friday less full days off and holidays (Rippling).
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { NothingYet, Page, selectClass, useMetric } from './kit';
+import { RefreshMetrics } from './RefreshMetrics';
 
 interface Line {
   days_worked: number;
@@ -76,7 +77,9 @@ export function WeeklyComparisonView() {
   const [week, setWeek] = useState('');
   const [pods, setPods] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<{ key: SortKey | null; dir: 1 | -1 }>({ key: null, dir: 1 });
-  const { data, denied, problem } = useMetric<Report>(`/api/v1/reports/metrics/weekly-comparison${week ? `?week=${week}` : ''}`);
+  const [reloads, setReloads] = useState(0);
+  const reload = useCallback(() => setReloads((n) => n + 1), []);
+  const { data, denied, problem } = useMetric<Report>(`/api/v1/reports/metrics/weekly-comparison?${week ? `week=${week}&` : ''}r=${reloads}`);
   const allPods = [...new Set((data?.rows ?? []).map((r) => r.pod))];
   const filtering = pods.size > 0;
   const shown = sortRows(filtering ? (data?.rows ?? []).filter((r) => pods.has(r.pod)) : (data?.rows ?? []), sort.key, sort.dir);
@@ -100,6 +103,7 @@ export function WeeklyComparisonView() {
     >
       {data?.received_at && (
         <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-300">
             Week of
             <select aria-label="Week" className={selectClass} value={data.week ?? ''} onChange={(e) => setWeek(e.target.value)}>
@@ -110,6 +114,8 @@ export function WeeklyComparisonView() {
               ))}
             </select>
           </label>
+          <RefreshMetrics receivedAt={data.received_at} reload={reload} />
+          </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300" role="group" aria-label="Pods">
             <span>Pods</span>
             {allPods.map((pod) => (

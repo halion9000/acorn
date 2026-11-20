@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import _all_count_rows
@@ -52,6 +52,31 @@ async def _excluded(db: DBSession, tenant_id: uuid.UUID) -> list[str]:
 
 class ExcludedIn(BaseModel):
     excluded: list[str] = Field(max_length=500)
+
+
+METRICS_VENDOR = "metrics"
+
+
+@router.post("/refresh", status_code=202, dependencies=[Depends(require_permission("metrics:view"))], summary="Ask CORE to read the weekly staff, ticket and invoice facts again now")
+async def request_refresh(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Leave a request for CORE on the organization's settings (CORE collects it about every 15 seconds and sends every Metrics dataset at once, instead of at its next hourly round). One atomic update."""
+    now = datetime.now(UTC)
+    await db.execute(
+        text(
+            """
+            UPDATE tenants
+            SET settings = jsonb_set(
+                COALESCE(settings, '{}'::jsonb),
+                '{sync_requests}',
+                COALESCE(settings -> 'sync_requests', '{}'::jsonb) || jsonb_build_object(CAST(:vendor AS text), CAST(:at AS text)),
+                true
+            )
+            WHERE id = :tenant
+            """
+        ).bindparams(vendor=METRICS_VENDOR, at=now.isoformat(), tenant=user.tenant_id)
+    )
+    await db.commit()
+    return {"requested_at": now.isoformat(), "vendor": METRICS_VENDOR}
 
 
 @router.get("/excluded", dependencies=[Depends(require_permission("metrics:view"))])

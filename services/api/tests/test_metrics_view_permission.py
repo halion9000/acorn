@@ -58,9 +58,10 @@ def test_every_role_reads_the_metrics_exactly_when_it_could_before():
 
 
 def test_a_key_with_only_metrics_view_reaches_exactly_the_metrics_reads():
-    expected = {(m, p) for p, r in ALL_ROUTES if p.startswith(("/reports/ticket-metrics", "/reports/metrics/")) for m in ("GET",)}
-    assert {(m, p) for p, r in ALL_ROUTES if required(r) == {"metrics:view"} for m in ("GET",)} == expected
-    assert _satisfied_by(["metrics:view"]) == expected
+    expected = {(m, p) for p, r in ALL_ROUTES if p.startswith(("/reports/ticket-metrics", "/reports/metrics/")) and "GET" in r.methods for m in ("GET",)}
+    assert {(m, p) for p, r in ALL_ROUTES if required(r) == {"metrics:view"} and "GET" in r.methods for m in ("GET",)} == expected
+    # The one deliberate write: asking CORE to send the metrics again now (it changes no data).
+    assert _satisfied_by(["metrics:view"]) == expected | {("POST", "/reports/metrics/refresh")}
 
 
 def test_cores_key_can_read_the_metrics_and_still_cannot_read_the_other_reports():

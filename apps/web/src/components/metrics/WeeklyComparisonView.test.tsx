@@ -50,7 +50,7 @@ describe('the Weekly Tech Comparison', () => {
     expect(within(james).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Pod 2', 'James Makowsky', '5', '46', '10', '13', '43', '(3)', '4.4', '4.6', '3']);
     expect(within(screen.getByTestId('weekly-total')).getByText('All pods')).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Week'), '2026-11-09');
-    expect(authFetch).toHaveBeenLastCalledWith('/api/v1/reports/metrics/weekly-comparison?week=2026-11-09');
+    expect(authFetch).toHaveBeenLastCalledWith('/api/v1/reports/metrics/weekly-comparison?week=2026-11-09&r=0');
   });
 
   it('says CORE has not sent the counts when the detail is missing', async () => {
