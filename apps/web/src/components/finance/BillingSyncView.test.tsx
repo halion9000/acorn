@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { BillingSyncView, canApprove, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
+import { BillingSyncView, anyWaiting, canApprove, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
 
 const row = (over: Partial<SyncRow> = {}): SyncRow => ({
   client_id: 'c1',
@@ -185,5 +185,39 @@ describe('the Billing sync page: sorting and where a number comes from', () => {
     expect(within(detail).getByRole('link', { name: /Licenses/ })).toHaveAttribute('href', '/settings/billing');
     await userEvent.click(screen.getByRole('button', { name: /Where the counted number of Acme Dental/ }));
     expect(screen.queryByTestId('sync-detail')).toBeNull();
+  });
+});
+
+describe('a line that is waiting for CORE', () => {
+  const waitingRow = () => row({ push: { status: 'pending', quantity: 12, message: null, by: 'hal', at: null } });
+
+  it('is known by a push that is pending or claimed, and not by one that finished', () => {
+    expect(anyWaiting([row()])).toBe(false);
+    expect(anyWaiting([row({ push: { status: 'failed', quantity: 12, message: 'x', by: null, at: null } }), row({ push: { status: 'done', quantity: 12, message: null, by: null, at: null } })])).toBe(false);
+    expect(anyWaiting([row(), waitingRow()])).toBe(true);
+    expect(anyWaiting([row({ push: { status: 'claimed', quantity: 12, message: null, by: null, at: null } })])).toBe(true);
+  });
+
+  it('asks again every five seconds by itself until CORE has answered, then stops asking', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let calls = 0;
+      authFetch.mockImplementation(() => {
+        calls += 1;
+        return answer(data(calls < 3 ? [waitingRow()] : [row({ push: { status: 'done', quantity: 12, message: 'Set to 12.', by: 'hal', at: null } })]));
+      });
+      render(<BillingSyncView />);
+      await screen.findByText(/Waiting for CORE/);
+      expect(calls).toBe(1);
+      await vi.advanceTimersByTimeAsync(5100);
+      await vi.waitFor(() => expect(calls).toBe(2));
+      await vi.advanceTimersByTimeAsync(5100);
+      await vi.waitFor(() => expect(calls).toBe(3));
+      await screen.findByText(/Set to 12\./);
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

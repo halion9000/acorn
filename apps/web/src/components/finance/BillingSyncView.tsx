@@ -73,6 +73,9 @@ export function partsText(r: SyncRow): string {
 }
 
 /** Whether a row can be approved right now: mapped to HaloPSA, not already waiting (pure). */
+/** Whether any pushed line is still on its way to HaloPSA, so the page keeps asking for its state. */
+export const anyWaiting = (rows: SyncRow[]): boolean => rows.some((r) => r.push.status === 'pending' || r.push.status === 'claimed');
+
 export const canApprove = (r: SyncRow): boolean => r.can_push && r.push.status !== 'pending' && r.push.status !== 'claimed';
 /** How a push reads for people (pure). */
 export function pushText(p: SyncRow['push']): string {
@@ -114,6 +117,13 @@ export function BillingSyncView() {
   useEffect(() => {
     void load(showHidden);
   }, [load, showHidden]);
+  // CORE answers a push in about twenty seconds; until it has, ask again every five so the line changes by itself.
+  const waiting = anyWaiting(data?.rows ?? []);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => void load(showHidden), 5000);
+    return () => clearInterval(timer);
+  }, [waiting, load, showHidden]);
 
   const items = useMemo(() => [...new Set((data?.rows ?? []).map((r) => r.invoice_item))].sort(), [data]);
   const rows = useMemo(() => sortRows(filterRows(data?.rows ?? [], text, item), sort.key, sort.dir), [data, text, item, sort]);
