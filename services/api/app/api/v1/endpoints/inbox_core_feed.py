@@ -39,6 +39,7 @@ from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
 from app.services import core_approvals, core_heartbeat
 from app.services import vcio_risk_tickets as vcio_tickets
+from app.services.ticket_stats_merge import merge_ticket_stats
 from app.services.alert_settle import case_has_no_other_open_alert, closed_in_tool, has_open_ticket, tickets_all_closed
 from app.services.alert_status import FINISHED_ALERT_STATUSES
 from app.services.alert_ticket_rules import link_created_ticket
@@ -1622,6 +1623,7 @@ async def report_core_feed_ticket_stats(tenant_token: str, body: TicketStatsIn, 
     if row is None:
         db.add(TicketStatsSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
     else:
+        payload = merge_ticket_stats(row.payload, payload)  # a pass that read fewer months must not cut the months held
         if payload.get("resolution") is None and (row.payload or {}).get("resolution") is not None:
             payload["resolution"] = row.payload["resolution"]  # this pass could not read it: keep the last one
         if payload.get("volume") is None and (row.payload or {}).get("volume") is not None:

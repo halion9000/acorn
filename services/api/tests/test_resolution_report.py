@@ -165,3 +165,39 @@ async def test_the_volume_page_uses_the_monthly_counts_once_sent_and_a_later_pas
     await send({"months": ["2026-10"], "rows": VOL_STATS["rows"], "open_now": []})  # a pass that could not read the volume part
     again = await with_db(tenant.id, lambda db: mp.ticket_volume(tenant.user, db, 12))
     assert again["source"] == "report" and again["total_created"] == 15, "the last volume counts were kept"
+
+
+# --- A smaller pass does not cut the months held ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+def _month_row(month, client="1", created=1):
+    return {"client_id": client, "client_name": "Acme", "month": month, "created": created, "resolved": 0, "responded": 0, "response_minutes": 0, "created_by_type": {}, "resolved_by_agent": {}, "critical": 0, "high": 0}
+
+
+def test_a_pass_that_read_fewer_months_replaces_those_months_and_keeps_the_others():
+    from app.services.ticket_stats_merge import merge_ticket_stats
+
+    old = {"months": ["2026-08", "2026-09", "2026-10"], "rows": [_month_row("2026-08", created=5), _month_row("2026-09", created=6), _month_row("2026-10", created=7), _month_row("2026-10", client="2", created=2)], "open_now": [{"client_id": "1"}]}
+    new = {"months": ["2026-10", "2026-11"], "rows": [_month_row("2026-10", created=9), _month_row("2026-11", created=3)], "open_now": [{"client_id": "9"}]}
+    out = merge_ticket_stats(old, new)
+    assert out["months"] == ["2026-08", "2026-09", "2026-10", "2026-11"]
+    assert sorted((r["month"], r["client_id"], r["created"]) for r in out["rows"]) == [("2026-08", "1", 5), ("2026-09", "1", 6), ("2026-10", "1", 9), ("2026-11", "1", 3)], "October is replaced whole: the second client's old row is gone with it"
+    assert out["open_now"] == [{"client_id": "9"}]
+    assert merge_ticket_stats(None, new) == new
+    assert merge_ticket_stats(old, new, limit=2)["months"] == ["2026-10", "2026-11"] and all(r["month"] >= "2026-10" for r in merge_ticket_stats(old, new, limit=2)["rows"])
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_ticket_summary_keeps_its_months_when_a_later_pass_carries_fewer(tenant):
+    async def send(body):
+        async with async_sessionmaker(create_async_engine(APP_URL, poolclass=NullPool), expire_on_commit=False)() as db:
+            await set_rls_context(db, tenant.id)
+            return await feed.report_core_feed_ticket_stats("tok", feed.TicketStatsIn.model_validate(body), db)
+
+    await send({"months": ["2026-09", "2026-10"], "rows": [_month_row("2026-09"), _month_row("2026-10")], "open_now": []})
+    await send({"months": ["2026-10"], "rows": [_month_row("2026-10", created=8)], "open_now": []})
+
+    async def stored(db):
+        return (await db.execute(select(TicketStatsSnapshot).where(TicketStatsSnapshot.tenant_id == tenant.id))).scalar_one().payload
+
+    held = await with_db(tenant.id, stored)
+    assert held["months"] == ["2026-09", "2026-10"] and sorted((r["month"], r["created"]) for r in held["rows"]) == [("2026-09", 1), ("2026-10", 8)]
