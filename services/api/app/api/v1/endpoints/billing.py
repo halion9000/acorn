@@ -618,25 +618,39 @@ async def delete_note(
     await db.commit()
 
 
-async def _disagreement_starts(
-    db: Any, owner: uuid.UUID, cid: uuid.UUID, lines: list[tuple[str, list[dict[str, str]]]], now: datetime
-) -> dict[str, tuple[datetime, bool]]:
-    """For one client, since when each of these invoice lines (name and mapped parts) has not matched. Read under that client's own scope."""
-    async with _as(db, owner, cid):
-        held = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id == cid))).scalars().all()
-        hist = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id == cid))).scalars().all()
-    current = {(r.source, r.item): (r.count, r.first_seen_at) for r in held}
-    history: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    tracking: dict[str, datetime] = {}
-    for r in held:
-        tracking[r.source] = min(tracking.get(r.source, r.first_seen_at), r.first_seen_at)
-    for h in hist:
-        history.setdefault((h.source, h.item), []).append({"observed_at": h.observed_at, "count": h.count})
-        tracking[h.source] = min(tracking.get(h.source, h.observed_at), h.observed_at)
-    return {
-        item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now)
-        for item, parts in lines
-    }
+async def _disagreement_starts_many(
+    db: Any, wanted: dict[uuid.UUID, list[tuple[str, list[dict[str, str]]]]], now: datetime
+) -> dict[uuid.UUID, dict[str, tuple[datetime, bool]]]:
+    """``_disagreement_starts`` for many clients at once: the counts and the history of all of them are read in two statements instead of two for every client (a client by client read made the Billing sync page
+    take over ten seconds)."""
+    if not wanted:
+        return {}
+    ids = list(wanted)
+    async with cross_tenant_reads(db):
+        held_all = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id.in_(ids)))).scalars().all()
+        hist_all = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id.in_(ids)))).scalars().all()
+    held_by: dict[uuid.UUID, list[Any]] = {}
+    for r in held_all:
+        held_by.setdefault(r.tenant_id, []).append(r)
+    hist_by: dict[uuid.UUID, list[Any]] = {}
+    for h in hist_all:
+        hist_by.setdefault(h.tenant_id, []).append(h)
+    out: dict[uuid.UUID, dict[str, tuple[datetime, bool]]] = {}
+    for cid, lines in wanted.items():
+        held = held_by.get(cid, [])
+        current = {(r.source, r.item): (r.count, r.first_seen_at) for r in held}
+        history: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        tracking: dict[str, datetime] = {}
+        for r in held:
+            tracking[r.source] = min(tracking.get(r.source, r.first_seen_at), r.first_seen_at)
+        for h in hist_by.get(cid, []):
+            history.setdefault((h.source, h.item), []).append({"observed_at": h.observed_at, "count": h.count})
+            tracking[h.source] = min(tracking.get(h.source, h.observed_at), h.observed_at)
+        out[cid] = {
+            item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now)
+            for item, parts in lines
+        }
+    return out
 
 
 @router.get(
@@ -656,19 +670,20 @@ async def reconcile_billing(
     notes = await _notes(db, owner)
     out: list[ReconcileRow] = []
     unmapped_lines = 0
+    shown_by: dict[uuid.UUID, list[dict[str, Any]]] = {}
+    wanted: dict[uuid.UUID, list[tuple[str, list[dict[str, str]]]]] = {}
     for cid, rows in per_client.items():
         billed = [{"item": r["item"], "count": r["count"]} for r in rows if r["source"] == BILLED_SOURCE and r.get("unit") != "ticket"]
         held = [r for r in rows if r["source"] != BILLED_SOURCE]
         result = reconcile(billed, held, mapping)
         unmapped_lines += len(result["unmapped"])
-        shown = [r for r in result["rows"] if include_matches or r["difference"] != 0]
-        starts = (
-            await _disagreement_starts(
-                db, owner, cid, [(r["invoice_item"], mapping[r["invoice_item"]]) for r in shown if r["difference"] != 0], now
-            )
-            if any(r["difference"] != 0 for r in shown)
-            else {}
-        )
+        shown_by[cid] = [r for r in result["rows"] if include_matches or r["difference"] != 0]
+        lines = [(r["invoice_item"], mapping[r["invoice_item"]]) for r in shown_by[cid] if r["difference"] != 0]
+        if lines:
+            wanted[cid] = lines
+    all_starts = await _disagreement_starts_many(db, wanted, now)
+    for cid, shown in shown_by.items():
+        starts = all_starts.get(cid, {})
         for r in shown:
             n = notes.get((cid, r["invoice_item"]))
             start = starts.get(r["invoice_item"])
