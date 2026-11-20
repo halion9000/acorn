@@ -322,3 +322,24 @@ def test_ticket_updates_also_give_comments_updates_and_resolved_per_person_per_w
     r = ms.ticket_updates({"weeks": [W1, W2], "rows": rows}, 1)
     assert r["rows"][0]["detail"] == {W1: {"comments": 7, "updated": 20, "resolved": 31}, W2: {"comments": 0, "updated": 2, "resolved": 1}}
     assert r["rows"][0]["by_week"] == {W1: 20, W2: 2}
+
+
+MEET = {
+    "weeks": [W1, W2],
+    "rows": [
+        {"week": W1, "engineer": "Ann", "team": "Pod 1", "total_hours": 3.5},
+        {"week": W2, "engineer": "Ann", "team": "Pod 1", "total_hours": 2},
+        {"week": W2, "engineer": "Bob", "team": "", "total_hours": "1.25"},
+        {"week": W2, "engineer": "Neg", "team": "Pod 1", "total_hours": -4},
+    ],
+}
+
+
+def test_meetings_total_by_week_by_person_and_by_team_with_no_team_as_unassigned_and_a_team_filter():
+    r = ms.meetings(MEET, 1)
+    assert r["total_hours"] == 6.75 and r["by_week"] == [{"week": W1, "hours": 3.5}, {"week": W2, "hours": 3.25}]
+    assert [(p["engineer"], p["total"], p["by_week"]) for p in r["people"]] == [("Ann", 5.5, {W1: 3.5, W2: 2.0}), ("Bob", 1.25, {W2: 1.25}), ("Neg", 0.0, {W2: 0.0})], "a negative figure counts as nothing"
+    assert r["by_team"] == [{"team": "Pod 1", "hours": 5.5}, {"team": "Unassigned", "hours": 1.25}] and r["teams"] == ["Pod 1", "Unassigned"]
+    only = ms.meetings(MEET, 1, "Unassigned")
+    assert [p["engineer"] for p in only["people"]] == ["Bob"] and only["total_hours"] == 1.25
+    assert ms.meetings(None, 3)["people"] == []

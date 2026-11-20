@@ -235,6 +235,15 @@ async def profitability(user: AuthUser, db: DBSession, month: str | None = Query
     }
 
 
+@router.get("/profitability/trend", dependencies=[Depends(require_permission("finance:view"))])
+async def profitability_trend(user: AuthUser, db: DBSession, months: int = Query(default=12, ge=1, le=36)) -> dict[str, Any]:
+    """Revenue, labor and what is left after labor for each of the newest months, and each client month by month (the same pricing as the month view)."""
+    row = (await db.execute(select(FinanceProfitSnapshot).where(FinanceProfitSnapshot.tenant_id == user.tenant_id))).scalar_one_or_none()
+    if row is None:
+        return {"received_at": None, "months": [], "series": [], "clients": []}
+    return {"received_at": row.received_at, **profit.profit_trend(row.payload, await _rates(db, user.tenant_id), months)}
+
+
 @router.get("/profitability/client", dependencies=[Depends(require_permission("finance:view"))])
 async def profitability_client(
     user: AuthUser,

@@ -152,6 +152,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/metric-dialpad-weekly"): (
         "CORE's daily Dialpad call counts and call time per engineer per week: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own dataset."
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/metric-meetings-weekly"): (
+        "CORE's daily meeting hours per engineer per week from their calendars: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it adds to only that organization's own dataset."
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles"): (
         "CORE's daily Microsoft 365 directory roles and their members per client: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own dataset."
     ),

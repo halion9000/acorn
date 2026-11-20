@@ -12,13 +12,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
 
-DATASET_KEYS = ("staff-weekly", "ticket-detail", "invoice-lines", "dialpad-weekly", "m365-roles")
+DATASET_KEYS = ("staff-weekly", "ticket-detail", "invoice-lines", "dialpad-weekly", "m365-roles", "meetings-weekly")
 
 # Datasets whose sends ADD to what is held instead of replacing it: the list that holds the rows, the fields that identify one row (a newer row replaces the older one with the same identity) and how many
 # rows are kept at most (the newest by the first field). CORE sends only the recent weeks it computed, so the history builds up here; Microsoft 365 roles arrive a few clients at a time.
 MERGED: dict[str, tuple[str, tuple[str, ...], int]] = {
     "staff-weekly": ("rows", ("week", "agent_id"), 20000),
     "dialpad-weekly": ("rows", ("week", "engineer"), 20000),
+    "meetings-weekly": ("rows", ("week", "engineer"), 20000),
     "m365-roles": ("clients", ("client_id",), 5000),
 }
 

@@ -326,3 +326,22 @@ def test_a_clients_every_ticket_is_listed_however_many_there_are():
     rows = [{"client": "Acme Dental, Inc.", "month": "2026-10", "ticket_id": str(1000 + i), "summary": f"T{i}", "hours": 0.01, "entries": 1, "agent_ids": ["40"]} for i in range(250)]
     b = p.client_breakdown(SNAP, LINES, HALO, [], "5", "2026-10", rows)
     assert len(b["tickets"]["rows"]) == 250
+
+
+def test_the_trend_prices_every_month_the_way_the_month_view_does_and_lists_each_client_by_month():
+    t = p.profit_trend(SNAP, [], 12)
+    assert t["months"] == ["2026-09", "2026-10"] and t["available_months"] == 2
+    sep, octo = t["series"]
+    assert (sep["revenue"], sep["labor"], sep["after_labor"], sep["clients_invoiced"]) == (Decimal("900"), Decimal("650.00"), Decimal("250.00"), 1)
+    one = p.profit_for_month(SNAP, [], "2026-10")["totals"]
+    assert (octo["revenue"], octo["labor"], octo["margin_percent"], octo["hours"]) == (one["revenue"], one["labor"], one["margin_percent"], one["hours"]), "the same totals as the month view"
+    assert octo["clients_invoiced"] == 2
+    acme, birch = t["clients"]
+    assert acme["client_name"] == "Acme Dental, Inc." and acme["revenue"] == Decimal("1900") and set(acme["by_month"]) == {"2026-09", "2026-10"}
+    assert birch["by_month"] == {"2026-10": {"revenue": Decimal("400.5"), "labor": Decimal("65.00"), "after_labor": Decimal("335.50")}}
+
+
+def test_the_trend_takes_only_the_newest_months_and_only_the_top_clients():
+    t = p.profit_trend(SNAP, [], 1, top=1)
+    assert t["months"] == ["2026-10"] and [c["client_name"] for c in t["clients"]] == ["Acme Dental, Inc."] and t["clients_left_out"] == 1
+    assert p.profit_trend({}, [], 6) == {"months": [], "available_months": 0, "series": [], "clients": [], "clients_left_out": 0}

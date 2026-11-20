@@ -39,6 +39,7 @@ export const PAGE_WORDS: Record<string, string[]> = {
   '/metrics/staff-metrics': ['staff metrics', 'utilization', 'weekly', 'team', 'tickets closed'],
   '/metrics/pods': ['pods', 'teams', 'resolved', 'days off', 'holidays'],
   '/metrics/ticket-updates': ['ticket updates', 'team member', 'weekly', 'activity'],
+  '/metrics/meetings': ['meetings', 'calendar', 'meeting hours'],
   '/metrics/dialpad': ['dialpad', 'calls', 'phone', 'triage', 'hours on call'],
   '/metrics/staff-hours': ['staff hours', 'distribution', 'hours by type', 'time'],
   '/metrics/scorecard': ['scorecard', 'score', 'grade', 'service desk', 'performance'],

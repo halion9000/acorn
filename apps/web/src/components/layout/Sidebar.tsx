@@ -444,6 +444,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'DialPad', href: '/metrics/dialpad', icon: <ScanIcon /> },
       { label: 'Labor hours', href: '/metrics/labor-hours', icon: <ScanIcon /> },
+      { label: 'Meetings', href: '/metrics/meetings', icon: <ScanIcon /> },
       { label: 'Pods', href: '/metrics/pods', icon: <ScanIcon /> },
       { label: 'Scorecard', href: '/metrics/scorecard', icon: <ScanIcon /> },
       { label: 'Staff hours distribution', href: '/metrics/staff-hours', icon: <ScanIcon /> },

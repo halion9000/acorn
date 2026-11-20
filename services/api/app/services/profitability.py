@@ -154,6 +154,35 @@ def profit_for_month(
     }
 
 
+def profit_trend(snapshot: dict[str, Any], rates: list[dict[str, Any]], months: int, top: int = 60) -> dict[str, Any]:
+    """Revenue, labor, what is left and the margin for each of the newest ``months`` months (oldest first), the hours and how many clients were invoiced, and each client month by month (the ``top`` clients by revenue
+    over the period). Labor is priced exactly as ``profit_for_month`` prices it."""
+    all_months = available_months(snapshot)
+    chosen = all_months[-max(1, months):]
+    series: list[dict[str, Any]] = []
+    clients: dict[str, dict[str, Any]] = {}
+    for m in chosen:
+        r = profit_for_month(snapshot, rates, m)
+        t = r["totals"]
+        series.append(
+            {
+                "month": m,
+                "revenue": t["revenue"],
+                "labor": t["labor"],
+                "after_labor": t["after_labor"],
+                "margin_percent": t["margin_percent"],
+                "hours": t["hours"],
+                "clients_invoiced": sum(1 for row in r["rows"] if row["revenue"] > 0),
+            }
+        )
+        for row in r["rows"]:
+            c = clients.setdefault(row["client_id"], {"client_id": row["client_id"], "client_name": row["client_name"], "revenue": ZERO, "by_month": {}})
+            c["revenue"] += row["revenue"]
+            c["by_month"][m] = {"revenue": row["revenue"], "labor": row["labor"], "after_labor": row["after_labor"]}
+    ranked = sorted(clients.values(), key=lambda c: (-c["revenue"], c["client_name"].lower()))
+    return {"months": chosen, "available_months": len(all_months), "series": series, "clients": ranked[:top], "clients_left_out": max(0, len(ranked) - top)}
+
+
 def software_per_run(halo_snapshot: dict[str, Any] | None) -> dict[str, Decimal]:
     """What each client's recurring invoices cost per invoice run (quantity x unit cost, lines that have a cost), by client-name key. Information only: see the module note."""
     out: dict[str, Decimal] = {}

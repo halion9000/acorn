@@ -2550,6 +2550,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/finance/profitability/trend:
+    get:
+      tags:
+      - finance
+      summary: Profitability Trend
+      description: Revenue, labor and what is left after labor for each of the newest
+        months, and each client month by month (the same pricing as the month view).
+      operationId: profitability_trend_api_v1_finance_profitability_trend_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 12
+          title: Months
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Profitability Trend Api V1 Finance Profitability Trend
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/finance/profitability/client:
     get:
       tags:
@@ -25588,6 +25624,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/meetings:
+    get:
+      tags:
+      - reports
+      summary: Meetings
+      description: Meeting hours per team member per week, by week and by team, from
+        the calendars CORE reads through CIPP.
+      operationId: meetings_api_v1_reports_metrics_meetings_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: months
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 36
+          minimum: 1
+          default: 3
+          title: Months
+      - name: team
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Team
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Meetings Api V1 Reports Metrics Meetings Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/reports/metrics/scorecard-template:
     get:
       tags:
@@ -34778,6 +34880,40 @@ paths:
       description: 'CORE''s Dialpad call counts and call time per engineer per week:
         replaces the ones before.'
       operationId: report_core_feed_metric_dialpad_weekly_api_v1_inbox_core_feed__tenant_token__metric_dialpad_weekly_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-meetings-weekly:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Meetings Weekly
+      description: 'CORE''s meeting hours per engineer per week, from each engineer''s
+        Microsoft 365 calendar: merged into what is held.'
+      operationId: report_core_feed_metric_meetings_weekly_api_v1_inbox_core_feed__tenant_token__metric_meetings_weekly_post
       parameters:
       - name: tenant_token
         in: path

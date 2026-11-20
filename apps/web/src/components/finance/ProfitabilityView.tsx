@@ -4,6 +4,7 @@
  * Sales and Finance > Profitability: for one month, what each client was invoiced, the hours worked for them, what those hours cost and what is left after labor. The numbers come from the HaloPSA summary
  * CORE sends about once a day. Software, hardware, travel and overhead are not in it (the page says so). Needs the finance permission; without it the API answers 403 and this says so.
  */
+import { ProfitTrend } from './ProfitTrend';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { sortedBy, type SortValue } from '@/lib/tableSort';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -227,6 +228,7 @@ export function ProfitabilityView() {
               </tbody>
             </table>
           </div>
+          <ProfitTrend />
           {openClient && <ClientProfitDetail clientId={openClient} month={data.report.month} focus={openFocus} onClose={() => setOpenClient(null)} />}
           {data.note && <p className="text-xs text-gray-500">{data.note}</p>}
           {data.report.unmatched_hours.length > 0 && (

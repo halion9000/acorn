@@ -60,6 +60,7 @@ MODELS = {
     "metric-ticket-detail": feed.MetricDatasetIn,
     "metric-invoice-lines": feed.MetricDatasetIn,
     "metric-dialpad-weekly": feed.MetricDatasetIn,
+    "metric-meetings-weekly": feed.MetricDatasetIn,
     "metric-m365-roles": feed.MetricDatasetIn,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,

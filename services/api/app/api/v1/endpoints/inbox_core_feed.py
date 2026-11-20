@@ -1898,6 +1898,13 @@ async def report_core_feed_metric_dialpad_weekly(tenant_token: str, body: Metric
     return await _keep_metric_dataset(db, tenant_id, "dialpad-weekly", body)
 
 
+@router.post("/core-feed/{tenant_token}/metric-meetings-weekly", response_model=MetricDatasetOut)
+async def report_core_feed_metric_meetings_weekly(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's meeting hours per engineer per week, from each engineer's Microsoft 365 calendar: merged into what is held."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "meetings-weekly", body)
+
+
 @router.post("/core-feed/{tenant_token}/metric-m365-roles", response_model=MetricDatasetOut)
 async def report_core_feed_metric_m365_roles(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
     """CORE's Microsoft 365 directory roles and their members per client: replaces the ones before."""

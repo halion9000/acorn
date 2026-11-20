@@ -80,6 +80,13 @@ async def staff_hours(user: AuthUser, db: DBSession, months: Months = 3) -> dict
     return {"received_at": row.received_at if row else None, **ms.hours_distribution(row.payload if row else None, months)}
 
 
+@router.get("/meetings", dependencies=[Depends(require_permission("metrics:view"))])
+async def meetings(user: AuthUser, db: DBSession, months: Months = 3, team: Annotated[str | None, Query(max_length=120)] = None) -> dict[str, Any]:
+    """Meeting hours per team member per week, by week and by team, from the calendars CORE reads through CIPP."""
+    data, at = await _dataset(db, user, "meetings-weekly")
+    return {"received_at": at, **ms.meetings(data, months, team)}
+
+
 @router.get("/scorecard-template", dependencies=[Depends(require_permission("metrics:view"))])
 async def scorecard_template() -> dict[str, Any]:
     """The weights, brackets and grade cut-offs the scorecard is worked out with (read only)."""

@@ -242,6 +242,32 @@ def dialpad(payload: dict[str, Any] | None, months: int, engineer: str | None = 
     }
 
 
+def meetings(payload: dict[str, Any] | None, months: int, team: str | None = None) -> dict[str, Any]:
+    """Meeting hours per team member per week for the period, the total by week, and the total for each team (the Rewst Meetings page). A person's team is the one on their row; people with none are Unassigned."""
+    weeks = recent_weeks(payload, months)
+    rows = [r for r in _rows_in(payload, weeks) if not team or (str(r.get("team") or "") or "Unassigned") == team]
+    people: dict[str, dict[str, Any]] = {}
+    by_week = {w: 0.0 for w in weeks}
+    teams: dict[str, float] = {}
+    for r in rows:
+        hours = max(0.0, _num(r.get("total_hours")))
+        who = str(r.get("engineer") or r.get("email") or "")
+        t = str(r.get("team") or "") or "Unassigned"
+        p = people.setdefault(who, {"engineer": who, "team": t, "total": 0.0, "by_week": {}})
+        p["total"] += hours
+        p["by_week"][str(r["week"])] = round(hours, 2)
+        by_week[str(r["week"])] += hours
+        teams[t] = teams.get(t, 0.0) + hours
+    return {
+        "weeks": weeks,
+        "total_hours": round(sum(by_week.values()), 2),
+        "by_week": [{"week": w, "hours": round(h, 2)} for w, h in by_week.items()],
+        "people": sorted(({**p, "total": round(p["total"], 2)} for p in people.values()), key=lambda p: (-p["total"], p["engineer"].lower())),
+        "by_team": sorted(({"team": t, "hours": round(h, 2)} for t, h in teams.items()), key=lambda x: (-x["hours"], x["team"].lower())),
+        "teams": sorted({str(r.get("team") or "") or "Unassigned" for r in (payload or {}).get("rows") or []}, key=str.lower),
+    }
+
+
 def hours_distribution(profit_payload: dict[str, Any] | None, months: int) -> dict[str, Any]:
     """Hours worked per person by ticket type (the charge type) for the newest ``months`` months of the HaloPSA hours summary, with each person's total and each type's share of all hours."""
     all_months = sorted({str(m) for m in (profit_payload or {}).get("months") or []})
