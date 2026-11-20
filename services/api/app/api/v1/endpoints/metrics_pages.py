@@ -87,6 +87,13 @@ async def meetings(user: AuthUser, db: DBSession, months: Months = 3, team: Anno
     return {"received_at": at, **ms.meetings(data, months, team)}
 
 
+@router.get("/halo-user-roles", dependencies=[Depends(require_permission("metrics:view"))])
+async def halo_user_roles(user: AuthUser, db: DBSession, client: Annotated[list[str] | None, Query(max_length=300)] = None) -> dict[str, Any]:
+    """How many HaloPSA users each client has in each user role (Accountants, C-Suite, Computer User, Primary POC...)."""
+    data, at = await _dataset(db, user, "halo-user-roles")
+    return {"received_at": at, **ms.halo_user_roles(data, client)}
+
+
 @router.get("/scorecard-template", dependencies=[Depends(require_permission("metrics:view"))])
 async def scorecard_template() -> dict[str, Any]:
     """The weights, brackets and grade cut-offs the scorecard is worked out with (read only)."""

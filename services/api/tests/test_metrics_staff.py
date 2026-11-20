@@ -343,3 +343,21 @@ def test_meetings_total_by_week_by_person_and_by_team_with_no_team_as_unassigned
     only = ms.meetings(MEET, 1, "Unassigned")
     assert [p["engineer"] for p in only["people"]] == ["Bob"] and only["total_hours"] == 1.25
     assert ms.meetings(None, 3)["people"] == []
+
+
+def test_halo_user_roles_count_users_per_client_and_role_with_totals_a_client_filter_and_what_could_not_be_read():
+    data = {
+        "roles": ["Primary POC", "Computer User"],
+        "clients": [
+            {"client": "Birch", "client_id": "6", "counts": {"Computer User": 1}},
+            {"client": "Acme", "client_id": "5", "counts": {"Primary POC": 1, "Computer User": 2, "Gone": 9}},
+        ],
+        "without_client": 1,
+        "unread": ["Contractor"],
+    }
+    r = ms.halo_user_roles(data)
+    assert r["roles"] == [{"role": "Computer User", "total": 3}, {"role": "Primary POC", "total": 1}]
+    assert [(c["client"], c["total"], c["counts"]) for c in r["clients"]] == [("Acme", 3, {"Computer User": 2, "Primary POC": 1}), ("Birch", 1, {"Computer User": 1, "Primary POC": 0})], "a role no longer listed is not counted"
+    assert r["all_clients"] == ["Acme", "Birch"] and r["without_client"] == 1 and r["unread"] == ["Contractor"]
+    assert [c["client"] for c in ms.halo_user_roles(data, ["Birch"])["clients"]] == ["Birch"]
+    assert ms.halo_user_roles(None)["clients"] == []

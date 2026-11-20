@@ -1905,6 +1905,13 @@ async def report_core_feed_metric_meetings_weekly(tenant_token: str, body: Metri
     return await _keep_metric_dataset(db, tenant_id, "meetings-weekly", body)
 
 
+@router.post("/core-feed/{tenant_token}/metric-halo-user-roles", response_model=MetricDatasetOut)
+async def report_core_feed_metric_halo_user_roles(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's HaloPSA user roles and how many users each client has in each: replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "halo-user-roles", body)
+
+
 @router.post("/core-feed/{tenant_token}/metric-m365-roles", response_model=MetricDatasetOut)
 async def report_core_feed_metric_m365_roles(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
     """CORE's Microsoft 365 directory roles and their members per client: replaces the ones before."""

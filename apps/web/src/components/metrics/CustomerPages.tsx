@@ -5,6 +5,7 @@
  * roles from CIPP: CORE sends them about once a day and A.C.O.R.N reads its own copy.
  */
 import { Doughnut } from './Doughnut';
+import { HaloUserRolesPanel } from './HaloUserRoles';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useState } from 'react';
 import { MetricPicker } from './MetricPicker';
@@ -166,9 +167,11 @@ export function UserRolesView() {
   const { data, denied, problem } = useMetric<RolesData>('/api/v1/reports/metrics/user-roles');
   const shown = (data?.roles ?? []).filter((r) => !hidden.has(r.role));
   return (
-    <Page title="User roles" subtitle="How many people hold each Microsoft 365 administrator role at each client, and who." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Microsoft 365 roles" />}>
+    <Page title="User roles" subtitle="How many HaloPSA users each client has in each role (Accountants, C-Suite, Computer User, Primary POC...), and below it who holds each Microsoft 365 administrator role." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Microsoft 365 roles" />}>
+      <HaloUserRolesPanel />
       {data?.received_at && (
         <>
+          <h2 className="pt-2 text-base font-semibold">Microsoft 365 administrator roles</h2>
           <MetricPicker
             noun="roles"
             options={data.roles.map((r) => ({ value: r.role, label: r.role, hint: String(r.total) }))}

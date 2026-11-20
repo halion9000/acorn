@@ -145,6 +145,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's daily invoiced amounts per client per month per invoice line: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
     (
         "POST",
+        "/api/v1/inbox/core-feed/{tenant_token}/metric-halo-user-roles",
+    ): "CORE's daily HaloPSA user roles and the users each client has in each: authenticated by the core-feed token in the path, checked in the handler (401 without it); replaces only that organization's own dataset.",
+    (
+        "POST",
         "/api/v1/inbox/core-feed/{tenant_token}/metric-meetings-weekly",
     ): "CORE's daily meeting hours per engineer per week from their calendars: authenticated by the core-feed token in the path, checked in the handler (401 without it); adds only to that organization's own dataset.",
     (

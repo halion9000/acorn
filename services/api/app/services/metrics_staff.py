@@ -268,6 +268,27 @@ def meetings(payload: dict[str, Any] | None, months: int, team: str | None = Non
     }
 
 
+def halo_user_roles(payload: dict[str, Any] | None, clients: list[str] | None = None) -> dict[str, Any]:
+    """The HaloPSA user roles page (the Rewst User Roles page): for each client how many users are in each role, with each client's total and each role's total. ``clients`` limits the rows to those names (all when none)."""
+    roles = sorted({str(r) for r in (payload or {}).get("roles") or []}, key=str.lower)
+    want = set(clients or [])
+    rows = []
+    for c in (payload or {}).get("clients") or []:
+        name = str(c.get("client") or "")
+        if want and name not in want:
+            continue
+        counts = {r: int((c.get("counts") or {}).get(r) or 0) for r in roles}
+        rows.append({"client": name, "client_id": str(c.get("client_id") or ""), "counts": counts, "total": sum(counts.values())})
+    rows.sort(key=lambda r: r["client"].lower())
+    return {
+        "roles": [{"role": r, "total": sum(x["counts"][r] for x in rows)} for r in roles],
+        "clients": rows,
+        "all_clients": sorted({str(c.get("client") or "") for c in (payload or {}).get("clients") or []}, key=str.lower),
+        "without_client": int((payload or {}).get("without_client") or 0),
+        "unread": [str(u) for u in (payload or {}).get("unread") or []],
+    }
+
+
 def hours_distribution(profit_payload: dict[str, Any] | None, months: int) -> dict[str, Any]:
     """Hours worked per person by ticket type (the charge type) for the newest ``months`` months of the HaloPSA hours summary, with each person's total and each type's share of all hours."""
     all_months = sorted({str(m) for m in (profit_payload or {}).get("months") or []})

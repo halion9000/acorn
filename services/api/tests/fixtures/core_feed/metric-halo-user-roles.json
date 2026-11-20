@@ -1,0 +1,24 @@
+{
+  "route": "metric-halo-user-roles",
+  "method": "POST",
+  "body": {
+    "data": {
+      "roles": [
+        "Computer User",
+        "Primary POC"
+      ],
+      "clients": [
+        {
+          "client_id": "12",
+          "client": "Acme Dental",
+          "counts": {
+            "Primary POC": 1,
+            "Computer User": 1
+          }
+        }
+      ],
+      "without_client": 0,
+      "unread": []
+    }
+  }
+}
