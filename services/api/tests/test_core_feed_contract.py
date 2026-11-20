@@ -62,6 +62,7 @@ MODELS = {
     "metric-dialpad-weekly": feed.MetricDatasetIn,
     "metric-meetings-weekly": feed.MetricDatasetIn,
     "metric-halo-user-roles": feed.MetricDatasetIn,
+    "metric-halo-licenses": feed.MetricDatasetIn,
     "metric-m365-roles": feed.MetricDatasetIn,
     "state": feed.StateReport,
     "actions-claim-huntress": feed.ClaimRequest,

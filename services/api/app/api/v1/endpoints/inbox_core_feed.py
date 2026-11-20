@@ -1914,6 +1914,13 @@ async def report_core_feed_metric_halo_user_roles(tenant_token: str, body: Metri
     return await _keep_metric_dataset(db, tenant_id, "halo-user-roles", body)
 
 
+@router.post("/core-feed/{tenant_token}/metric-halo-licenses", response_model=MetricDatasetOut)
+async def report_core_feed_metric_halo_licenses(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
+    """CORE's HaloPSA software licenses and the recurring invoice lines that carry them (the Billing sync Linked column): replaces the ones before."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    return await _keep_metric_dataset(db, tenant_id, "halo-licenses", body)
+
+
 @router.post("/core-feed/{tenant_token}/metric-m365-roles", response_model=MetricDatasetOut)
 async def report_core_feed_metric_m365_roles(tenant_token: str, body: MetricDatasetIn, db: DBSession) -> MetricDatasetOut:
     """CORE's Microsoft 365 directory roles and their members per client: replaces the ones before."""

@@ -21,6 +21,7 @@ from app.api.v1.endpoints.billing import reconcile_billing
 from app.models.billing_sync import BillingSyncItem
 from app.db.rls_scope import cross_tenant_reads
 from app.models.client_alias import ClientAlias
+from app.models.metric_dataset import MetricDataset
 from app.models.signin import ClientLicenseCount
 from app.models.vendor_action import VendorAction
 from app.services.audit import emit_audit
@@ -62,6 +63,9 @@ class SyncRow(BaseModel):
     # False when the client is not mapped to a HaloPSA client, so there is nothing to push to.
     can_push: bool
     push: PushOut
+    # The HaloPSA license (subscription) behind the line and whether it is on the invoice: linked, not_linked, na (no license) or unknown (CORE has not sent licenses yet).
+    license_id: int | None = None
+    link: str = "unknown"
 
 
 class SyncOut(BaseModel):
@@ -117,6 +121,32 @@ async def _halo_ids(db: DBSession, owner: uuid.UUID, client_ids: list[uuid.UUID]
     return {r.child_tenant_id: (r.vendor_client_id, r.vendor_client_name) for r in rows if r.child_tenant_id}
 
 
+def _norm(text_: str) -> str:
+    return " ".join("".join(c.lower() if c.isalnum() else " " for c in text_).split())
+
+
+def link_status(halo_client_id: str | None, item: str, data: dict[str, Any] | None) -> tuple[str, int | None]:
+    """(link, license id) for one billing row, from the licenses and invoice lines CORE read from HaloPSA (pure).
+
+    linked: a line of the client's recurring invoice with this item is tied to a license (its id is on the line); not_linked: a license of the client carries this item's name but no invoice line is tied to it; na: no license at all; unknown: nothing was sent yet."""
+    if not data or not halo_client_id:
+        return "unknown", None
+    want = _norm(item)
+    for line in data.get("lines") or []:
+        if str(line.get("client_id")) == str(halo_client_id) and _norm(str(line.get("item", ""))) == want:
+            ids = [i for i in line.get("licence_ids") or [] if isinstance(i, int)]
+            if ids:
+                return "linked", ids[0]
+    carried = {i for line in data.get("lines") or [] if str(line.get("client_id")) == str(halo_client_id) for i in line.get("licence_ids") or []}
+    for lic in data.get("licenses") or []:
+        if str(lic.get("client_id")) != str(halo_client_id) or lic.get("active") is False:
+            continue
+        name = _norm(str(lic.get("name", "")))
+        if len(want) >= 4 and (want in name or (len(name) >= 4 and name in want)):
+            return ("linked" if lic.get("id") in carried else "not_linked"), lic.get("id")
+    return "na", None
+
+
 # CORE reads what HaloPSA bills about once a day, so for a day after a push that worked the page takes the pushed quantity as what is billed (otherwise a line that was just fixed keeps showing the old number and the old difference).
 HELD_AFTER_PUSH = timedelta(hours=24)
 
@@ -146,6 +176,9 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
             .all()
         }
     halo = await _halo_ids(db, user.tenant_id, list({r.client_id for r in rows}))
+    licenses = (
+        await db.execute(select(MetricDataset.payload).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == "halo-licenses"))
+    ).scalar_one_or_none()
     out: list[SyncRow] = []
     hidden = 0
     now = datetime.now(UTC)
@@ -165,6 +198,7 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
             if a is not None and s is not None
             else PushOut(status="none")
         )
+        link, license_id = link_status(halo[r.client_id][0] if r.client_id in halo else None, r.invoice_item, licenses)
         out.append(
             SyncRow(
                 client_id=r.client_id,
@@ -177,6 +211,8 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
                 hidden=is_hidden,
                 can_push=r.client_id in halo,
                 push=push,
+                license_id=license_id,
+                link=link,
             )
         )
     counts_at = None

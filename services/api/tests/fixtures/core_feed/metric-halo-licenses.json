@@ -1,0 +1,10 @@
+{
+  "route": "metric-halo-licenses",
+  "method": "POST",
+  "body": {
+    "data": {
+      "licenses": [],
+      "lines": []
+    }
+  }
+}

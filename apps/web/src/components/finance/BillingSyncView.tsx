@@ -21,6 +21,10 @@ export interface SyncRow {
   parts?: { source: string; item: string; count: number }[];
   hidden: boolean;
   can_push: boolean;
+  /** The HaloPSA license (subscription) behind the line; absent from an older API. */
+  license_id?: number | null;
+  /** linked: the license is on the invoice; not_linked: the license exists but is not on it; na: no license; unknown: CORE has not sent licenses yet. */
+  link?: 'linked' | 'not_linked' | 'na' | 'unknown';
   push: { status: 'none' | 'pending' | 'claimed' | 'done' | 'failed'; quantity: number | null; message: string | null; by: string | null; at: string | null };
 }
 interface SyncData {
@@ -66,6 +70,13 @@ export function sortRows(rows: SyncRow[], key: SortKey | null, dir: SortDir): Sy
 export function nextSort(current: { key: SortKey | null; dir: SortDir }, key: SortKey): { key: SortKey | null; dir: SortDir } {
   if (current.key === key) return { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
   return { key, dir: key === 'client_name' || key === 'invoice_item' || key === 'status' ? 'asc' : 'desc' };
+}
+/** The Linked column's words and color for a row (pure): Linked, Not Linked, N/A; nothing before CORE has sent licenses. */
+export function linkText(r: SyncRow): { label: string; tone: string } {
+  if (r.link === 'linked') return { label: 'Linked', tone: 'text-emerald-300' };
+  if (r.link === 'not_linked') return { label: 'Not Linked', tone: 'text-amber-300' };
+  if (r.link === 'na') return { label: 'N/A', tone: 'text-gray-400' };
+  return { label: '', tone: 'text-gray-500' };
 }
 /** The counted number written out: "ThreatMate Internal assets 0" for each part, or why there is none (pure). */
 export function partsText(r: SyncRow): string {
@@ -170,6 +181,7 @@ export function BillingSyncView() {
   const items = useMemo(() => [...new Set((data?.rows ?? []).map((r) => r.invoice_item))].sort(), [data]);
   const rows = useMemo(() => sortRows(filterRows(data?.rows ?? [], text, item), sort.key, sort.dir), [data, text, item, sort]);
   const chosen = rows.filter((r) => picked.has(rowKey(r)));
+  const allPicked = rows.length > 0 && chosen.length === rows.length;
 
   const post = async (path: string, body: unknown): Promise<unknown> => {
     setBusy(true);
@@ -232,6 +244,9 @@ export function BillingSyncView() {
         <span className="text-xs text-sky-300" role="status" data-testid="billing-refresh" data-tick={tick}>
           {refreshText(pressedAt, data?.counts_read_at, Date.now(), timedOut)}
         </span>
+        <button type="button" className={ghost} disabled={busy || rows.length === 0} onClick={() => setPicked(allPicked ? new Set() : new Set(rows.map(rowKey)))}>
+          {allPicked ? 'Clear selection' : `Select all (${rows.length})`}
+        </button>
         <button type="button" className={ghost} disabled={busy || chosen.filter(canApprove).length === 0} onClick={() => void approve(chosen.filter(canApprove))}>
           Approve selected ({chosen.filter(canApprove).length})
         </button>
@@ -266,7 +281,6 @@ export function BillingSyncView() {
                     ['billed', 'Halo', 'text-right'],
                     ['counted', 'Tool Count', 'text-right'],
                     ['difference', 'Difference', 'text-right'],
-                    ['status', 'Status', ''],
                   ] as [SortKey, string, string][]
                 ).map(([key, label, align]) => (
                   <th key={key} scope="col" className={`px-3 py-2 ${align}`} aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
@@ -276,6 +290,13 @@ export function BillingSyncView() {
                     </button>
                   </th>
                 ))}
+                <th scope="col" className="px-3 py-2">License ID</th>
+                <th scope="col" className="px-3 py-2">Linked</th>
+                <th scope="col" className="px-3 py-2" aria-sort={sort.key === 'status' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button type="button" className="uppercase hover:text-gray-300" onClick={() => setSort(nextSort(sort, 'status'))} aria-label="Sort by Status">
+                    Status{sort.key === 'status' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                </th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -295,6 +316,8 @@ export function BillingSyncView() {
                     </button>
                   </td>
                   <td className={`px-3 py-1.5 text-right tabular-nums ${r.difference > 0 ? 'text-amber-300' : 'text-sky-300'}`}>{signed(r.difference)}</td>
+                  <td className="px-3 py-1.5 tabular-nums text-gray-300" data-testid="license-id">{r.license_id ?? (r.link && r.link !== 'unknown' ? 'None' : '')}</td>
+                  <td className={`px-3 py-1.5 ${linkText(r).tone}`} data-testid="link">{linkText(r).label}</td>
                   <td className="px-3 py-1.5 text-xs text-gray-400">
                     {!r.can_push ? 'Not mapped to HaloPSA' : pushText(r.push)}
                     {r.hidden ? ' (hidden)' : ''}
@@ -311,7 +334,7 @@ export function BillingSyncView() {
                 {open === rowKey(r) && (
                   <tr data-testid="sync-detail" className="bg-gray-900/50">
                     <td />
-                    <td colSpan={7} className="px-3 py-2 text-xs text-gray-300">
+                    <td colSpan={9} className="px-3 py-2 text-xs text-gray-300">
                       <p>
                         HaloPSA bills <span className="text-gray-100">{r.billed}</span> of <span className="text-gray-100">{r.invoice_item}</span>. A.C.O.R.N counts <span className="text-gray-100">{r.counted}</span> as: {partsText(r)}.
                       </p>

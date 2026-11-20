@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { BillingSyncView, anyWaiting, canApprove, refreshText, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
+import { BillingSyncView, anyWaiting, canApprove, refreshText, linkText, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
 
 const row = (over: Partial<SyncRow> = {}): SyncRow => ({
   client_id: 'c1',
@@ -282,5 +282,40 @@ describe('Refresh data asks CORE to read everything again', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('the Linked column', () => {
+  it('words and colors each state, and says nothing before CORE has sent licenses', () => {
+    expect(linkText(row({ link: 'linked' })).label).toBe('Linked');
+    expect(linkText(row({ link: 'not_linked' })).label).toBe('Not Linked');
+    expect(linkText(row({ link: 'na' })).label).toBe('N/A');
+    expect(linkText(row({ link: 'unknown' })).label).toBe('');
+    expect(linkText(row()).label).toBe('');
+  });
+
+  it('shows the license id and the link on every row, None when there is no license', async () => {
+    authFetch.mockImplementation(() =>
+      answer(data([row({ link: 'linked', license_id: 7 }), row({ client_id: 'c2', client_name: 'Birch Law', link: 'na', license_id: null }), row({ client_id: 'c3', client_name: 'Cedar Co', link: 'not_linked', license_id: 9 })])),
+    );
+    render(<BillingSyncView />);
+    await screen.findByText('Acme Dental');
+    expect(screen.getAllByTestId('license-id').map((c) => c.textContent)).toEqual(['7', 'None', '9']);
+    expect(screen.getAllByTestId('link').map((c) => c.textContent)).toEqual(['Linked', 'N/A', 'Not Linked']);
+  });
+});
+
+describe('Select all', () => {
+  it('selects every row shown (the filter applies), then clears them', async () => {
+    render(<BillingSyncView />);
+    await screen.findByText('Acme Dental');
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (3)' }));
+    expect(screen.getAllByRole('checkbox').filter((c) => (c as HTMLInputElement).checked)).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.getAllByRole('checkbox').filter((c) => (c as HTMLInputElement).checked)).toHaveLength(0);
+    await userEvent.type(screen.getByRole('textbox'), 'Birch');
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1)' }));
+    expect(screen.getByRole('button', { name: 'Approve selected (0)' })).toBeTruthy();
+    expect(screen.getAllByRole('checkbox').filter((c) => (c as HTMLInputElement).checked)).toHaveLength(1);
   });
 });

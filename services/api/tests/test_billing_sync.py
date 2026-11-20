@@ -226,3 +226,26 @@ async def test_refresh_leaves_one_request_for_core_that_its_usual_claim_hands_ov
     assert "billing-counts" not in await with_db(world.owner, claim), "and only once"
     out = await with_db(world.owner, lambda db: ep.list_sync(world.user, db, False))
     assert hasattr(out, "counts_read_at"), "the list carries the time the counts were last read (empty when no client has any)"
+
+
+def test_the_link_of_a_row_is_linked_when_a_line_carries_a_license_not_linked_when_only_a_license_has_the_name_and_na_when_there_is_none():
+    from app.api.v1.endpoints.billing_sync import link_status
+
+    data = {
+        "licenses": [
+            {"id": 7, "client_id": "219", "name": "Datto SaaS Google Users - acme.com", "active": True},
+            {"id": 8, "client_id": "219", "name": "Sentinel Endpoints", "active": True},
+            {"id": 9, "client_id": "300", "name": "Datto SaaS Google Users - other.com", "active": True},
+        ],
+        "lines": [
+            {"client_id": "219", "invoice_id": 1, "item": "Google Workspace Backup", "licence_ids": [7]},
+            {"client_id": "219", "invoice_id": 1, "item": "Sentinel Endpoints", "licence_ids": []},
+            {"client_id": "219", "invoice_id": 1, "item": "Managed Services", "licence_ids": []},
+        ],
+    }
+    assert link_status("219", "Google Workspace Backup", data) == ("linked", 7), "the line carries the license id"
+    assert link_status("219", "Sentinel Endpoints", data) == ("not_linked", 8), "the license exists but no line is tied to it"
+    assert link_status("219", "Managed Services", data) == ("na", None)
+    assert link_status("300", "Google Workspace Backup", data) == ("na", None), "another client's license and lines do not count"
+    assert link_status("219", "Sentinel Endpoints", None) == ("unknown", None)
+    assert link_status(None, "Sentinel Endpoints", data) == ("unknown", None)

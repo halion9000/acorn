@@ -35112,6 +35112,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/metric-halo-licenses:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Metric Halo Licenses
+      description: 'CORE''s HaloPSA software licenses and the recurring invoice lines
+        that carry them (the Billing sync Linked column): replaces the ones before.'
+      operationId: report_core_feed_metric_halo_licenses_api_v1_inbox_core_feed__tenant_token__metric_halo_licenses_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricDatasetIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDatasetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles:
     post:
       tags:
@@ -65273,6 +65307,15 @@ components:
           title: Can Push
         push:
           $ref: '#/components/schemas/app__api__v1__endpoints__billing_sync__PushOut'
+        license_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: License Id
+        link:
+          type: string
+          title: Link
+          default: unknown
       type: object
       required:
       - client_id

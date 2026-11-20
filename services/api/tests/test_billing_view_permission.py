@@ -29,6 +29,9 @@ def _satisfied_by(scopes) -> set[tuple[str, str]]:
     return out
 
 
+REFRESH = ("POST", "/billing/sync/refresh")
+
+
 def _billing_gets() -> set[tuple[str, str]]:
     return {(m, p) for p, r in ALL_ROUTES if p.startswith("/billing") and "GET" in r.methods for m in ("GET",)}
 
@@ -64,13 +67,14 @@ def test_every_role_reads_billing_exactly_when_it_could_before():
 def test_every_billing_read_needs_billing_view_and_a_key_with_only_it_reaches_exactly_those_routes():
     gets = _billing_gets()
     assert len(gets) >= 8, "the comparison would be empty otherwise"
-    assert {(m, p) for p, r in ALL_ROUTES if required(r) == {"billing:view"} for m in ("GET",)} == gets
-    assert _satisfied_by(["billing:view"]) == gets
+    assert {(m, p) for p, r in ALL_ROUTES if required(r) == {"billing:view"} and "GET" in r.methods for m in ("GET",)} == gets
+    # The one deliberate write a viewer may make: asking CORE to read the counts again (it changes no billing data).
+    assert _satisfied_by(["billing:view"]) == gets | {REFRESH}
 
 
 def test_changing_anything_under_billing_still_needs_the_manage_permission_and_billing_view_does_not_reach_it():
     writes = {(m, p) for p, r in ALL_ROUTES if p.startswith("/billing") for m in r.methods if m in {"PUT", "POST", "DELETE"}}
     assert writes, "there are writes under /billing"
     reach = _satisfied_by(["billing:view"])
-    for m, p in writes:
+    for m, p in writes - {REFRESH}:
         assert (m, p) not in reach, (m, p)
