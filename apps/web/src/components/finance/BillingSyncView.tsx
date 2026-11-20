@@ -99,8 +99,11 @@ export function BillingSyncView() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
   const load = useCallback(async (hidden: boolean) => {
+    setLoading(true);
     try {
       const res = await authFetch(`/api/v1/billing/sync${hidden ? '?show_hidden=true' : ''}`);
       if (res.status === 403) {
@@ -110,8 +113,11 @@ export function BillingSyncView() {
       if (!res.ok) throw new Error(`The API answered ${res.status}`);
       setData((await res.json()) as SyncData);
       setProblem(null);
+      setLoadedAt(new Date());
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Could not load');
+    } finally {
+      setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -181,9 +187,12 @@ export function BillingSyncView() {
         <label className="flex items-center gap-1 text-sm text-gray-300">
           <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> Show hidden{data && data.hidden > 0 ? ` (${data.hidden})` : ''}
         </label>
-        <button type="button" className={ghost} disabled={busy} onClick={() => void load(showHidden)}>
-          Refresh data
+        <button type="button" className={ghost} disabled={busy || loading} aria-busy={loading} onClick={() => void load(showHidden)}>
+          {loading ? 'Refreshing…' : 'Refresh data'}
         </button>
+        <span className="text-xs text-gray-400" role="status" data-testid="billing-updated">
+          {loading ? 'Reading the latest from A.C.O.R.N…' : loadedAt ? `Updated ${loadedAt.toLocaleTimeString()}` : ''}
+        </span>
         <button type="button" className={ghost} disabled={busy || chosen.filter(canApprove).length === 0} onClick={() => void approve(chosen.filter(canApprove))}>
           Approve selected ({chosen.filter(canApprove).length})
         </button>

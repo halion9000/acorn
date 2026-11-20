@@ -9,7 +9,7 @@ was hidden stays hidden until a person unhides it. Reading needs ``billing:view`
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -113,6 +113,17 @@ async def _halo_ids(db: DBSession, owner: uuid.UUID, client_ids: list[uuid.UUID]
     return {r.child_tenant_id: (r.vendor_client_id, r.vendor_client_name) for r in rows if r.child_tenant_id}
 
 
+# CORE reads what HaloPSA bills about once a day, so for a day after a push that worked the page takes the pushed quantity as what is billed (otherwise a line that was just fixed keeps showing the old number and the old difference).
+HELD_AFTER_PUSH = timedelta(hours=24)
+
+
+def billed_after_push(billed: int, counted: int, status: str | None, pushed_quantity: int | None, pushed_at: datetime | None, now: datetime) -> tuple[int, int]:
+    """(billed, difference) for a line: the numbers CORE last read, or, within a day of a push that CORE reported done, the quantity that was pushed (pure)."""
+    if status == "done" and pushed_quantity is not None and pushed_at is not None and timedelta(0) <= now - pushed_at <= HELD_AFTER_PUSH:
+        return pushed_quantity, counted - pushed_quantity
+    return billed, counted - billed
+
+
 @router.get("", response_model=SyncOut, dependencies=[Depends(require_permission("billing:view"))])
 async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) -> SyncOut:
     """The differences between what is billed and what is counted, with what has been hidden and the last push of each line."""
@@ -133,16 +144,18 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
     halo = await _halo_ids(db, user.tenant_id, list({r.client_id for r in rows}))
     out: list[SyncRow] = []
     hidden = 0
+    now = datetime.now(UTC)
     for r in rows:
-        if r.difference == 0:
-            continue
         s = state.get((r.client_id, r.invoice_item))
+        a = actions.get(s.action_id) if s and s.action_id else None
+        billed, difference = billed_after_push(r.billed, r.counted, a.status if a is not None else None, s.pushed_quantity if s else None, s.pushed_at if s else None, now)
+        if difference == 0:
+            continue
         is_hidden = bool(s and s.hidden)
         if is_hidden:
             hidden += 1
             if not show_hidden:
                 continue
-        a = actions.get(s.action_id) if s and s.action_id else None
         push = (
             PushOut(status=a.status, quantity=s.pushed_quantity, message=a.result_message, by=s.pushed_by, at=s.pushed_at)
             if a is not None and s is not None
@@ -153,9 +166,9 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
                 client_id=r.client_id,
                 client_name=r.client_name,
                 invoice_item=r.invoice_item,
-                billed=r.billed,
+                billed=billed,
                 counted=r.counted,
-                difference=r.difference,
+                difference=difference,
                 parts=[PartOut(source=str(p.get("source", "")), item=str(p.get("item", "")), count=int(p.get("count", 0))) for p in r.parts],
                 hidden=is_hidden,
                 can_push=r.client_id in halo,

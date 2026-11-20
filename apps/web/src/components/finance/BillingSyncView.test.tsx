@@ -221,3 +221,20 @@ describe('a line that is waiting for CORE', () => {
     }
   });
 });
+
+describe('refreshing the data', () => {
+  it('says it is refreshing while it reads, disables the button, and then says when it was updated', async () => {
+    render(<BillingSyncView />);
+    await screen.findByText('Acme Dental');
+    await waitFor(() => expect(screen.getByTestId('billing-updated').textContent).toMatch(/^Updated /));
+    let release: (v: unknown) => void = () => {};
+    authFetch.mockImplementation(() => new Promise((r) => (release = r)));
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh data' }));
+    const busy = await screen.findByRole('button', { name: 'Refreshing…' });
+    expect((busy as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('billing-updated').textContent).toBe('Reading the latest from A.C.O.R.N…');
+    release({ ok: true, status: 200, json: () => Promise.resolve(data()) });
+    expect(await screen.findByRole('button', { name: 'Refresh data' })).toBeTruthy();
+    expect(screen.getByTestId('billing-updated').textContent).toMatch(/^Updated /);
+  });
+});

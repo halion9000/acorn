@@ -192,3 +192,18 @@ async def test_hiding_keeps_a_line_out_of_the_list_until_it_is_unhidden_and_chan
         world.owner, lambda db: db.execute(text("select count(*) from vendor_actions where tenant_id = :t"), {"t": world.owner})
     )
     assert queued.scalar_one() == 0
+
+
+def test_for_a_day_after_a_push_that_worked_the_line_counts_the_pushed_quantity_as_billed():
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.billing_sync import billed_after_push
+
+    now = datetime(2026, 11, 20, 15, tzinfo=UTC)
+    soon = now - timedelta(hours=2)
+    assert billed_after_push(627, 838, "done", 838, soon, now) == (838, 0), "fixed: no difference left until CORE reads HaloPSA again"
+    assert billed_after_push(627, 900, "done", 838, soon, now) == (838, 62), "the tool count moved on after the push"
+    assert billed_after_push(627, 838, "done", 838, now - timedelta(hours=25), now) == (627, 211), "after a day CORE's own reading is trusted again"
+    assert billed_after_push(627, 838, "failed", 838, soon, now) == (627, 211), "a push that failed changes nothing"
+    assert billed_after_push(627, 838, "pending", 838, soon, now) == (627, 211)
+    assert billed_after_push(627, 838, None, None, None, now) == (627, 211)
