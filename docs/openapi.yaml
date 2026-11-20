@@ -25452,6 +25452,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/reports/metrics/weekly-comparison:
+    get:
+      tags:
+      - reports
+      summary: Weekly Comparison
+      description: 'The Weekly Tech Comparison: per engineer for one week (the newest
+        when none is asked for), days worked, new, opened and closed, older closed,
+        net, per day, and Dialpad call tickets left out.'
+      operationId: weekly_comparison_api_v1_reports_metrics_weekly_comparison_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: week
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 10
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          - type: 'null'
+          title: Week
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Weekly Comparison Api V1 Reports Metrics Weekly Comparison
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/reports/metrics/ticket-updates:
     get:
       tags:

@@ -71,6 +71,11 @@
           "days_worked": 5,
           "closed": 1,
           "created": 1,
+          "new_tickets": 1,
+          "closed_tickets": 1,
+          "opened_closed": 1,
+          "older_closed": 0,
+          "calls_excluded": 0,
           "ticket_updates": 2,
           "total_calls": 12,
           "total_call_time": 40

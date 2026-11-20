@@ -55,6 +55,13 @@ async def pods(user: AuthUser, db: DBSession, months: Months = 3) -> dict[str, A
     return {"received_at": at, **ms.pods(data, months)}
 
 
+@router.get("/weekly-comparison", dependencies=[Depends(require_permission("metrics:view"))])
+async def weekly_comparison(user: AuthUser, db: DBSession, week: Annotated[str | None, Query(max_length=10, pattern=r"^\d{4}-\d{2}-\d{2}$")] = None) -> dict[str, Any]:
+    """The Weekly Tech Comparison: per engineer for one week (the newest when none is asked for), days worked, new, opened and closed, older closed, net, per day, and Dialpad call tickets left out."""
+    data, at = await _dataset(db, user, "staff-weekly")
+    return {"received_at": at, **ms.weekly_comparison(data, week)}
+
+
 @router.get("/ticket-updates", dependencies=[Depends(require_permission("metrics:view"))])
 async def ticket_updates(
     user: AuthUser, db: DBSession, months: Months = 3, members: Annotated[list[str] | None, Query(max_length=200)] = None

@@ -71,14 +71,14 @@ def test_a_period_is_the_newest_weeks_and_a_year_is_fifty_two_at_most():
 
 def test_staff_metrics_utilization_is_logged_hours_over_available_hours_the_way_rewst_counts_it_and_filters_by_team():
     r = ms.staff_metrics(STAFF, 1)
-    # a team's week is all its logged hours over all its available hours (40 each, less time off in hours): (30 + 5) / 80 and 12 / (38 + 40)
-    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 43.8, 32), (W2, 15.4, 9)]
-    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [("Dan", 53.8, 40, 42.0), ("Vic", 6.2, 1, 5.0)]
-    assert r["members"][0]["by_week"] == {W1: 75.0, W2: 31.58}, "30 / 40 and 12 / 38"
+    # a team's week is all its logged hours over all its available hours (40 each, less 8 for each day off): (30 + 5) / 80 and 12 / (24 + 40)
+    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 43.8, 32), (W2, 18.8, 9)]
+    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [("Dan", 65.6, 40, 42.0), ("Vic", 6.2, 1, 5.0)]
+    assert r["members"][0]["by_week"] == {W1: 75.0, W2: 50.0}, "30 / 40 and 12 / 24"
     assert r["teams"] == ["Pod 1", "Pod 2"]
     only = ms.staff_metrics(STAFF, 1, "Pod 2")
     assert [m["engineer"] for m in only["members"]] == ["Vic"] and only["weeks"][0]["utilization"] == 12.5
-    assert ms.week_util({"labor_hours": 5, "days_off": 40}) is None, "nothing available is no utilization, not a divide by zero"
+    assert ms.week_util({"labor_hours": 5, "days_off": 5}) is None, "nothing available is no utilization, not a divide by zero"
 
 
 def test_pods_group_the_engineers_by_team_with_days_off_and_a_week_by_week_list():
@@ -361,3 +361,29 @@ def test_halo_user_roles_count_users_per_client_and_role_with_totals_a_client_fi
     assert r["all_clients"] == ["Acme", "Birch"] and r["without_client"] == 1 and r["unread"] == ["Contractor"]
     assert [c["client"] for c in ms.halo_user_roles(data, ["Birch"])["clients"]] == ["Birch"]
     assert ms.halo_user_roles(None)["clients"] == []
+
+
+def test_the_weekly_comparison_groups_engineers_by_pod_with_per_day_rates_net_and_an_all_pods_line():
+    def r(engineer, team, **kw):
+        return {"week": W2, "agent_id": engineer, "engineer": engineer, "team": team, "labor_hours": 10, "days_worked": 5, **kw}
+
+    data = {
+        "rows": [
+            r("Zed", "Pod 2", new_tickets=10, closed_tickets=20, opened_closed=8, older_closed=12, calls_excluded=3),
+            r("Amy", "Pod 1", days_worked=4, new_tickets=8, closed_tickets=12, opened_closed=5, older_closed=7),
+            r("Gone", "", new_tickets=5),
+            {"week": W1, "agent_id": "Old", "engineer": "Old", "team": "Pod 1", "labor_hours": 5, "new_tickets": 99},
+        ]
+    }
+    out = ms.weekly_comparison(data)
+    assert out["week"] == W2 and out["has_detail"] is True
+    assert [(x["pod"], x["engineer"]) for x in out["rows"]] == [("Pod 1", "Amy"), ("Pod 2", "Zed")], "by pod then name; no one without a pod; only the chosen week"
+    amy = out["rows"][0]
+    assert (amy["days_worked"], amy["new"], amy["closed"], amy["net"], amy["new_per_day"], amy["closed_per_day"]) == (4.0, 8, 12, 4, 2.0, 3.0)
+    assert (amy["opened_closed"], amy["older_closed"]) == (5, 7)
+    t = out["total"]
+    assert (t["days_worked"], t["new"], t["closed"], t["net"], t["new_per_day"], t["closed_per_day"], t["calls_excluded"]) == (9.0, 18, 32, 14, 2.0, 3.6, 3)
+    assert ms.weekly_comparison(data, W1)["rows"][0]["new"] == 99
+    old = ms.weekly_comparison({"rows": [r("Al", "Pod 1")]})
+    assert old["has_detail"] is False and old["rows"][0]["new"] == 0
+    assert ms.weekly_comparison(None) == {"weeks": [], "week": None, "has_detail": False, "rows": [], "total": ms.weekly_comparison(None)["total"]}

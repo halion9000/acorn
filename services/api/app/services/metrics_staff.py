@@ -69,8 +69,8 @@ def _mean(values: list[float]) -> float | None:
 
 
 def week_available(r: dict[str, Any]) -> float:
-    """Hours a person could work in a week: 40, less time off and holidays (both in hours); 0 when nothing is left."""
-    return max(0.0, 40.0 - _num(r.get("days_off")) - _num(r.get("holidays")))
+    """Hours a person could work in a week: 40, less eight for each day of time off and each holiday; 0 when nothing is left."""
+    return max(0.0, 40.0 - 8.0 * (_num(r.get("days_off")) + _num(r.get("holidays"))))
 
 
 def week_util(r: dict[str, Any]) -> float | None:
@@ -265,6 +265,42 @@ def meetings(payload: dict[str, Any] | None, months: int, team: str | None = Non
         "people": sorted(({**p, "total": round(p["total"], 2)} for p in people.values()), key=lambda p: (-p["total"], p["engineer"].lower())),
         "by_team": sorted(({"team": t, "hours": round(h, 2)} for t, h in teams.items()), key=lambda x: (-x["hours"], x["team"].lower())),
         "teams": sorted({str(r.get("team") or "") or "Unassigned" for r in (payload or {}).get("rows") or []}, key=str.lower),
+    }
+
+
+def weekly_comparison(payload: dict[str, Any] | None, week: str | None = None) -> dict[str, Any]:
+    """The Weekly Tech Comparison for one week (the newest in the data when none is asked for): per engineer, grouped by pod, the days worked, tickets new, opened and closed the same week, older tickets closed, closed in all, net (closed less new), new and closed per day worked, and the Dialpad call tickets left out; and the same for all pods.
+
+    ``has_detail`` is False while CORE has not yet sent the new ticket fields (the page says it is waiting for CORE's next round)."""
+    weeks = weeks_of(payload)
+    chosen = week if week in weeks else (weeks[-1] if weeks else None)
+    rows = _rows_in(payload, [chosen]) if chosen else []
+    has_detail = any("new_tickets" in r for r in rows)
+
+    def line(group: list[dict[str, Any]]) -> dict[str, Any]:
+        days = sum(_num(r.get("days_worked", 5)) for r in group)
+        new = int(sum(_num(r.get("new_tickets")) for r in group))
+        closed = int(sum(_num(r.get("closed_tickets")) for r in group))
+        return {
+            "days_worked": round(days, 1),
+            "new": new,
+            "opened_closed": int(sum(_num(r.get("opened_closed")) for r in group)),
+            "older_closed": int(sum(_num(r.get("older_closed")) for r in group)),
+            "closed": closed,
+            "net": closed - new,
+            "new_per_day": round(new / days, 1) if days > 0 else None,
+            "closed_per_day": round(closed / days, 1) if days > 0 else None,
+            "calls_excluded": int(sum(_num(r.get("calls_excluded")) for r in group)),
+        }
+
+    people = [r for r in rows if r.get("team") and (_active(r) or _num(r.get("new_tickets")) or _num(r.get("closed_tickets")))]
+    people.sort(key=lambda r: (str(r.get("team")), str(r.get("engineer")).lower()))
+    return {
+        "weeks": weeks,
+        "week": chosen,
+        "has_detail": has_detail,
+        "rows": [{"pod": str(r.get("team")), "engineer": str(r.get("engineer")), **line([r])} for r in people],
+        "total": line(people),
     }
 
 
