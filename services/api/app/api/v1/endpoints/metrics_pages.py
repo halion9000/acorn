@@ -173,6 +173,13 @@ async def user_roles(user: AuthUser, db: DBSession) -> dict[str, Any]:
     return {"received_at": at, **mc.user_roles(data)}
 
 
+@router.get("/licensing-apps", dependencies=[Depends(require_permission("metrics:view"))])
+async def licensing_apps(user: AuthUser, db: DBSession, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None) -> dict[str, Any]:
+    """Which apps each client is billed for in a month (the Rewst Monthly Licensing page), from the invoice lines CORE sends."""
+    data, at = await _dataset(db, user, "invoice-lines")
+    return {"received_at": at, **mt.licensing_apps(data, month)}
+
+
 @router.get("/monthly-licensing", dependencies=[Depends(require_permission("metrics:view"))])
 async def monthly_licensing(
     user: AuthUser, db: DBSession, month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None

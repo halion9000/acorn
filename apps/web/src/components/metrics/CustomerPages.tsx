@@ -6,6 +6,7 @@
  */
 import { Doughnut } from './Doughnut';
 import { HaloUserRolesPanel } from './HaloUserRoles';
+import { LicensingApps } from './LicensingApps';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { useState } from 'react';
 import { MetricPicker } from './MetricPicker';
@@ -124,7 +125,9 @@ export function MonthlyLicensingView() {
   const { data, denied, problem } = useMetric<LicensingData>(`/api/v1/reports/metrics/monthly-licensing?month=${month}`);
   const shown = (data?.items ?? []).filter((i) => !hidden.has(i.key));
   return (
-    <Page title="Monthly licensing" subtitle="What each client had of each license and counted item, as of the end of the month chosen (this month is what is counted now)." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={null}>
+    <Page title="Monthly licensing" subtitle="Which apps each client is billed for in a month, from the invoices, and below it what each client had of each license and counted item (this month is what is counted now)." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={null}>
+      <LicensingApps />
+      <h2 className="pt-2 text-base font-semibold">License and counted items from the tools</h2>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-sm text-gray-300">
           <span>Month</span>

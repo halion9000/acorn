@@ -289,3 +289,19 @@ def test_stale_tickets_carry_their_type_opened_day_and_idle_days():
     first, second = mt.ticket_volume(detail, 1)["stale"]
     assert (first["type"], first["opened"], first["last_activity"], first["idle_days"]) == ("Project", "2026-08-01", "2026-11-10", 4)
     assert second["idle_days"] is None and second["last_activity"] == ""
+
+
+def test_licensing_apps_are_the_items_each_client_is_billed_for_in_a_month_with_the_common_ones_marked():
+    def row(month, client, item, qty=1, amount=10):
+        return {"month": month, "client_name": client, "item": item, "quantity": qty, "amount": amount, "category": "x"}
+
+    rows = [row("2026-10", "Acme", "Huntress EDR"), row("2026-10", "Birch", "Huntress EDR"), row("2026-10", "Cedar", "Huntress EDR"), row("2026-10", "Acme", "NinjaOne RMM"), row("2026-10", "Acme", "Credit", qty=1, amount=-5), row("2026-10", "Birch", "Free item", qty=0, amount=0), row("2026-09", "Acme", "Old app")]
+    out = mt.licensing_apps({"rows": rows}, None)
+    assert out["month"] == "2026-10" and out["months"] == ["2026-10", "2026-09"], "the newest month by default, newest first"
+    assert out["apps"] == [{"app": "Huntress EDR", "clients": 3, "common": True}, {"app": "NinjaOne RMM", "clients": 1, "common": False}], "credits and zero quantities are not apps"
+    assert out["clients"][0] == {"client": "Acme", "apps": ["Huntress EDR", "NinjaOne RMM"]}
+    older = mt.licensing_apps({"rows": rows}, "2026-09")
+    assert older["month"] == "2026-09" and [a["app"] for a in older["apps"]] == ["Old app"]
+    assert mt.licensing_apps({"rows": rows}, "2030-01")["month"] == "2026-10", "a month that is not held falls back to the newest"
+    assert [a["app"] for a in mt.licensing_apps({"rows": rows}, "2026-10", ["huntress edr"])["apps"]] == ["NinjaOne RMM"]
+    assert mt.licensing_apps(None, None) == {"months": [], "month": None, "apps": [], "clients": []}
