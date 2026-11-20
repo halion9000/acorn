@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { WeeklyComparisonView, netText } from './WeeklyComparisonView';
+import { WeeklyComparisonView, netText, sortRows, totalOf } from './WeeklyComparisonView';
 
 const line = (over = {}) => ({ days_worked: 5, new: 22, opened_closed: 10, older_closed: 13, closed: 23, net: 1, new_per_day: 4.4, closed_per_day: 4.6, calls_excluded: 3, ...over });
 const REPORT = (over = {}) => ({
@@ -57,5 +57,35 @@ describe('the Weekly Tech Comparison', () => {
     authFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(REPORT({ has_detail: false })) });
     render(<WeeklyComparisonView />);
     expect(await screen.findByText(/CORE has not sent the weekly ticket counts/)).toBeInTheDocument();
+  });
+});
+
+describe('sorting and the pod filter', () => {
+  const row = (pod: string, engineer: string, over = {}) => ({ pod, engineer, ...line(), ...over });
+  it('orders by a column, numbers largest first, a missing rate last, and keeps the order for equal values', () => {
+    const rows = [row('Pod 1', 'A', { closed: 5, new_per_day: null }), row('Pod 1', 'B', { closed: 9, new_per_day: 2 }), row('Pod 2', 'C', { closed: 9, new_per_day: 4 })];
+    expect(sortRows(rows, 'closed', -1).map((r) => r.engineer)).toEqual(['B', 'C', 'A']);
+    expect(sortRows(rows, 'new_per_day', -1).map((r) => r.engineer)).toEqual(['C', 'B', 'A']);
+    expect(sortRows(rows, 'engineer', -1).map((r) => r.engineer)).toEqual(['C', 'B', 'A']);
+    expect(sortRows(rows, null, 1)).toBe(rows);
+  });
+
+  it('works the totals of the rows shown, with the per-day rates from them', () => {
+    const t = totalOf([row('Pod 1', 'A', { days_worked: 4, new: 8, closed: 12 }), row('Pod 1', 'B', { days_worked: 5, new: 10, closed: 20 })]);
+    expect([t.days_worked, t.new, t.closed, t.net, t.new_per_day, t.closed_per_day]).toEqual([9, 18, 32, 14, 2, 3.6]);
+  });
+
+  it('sorts when a heading is pressed, and shows only the pods ticked with their own total', async () => {
+    authFetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(REPORT()) });
+    render(<WeeklyComparisonView />);
+    const table = await screen.findByTestId('weekly-comparison');
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by New this week' }));
+    expect(within(table).getAllByRole('row').slice(1, 3).map((r) => within(r).getAllByRole('cell')[1]!.textContent)).toEqual(['James Makowsky', 'Edgar Panduro']);
+    await userEvent.click(screen.getByLabelText('Pod 1'));
+    expect(within(table).queryByText('James Makowsky')).toBeNull();
+    expect(within(screen.getByTestId('weekly-total')).getByText('Selected pods')).toBeInTheDocument();
+    expect(within(screen.getByTestId('weekly-total')).getAllByRole('cell')[3]!.textContent).toBe('22');
+    await userEvent.click(screen.getByRole('button', { name: 'Show all pods' }));
+    expect(within(table).getByText('James Makowsky')).toBeInTheDocument();
   });
 });

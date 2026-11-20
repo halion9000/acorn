@@ -451,6 +451,7 @@ const navSections: NavSection[] = [
       { label: 'Staff metrics', href: '/metrics/staff-metrics', icon: <ScanIcon /> },
       { label: 'Team member ticket updates', href: '/metrics/ticket-updates', icon: <ScanIcon /> },
       { label: 'Weekly tech comparison', href: '/metrics/weekly-comparison', icon: <ScanIcon /> },
+      { label: 'Metrics people (settings)', href: '/settings/metrics-people', icon: <CogIcon /> },
     ],
   },
   {
