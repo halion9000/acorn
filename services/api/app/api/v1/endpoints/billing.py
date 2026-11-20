@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -621,31 +621,57 @@ async def delete_note(
 async def _disagreement_starts_many(
     db: Any, wanted: dict[uuid.UUID, list[tuple[str, list[dict[str, str]]]]], now: datetime
 ) -> dict[uuid.UUID, dict[str, tuple[datetime, bool]]]:
-    """``_disagreement_starts`` for many clients at once: the counts and the history of all of them are read in two statements instead of two for every client (a client by client read made the Billing sync page
-    take over ten seconds)."""
+    """For many clients at once, since when each of their invoice lines has not matched (see ``disagreement_since``).
+
+    Read in a few statements, and only what these lines use: the history of a tool count that flaps all day (the network scanners, machines online now) made up most of the 650 thousand history rows, and reading
+    every row of every client for every page load took over ten seconds. The history of exactly the billed lines and the tool counts they are mapped to is read, and for each tool in use the earliest time it was seen
+    is worked out by the database."""
     if not wanted:
         return {}
     ids = list(wanted)
+    pairs: set[tuple[str, str]] = set()
+    sources: set[str] = set()
+    for lines in wanted.values():
+        for item, parts in lines:
+            pairs.add((BILLED_SOURCE, item))
+            for p in parts:
+                pairs.add((p["source"], p["item"]))
+    sources = {src for src, _item in pairs}
     async with cross_tenant_reads(db):
         held_all = (await db.execute(select(ClientLicenseCount).where(ClientLicenseCount.tenant_id.in_(ids)))).scalars().all()
-        hist_all = (await db.execute(select(ClientLicenseHistory).where(ClientLicenseHistory.tenant_id.in_(ids)))).scalars().all()
+        hist_all = (
+            await db.execute(
+                select(ClientLicenseHistory.tenant_id, ClientLicenseHistory.source, ClientLicenseHistory.item, ClientLicenseHistory.observed_at, ClientLicenseHistory.count).where(
+                    ClientLicenseHistory.tenant_id.in_(ids), tuple_(ClientLicenseHistory.source, ClientLicenseHistory.item).in_(list(pairs))
+                )
+            )
+        ).all()
+        first_all = (
+            await db.execute(
+                select(ClientLicenseHistory.tenant_id, ClientLicenseHistory.source, func.min(ClientLicenseHistory.observed_at))
+                .where(ClientLicenseHistory.tenant_id.in_(ids), ClientLicenseHistory.source.in_(list(sources)))
+                .group_by(ClientLicenseHistory.tenant_id, ClientLicenseHistory.source)
+            )
+        ).all()
     held_by: dict[uuid.UUID, list[Any]] = {}
     for r in held_all:
         held_by.setdefault(r.tenant_id, []).append(r)
     hist_by: dict[uuid.UUID, list[Any]] = {}
     for h in hist_all:
-        hist_by.setdefault(h.tenant_id, []).append(h)
+        hist_by.setdefault(h[0], []).append(h)
+    first_by: dict[uuid.UUID, dict[str, datetime]] = {}
+    for tenant, source, first in first_all:
+        first_by.setdefault(tenant, {})[source] = first
     out: dict[uuid.UUID, dict[str, tuple[datetime, bool]]] = {}
     for cid, lines in wanted.items():
         held = held_by.get(cid, [])
         current = {(r.source, r.item): (r.count, r.first_seen_at) for r in held}
         history: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        tracking: dict[str, datetime] = {}
+        tracking: dict[str, datetime] = dict(first_by.get(cid, {}))
         for r in held:
             tracking[r.source] = min(tracking.get(r.source, r.first_seen_at), r.first_seen_at)
-        for h in hist_by.get(cid, []):
-            history.setdefault((h.source, h.item), []).append({"observed_at": h.observed_at, "count": h.count})
-            tracking[h.source] = min(tracking.get(h.source, h.observed_at), h.observed_at)
+        for _t, source, item, observed_at, count in hist_by.get(cid, []):
+            history.setdefault((source, item), []).append({"observed_at": observed_at, "count": count})
         out[cid] = {
             item: disagreement_since((BILLED_SOURCE, item), [(p["source"], p["item"]) for p in parts], history, current, tracking, now)
             for item, parts in lines

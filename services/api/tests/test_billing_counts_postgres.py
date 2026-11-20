@@ -89,3 +89,47 @@ async def test_the_other_organization_sees_its_own_client_only(world):
         world["other_parent"], lambda db: billing.licence_waste(SimpleNamespace(tenant_id=world["other_parent"]), db, 1, 500)
     )
     assert [(r.item, r.unassigned) for r in out.rows] == [("Secret licence", 90)]
+
+
+async def test_the_start_of_each_disagreement_is_read_for_all_clients_at_once_from_only_the_history_of_the_lines_in_play(world):
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.license_counts import disagreement_since
+
+    BILLED_SOURCE = billing.BILLED_SOURCE
+
+    now = datetime(2026, 11, 20, 12, tzinfo=UTC)
+    t0 = now - timedelta(days=40)
+    owner = create_async_engine(PG_URL)
+    rows = [  # (client, source, item, count, previous, days ago): the invoice line and the tool count it is checked against, then a scanner count that flaps every day
+        ("acme", BILLED_SOURCE, "Endpoint protection", 10, None, 40),
+        ("acme", "huntress", "Agents", 10, None, 40),
+        ("acme", "huntress", "Agents", 8, 10, 15),
+    ] + [("acme", "auvik", "Discovered devices", 100 + d, 99 + d, d) for d in range(1, 30)]
+    try:
+        async with owner.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            for who, source, item, count, prev, days in rows:
+                await conn.execute(
+                    text("insert into client_license_history (tenant_id, source, item, unit, count, previous_count, observed_at) values (:t, :s, :i, 'other', :c, :p, :o)"),
+                    {"t": world[who], "s": source, "i": item, "c": count, "p": prev, "o": now - timedelta(days=days)},
+                )
+            for source, item, count in ((BILLED_SOURCE, "Endpoint protection", 10), ("huntress", "Agents", 8)):
+                await conn.execute(
+                    text("insert into client_license_counts (tenant_id, source, item, unit, count, available, first_seen_at, updated_at) values (:t, :s, :i, 'other', :c, 0, :f, now())"),
+                    {"t": world["acme"], "s": source, "i": item, "c": count, "f": t0},
+                )
+        lines = {world["acme"]: [("Endpoint protection", [{"source": "huntress", "item": "Agents"}])]}
+        got = await as_owner(world["parent"], lambda db: billing._disagreement_starts_many(db, lines, now))
+        history = {(BILLED_SOURCE, "Endpoint protection"): [{"observed_at": now - timedelta(days=40), "count": 10}], ("huntress", "Agents"): [{"observed_at": now - timedelta(days=40), "count": 10}, {"observed_at": now - timedelta(days=15), "count": 8}]}
+        current = {(BILLED_SOURCE, "Endpoint protection"): (10, t0), ("huntress", "Agents"): (8, t0)}
+        tracking = {BILLED_SOURCE: t0, "huntress": t0}
+        expected = disagreement_since((BILLED_SOURCE, "Endpoint protection"), [("huntress", "Agents")], history, current, tracking, now)
+        assert got == {world["acme"]: {"Endpoint protection": expected}}
+        assert (now - got[world["acme"]]["Endpoint protection"][0]).days == 15, "the line has not matched since the count of the tool dropped 15 days ago"
+        assert await as_owner(world["parent"], lambda db: billing._disagreement_starts_many(db, {}, now)) == {}
+    finally:
+        async with owner.begin() as conn:
+            await conn.execute(text("select set_config('app.rls_fail_closed', 'off', true)"))
+            await conn.execute(text("delete from client_license_history where tenant_id = :t"), {"t": world["acme"]})
+        await owner.dispose()
