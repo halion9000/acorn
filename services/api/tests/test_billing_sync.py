@@ -207,3 +207,22 @@ def test_for_a_day_after_a_push_that_worked_the_line_counts_the_pushed_quantity_
     assert billed_after_push(627, 838, "failed", 838, soon, now) == (627, 211), "a push that failed changes nothing"
     assert billed_after_push(627, 838, "pending", 838, soon, now) == (627, 211)
     assert billed_after_push(627, 838, None, None, None, now) == (627, 211)
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_refresh_leaves_one_request_for_core_that_its_usual_claim_hands_over_once_and_the_list_says_when_counts_were_last_read(world, differences):
+    from app.api.v1.endpoints.inbox_core_feed import claim_sync_requests_for
+
+    asked = await with_db(world.owner, lambda db: ep.request_refresh(world.user, db))
+    assert asked["vendor"] == "billing-counts" and asked["requested_at"]
+
+    async def claim(db):
+        got = await claim_sync_requests_for(db, world.owner)
+        await db.commit()
+        return got
+
+    assert "billing-counts" in await with_db(world.owner, claim), "CORE's claim hands the request over"
+    assert "billing-counts" not in await with_db(world.owner, claim), "and only once"
+    out = await with_db(world.owner, lambda db: ep.list_sync(world.user, db, False))
+    assert hasattr(out, "counts_read_at"), "the list carries the time the counts were last read (empty when no client has any)"

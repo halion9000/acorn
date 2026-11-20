@@ -14,12 +14,14 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.billing import reconcile_billing
 from app.models.billing_sync import BillingSyncItem
+from app.db.rls_scope import cross_tenant_reads
 from app.models.client_alias import ClientAlias
+from app.models.signin import ClientLicenseCount
 from app.models.vendor_action import VendorAction
 from app.services.audit import emit_audit
 
@@ -67,6 +69,8 @@ class SyncOut(BaseModel):
     rows: list[SyncRow]
     hidden: int
     can_push: bool
+    # When CORE last stored a tool count for any client: the page watches it move to know that a Refresh data has been carried out.
+    counts_read_at: datetime | None = None
 
 
 class ItemIn(BaseModel):
@@ -175,7 +179,38 @@ async def list_sync(user: AuthUser, db: DBSession, show_hidden: bool = False) ->
                 push=push,
             )
         )
-    return SyncOut(generated_at=datetime.now(UTC), rows=out, hidden=hidden, can_push=True)
+    counts_at = None
+    ids = list({r.client_id for r in rows})
+    if ids:
+        async with cross_tenant_reads(db):
+            counts_at = (await db.execute(select(func.max(ClientLicenseCount.updated_at)).where(ClientLicenseCount.tenant_id.in_(ids)))).scalar_one_or_none()
+    return SyncOut(generated_at=datetime.now(UTC), rows=out, hidden=hidden, can_push=True, counts_read_at=counts_at)
+
+
+# The name CORE knows this request by: it reads every tool's counts and HaloPSA's billed lines again now (CORE's sweeps otherwise run once a day, each at its own hour).
+BILLING_COUNTS_VENDOR = "billing-counts"
+
+
+@router.post("/refresh", status_code=202, dependencies=[Depends(require_permission("billing:view"))], summary="Ask CORE to read every tool's counts and what HaloPSA bills again now")
+async def request_refresh(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Leave a request for CORE on the organization's settings (CORE collects it about every 15 seconds and runs the counting passes at once). One atomic update, so it cannot overwrite another change made at the same moment."""
+    now = datetime.now(UTC)
+    await db.execute(
+        text(
+            """
+            UPDATE tenants
+            SET settings = jsonb_set(
+                COALESCE(settings, '{}'::jsonb),
+                '{sync_requests}',
+                COALESCE(settings -> 'sync_requests', '{}'::jsonb) || jsonb_build_object(CAST(:vendor AS text), CAST(:at AS text)),
+                true
+            )
+            WHERE id = :tenant
+            """
+        ).bindparams(vendor=BILLING_COUNTS_VENDOR, at=now.isoformat(), tenant=user.tenant_id)
+    )
+    await db.commit()
+    return {"requested_at": now.isoformat(), "vendor": BILLING_COUNTS_VENDOR}
 
 
 async def _state(db: DBSession, tenant: uuid.UUID, client_id: uuid.UUID, item: str) -> BillingSyncItem:

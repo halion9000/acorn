@@ -25243,6 +25243,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/billing/sync/refresh:
+    post:
+      tags:
+      - billing
+      summary: Ask CORE to read every tool's counts and what HaloPSA bills again now
+      description: Leave a request for CORE on the organization's settings (CORE collects
+        it about every 15 seconds and runs the counting passes at once). One atomic
+        update, so it cannot overwrite another change made at the same moment.
+      operationId: request_refresh_api_v1_billing_sync_refresh_post
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Request Refresh Api V1 Billing Sync Refresh Post
+      security:
+      - HTTPBearer: []
   /api/v1/billing/sync/approve:
     post:
       tags:
@@ -71012,6 +71032,12 @@ components:
         can_push:
           type: boolean
           title: Can Push
+        counts_read_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Counts Read At
       type: object
       required:
       - generated_at

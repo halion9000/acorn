@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { BillingSyncView, anyWaiting, canApprove, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
+import { BillingSyncView, anyWaiting, canApprove, refreshText, filterRows, nextSort, partsText, pushText, signed, sortRows, type SyncRow } from './BillingSyncView';
 
 const row = (over: Partial<SyncRow> = {}): SyncRow => ({
   client_id: 'c1',
@@ -228,13 +228,59 @@ describe('refreshing the data', () => {
     await screen.findByText('Acme Dental');
     await waitFor(() => expect(screen.getByTestId('billing-updated').textContent).toMatch(/^Updated /));
     let release: (v: unknown) => void = () => {};
-    authFetch.mockImplementation(() => new Promise((r) => (release = r)));
+    authFetch.mockImplementationOnce(() => new Promise((r) => (release = r)));
     await userEvent.click(screen.getByRole('button', { name: 'Refresh data' }));
     const busy = await screen.findByRole('button', { name: 'Refreshing…' });
     expect((busy as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('billing-updated').textContent).toBe('Reading the latest from A.C.O.R.N…');
-    release({ ok: true, status: 200, json: () => Promise.resolve(data()) });
+    release({ ok: false, status: 500, json: () => Promise.resolve({}) }); // CORE could not be asked: the list is still read, and the button is free again
     expect(await screen.findByRole('button', { name: 'Refresh data' })).toBeTruthy();
-    expect(screen.getByTestId('billing-updated').textContent).toMatch(/^Updated /);
+    await waitFor(() => expect(screen.getByTestId('billing-updated').textContent).toMatch(/^Updated /));
+  });
+});
+
+describe('Refresh data asks CORE to read everything again', () => {
+  it('says nothing before the first press, then that CORE was asked, then when the counts were read', () => {
+    const t0 = Date.UTC(2026, 10, 20, 15, 0, 0);
+    expect(refreshText(null, null, t0, false)).toBe('');
+    expect(refreshText(t0, '2026-11-20T14:00:00Z', t0 + 42_000, false)).toMatch(/Asked CORE to read every tool and HaloPSA again \(42s ago\)\. Counts last read .*This takes a few minutes/);
+    expect(refreshText(t0, null, t0, false)).toMatch(/Counts last read never/);
+    expect(refreshText(t0, '2026-11-20T15:03:00Z', t0 + 200_000, false)).toMatch(/^Counts read again at /);
+    expect(refreshText(t0, '2026-11-20T14:00:00Z', t0 + 700_000, true)).toMatch(/has not finished reading yet/);
+  });
+
+  it('posts the request, says so, keeps asking for the list until the counts are newer, and then says they were read', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let listed = 0;
+      const posts: string[] = [];
+      authFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          posts.push(String(url));
+          return answer({ requested_at: 'x', vendor: 'billing-counts' });
+        }
+        listed += 1;
+        // the counts are old for the first three reads and new on the fourth
+        return answer({ ...data(), counts_read_at: listed < 4 ? '2020-01-01T00:00:00Z' : new Date(Date.now() + 60_000).toISOString() });
+      });
+      render(<BillingSyncView />);
+      await screen.findByText('Acme Dental');
+      await userEvent.click(screen.getByRole('button', { name: 'Refresh data' }));
+      await screen.findByText(/Asked CORE to read every tool and HaloPSA again/);
+      expect(posts).toEqual(['/api/v1/billing/sync/refresh']);
+      expect((await screen.findByRole('button', { name: 'Refreshing…' }) as HTMLButtonElement).disabled).toBe(true);
+      const before = listed;
+      await vi.advanceTimersByTimeAsync(8100);
+      await vi.waitFor(() => expect(listed).toBeGreaterThan(before));
+      await vi.advanceTimersByTimeAsync(8100);
+      await vi.advanceTimersByTimeAsync(8100);
+      await screen.findByText(/^Counts read again at /);
+      expect(screen.getByRole('button', { name: 'Refresh data' })).toBeTruthy();
+      const after = listed;
+      await vi.advanceTimersByTimeAsync(30000);
+      expect(listed).toBe(after);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

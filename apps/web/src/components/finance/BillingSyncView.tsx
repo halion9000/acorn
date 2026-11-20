@@ -27,6 +27,7 @@ interface SyncData {
   generated_at: string;
   rows: SyncRow[];
   hidden: number;
+  counts_read_at?: string | null;
 }
 interface Result {
   client_id: string;
@@ -76,6 +77,16 @@ export function partsText(r: SyncRow): string {
 /** Whether any pushed line is still on its way to HaloPSA, so the page keeps asking for its state. */
 export const anyWaiting = (rows: SyncRow[]): boolean => rows.some((r) => r.push.status === 'pending' || r.push.status === 'claimed');
 
+/** What the Refresh data line says: nothing before the first press; while waiting, that CORE was asked and what the last counts were; once the counts are newer than the press, when they were read (pure). */
+export function refreshText(pressedAt: number | null, countsAt: string | null | undefined, now: number, timedOut: boolean): string {
+  if (pressedAt === null) return '';
+  const read = countsAt ? new Date(countsAt) : null;
+  if (read && read.getTime() >= pressedAt) return `Counts read again at ${read.toLocaleTimeString()}.`;
+  if (timedOut) return 'CORE has not finished reading yet (it can take ten minutes or more). The page will show the new counts when you refresh again.';
+  const secs = Math.max(0, Math.round((now - pressedAt) / 1000));
+  return `Asked CORE to read every tool and HaloPSA again (${secs}s ago). Counts last read ${read ? read.toLocaleTimeString() : 'never'}. This takes a few minutes; the page updates by itself.`;
+}
+
 export const canApprove = (r: SyncRow): boolean => r.can_push && r.push.status !== 'pending' && r.push.status !== 'claimed';
 /** How a push reads for people (pure). */
 export function pushText(p: SyncRow['push']): string {
@@ -101,6 +112,8 @@ export function BillingSyncView() {
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
+  const [pressedAt, setPressedAt] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
 
   const load = useCallback(async (hidden: boolean) => {
     setLoading(true);
@@ -123,6 +136,29 @@ export function BillingSyncView() {
   useEffect(() => {
     void load(showHidden);
   }, [load, showHidden]);
+  // After Refresh data CORE reads every tool and HaloPSA again (a few minutes): ask for the list every eight seconds until the counts are newer than the press, for at most ten minutes.
+  const countsNewer = pressedAt !== null && data?.counts_read_at ? new Date(data.counts_read_at).getTime() >= pressedAt : false;
+  const timedOut = pressedAt !== null && Date.now() - pressedAt > 10 * 60 * 1000;
+  const watching = pressedAt !== null && !countsNewer && !timedOut;
+  useEffect(() => {
+    if (!watching) return;
+    const timer = setInterval(() => {
+      setTick((n) => n + 1);
+      void load(showHidden);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [watching, load, showHidden]);
+  const refresh = async (): Promise<void> => {
+    const at = Date.now();
+    setLoading(true);
+    try {
+      const res = await authFetch('/api/v1/billing/sync/refresh', { method: 'POST' });
+      if (res.ok) setPressedAt(at);
+    } catch {
+      /* the list below is still read again */
+    }
+    await load(showHidden);
+  };
   // CORE answers a push in about twenty seconds; until it has, ask again every five so the line changes by itself.
   const waiting = anyWaiting(data?.rows ?? []);
   useEffect(() => {
@@ -187,11 +223,14 @@ export function BillingSyncView() {
         <label className="flex items-center gap-1 text-sm text-gray-300">
           <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> Show hidden{data && data.hidden > 0 ? ` (${data.hidden})` : ''}
         </label>
-        <button type="button" className={ghost} disabled={busy || loading} aria-busy={loading} onClick={() => void load(showHidden)}>
-          {loading ? 'Refreshing…' : 'Refresh data'}
+        <button type="button" className={ghost} disabled={busy || loading || watching} aria-busy={loading || watching} onClick={() => void refresh()}>
+          {loading || watching ? 'Refreshing…' : 'Refresh data'}
         </button>
         <span className="text-xs text-gray-400" role="status" data-testid="billing-updated">
           {loading ? 'Reading the latest from A.C.O.R.N…' : loadedAt ? `Updated ${loadedAt.toLocaleTimeString()}` : ''}
+        </span>
+        <span className="text-xs text-sky-300" role="status" data-testid="billing-refresh" data-tick={tick}>
+          {refreshText(pressedAt, data?.counts_read_at, Date.now(), timedOut)}
         </span>
         <button type="button" className={ghost} disabled={busy || chosen.filter(canApprove).length === 0} onClick={() => void approve(chosen.filter(canApprove))}>
           Approve selected ({chosen.filter(canApprove).length})
