@@ -387,3 +387,51 @@ def test_the_weekly_comparison_groups_engineers_by_pod_with_per_day_rates_net_an
     old = ms.weekly_comparison({"rows": [r("Al", "Pod 1")]})
     assert old["has_detail"] is False and old["rows"][0]["new"] == 0
     assert ms.weekly_comparison(None) == {"weeks": [], "week": None, "has_detail": False, "rows": [], "total": ms.weekly_comparison(None)["total"]}
+
+
+def test_people_marked_excluded_leave_the_people_rows_and_the_stale_list_but_nothing_else():
+    staff = {"rows": [{"week": W2, "engineer": "Dan Kemp", "team": "Pod 1"}, {"week": W2, "engineer": "Vic  Cio", "team": "Pod 2"}], "weeks": [W2]}
+    out = ms.without_excluded("staff-weekly", staff, ["dan kemp", " "])
+    assert [r["engineer"] for r in out["rows"]] == ["Vic  Cio"] and out["weeks"] == [W2]
+    assert [r["engineer"] for r in ms.without_excluded("dialpad-weekly", staff, ["vic cio"])["rows"]] == ["Dan Kemp"], "spaces and case do not matter"
+    detail = {"stale": [{"agent": "Dan Kemp"}, {"agent": "Vic Cio"}, {"agent": ""}], "created": [{"client_name": "Acme", "created": 4}]}
+    kept = ms.without_excluded("ticket-detail", detail, ["Dan Kemp"])
+    assert [s["agent"] for s in kept["stale"]] == ["Vic Cio", ""] and kept["created"] == detail["created"], "the ticket counts stay"
+    assert ms.without_excluded("staff-weekly", staff, []) is staff, "nothing excluded changes nothing"
+    assert ms.without_excluded("staff-weekly", None, ["x"]) is None
+    assert ms.engineers_of(staff) == ["Dan Kemp", "Vic  Cio"]
+
+
+@pytest.mark.asyncio
+async def test_the_excluded_list_is_saved_on_the_organization_and_every_staff_page_reads_it():
+    import uuid
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints import metrics_pages as mp
+
+    tenant = SimpleNamespace(settings={"keep": 1})
+    payload = {"rows": [{"week": W2, "engineer": "Dan Kemp", "team": "Pod 1"}, {"week": W2, "engineer": "Vic Cio", "team": "Pod 2"}]}
+    row = SimpleNamespace(payload=payload, received_at="t")
+
+    class Result:
+        def scalar_one_or_none(self):
+            return row
+
+    class Db:
+        async def get(self, model, key):
+            return tenant
+
+        async def execute(self, stmt):
+            return Result()
+
+        async def commit(self):
+            pass
+
+    user = SimpleNamespace(tenant_id=uuid.uuid4())
+    saved = await mp.put_excluded(mp.ExcludedIn(excluded=["  dan   kemp ", "", "Dan Kemp"]), user, Db())
+    assert saved == {"excluded": ["Dan Kemp"]}, "spaces are tidied and a name given twice is kept once, whatever its case"
+    assert tenant.settings["keep"] == 1, "other settings are kept"
+    got = await mp.get_excluded(user, Db())
+    assert got["engineers"] == ["Dan Kemp", "Vic Cio"], "the choices are everyone CORE sent, excluded or not"
+    data, at = await mp._dataset(Db(), user, "staff-weekly")
+    assert [r["engineer"] for r in data["rows"]] == ["Vic Cio"] and at == "t"

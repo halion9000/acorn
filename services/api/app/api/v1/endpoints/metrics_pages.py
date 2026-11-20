@@ -11,7 +11,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
@@ -21,6 +22,7 @@ from app.db.rls_scope import cross_tenant_reads
 from app.models.finance_profit import FinanceProfitSnapshot
 from app.models.metric_dataset import MetricDataset
 from app.models.signin import ClientLicenseHistory
+from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.services import metrics_customers as mc
 from app.services import metrics_staff as ms
@@ -36,7 +38,45 @@ async def _dataset(db: DBSession, user: AuthUser, key: str) -> tuple[dict[str, A
     row = (
         await db.execute(select(MetricDataset).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == key))
     ).scalar_one_or_none()
-    return (row.payload, row.received_at) if row else (None, None)
+    if row is None:
+        return None, None
+    # People marked excluded under Settings are left out of what the pages show (their tickets still count everywhere else).
+    return ms.without_excluded(key, row.payload, await _excluded(db, user.tenant_id)), row.received_at
+
+
+async def _excluded(db: DBSession, tenant_id: uuid.UUID) -> list[str]:
+    tenant = await db.get(Tenant, tenant_id)
+    names = ((tenant.settings if tenant else None) or {}).get("metrics", {}).get("excluded_engineers") or []
+    return [str(n) for n in names if isinstance(n, str)]
+
+
+class ExcludedIn(BaseModel):
+    excluded: list[str] = Field(max_length=500)
+
+
+@router.get("/excluded", dependencies=[Depends(require_permission("metrics:view"))])
+async def get_excluded(user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """The engineers marked excluded from the metrics pages, and every engineer name CORE has sent (to choose from)."""
+    row = (
+        await db.execute(select(MetricDataset).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == "staff-weekly"))
+    ).scalar_one_or_none()
+    return {"excluded": await _excluded(db, user.tenant_id), "engineers": ms.engineers_of(row.payload if row else None)}
+
+
+@router.put("/excluded", dependencies=[Depends(require_permission("mssp:manage"))])
+async def put_excluded(body: ExcludedIn, user: AuthUser, db: DBSession) -> dict[str, Any]:
+    """Replace the list of engineers left out of what the metrics pages show. Nothing is deleted: the tickets, hours and calls stay in the data and in every client total."""
+    tenant = await db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    names = sorted({" ".join(n.split())[:120].lower(): " ".join(n.split())[:120] for n in body.excluded if n.strip()}.values(), key=str.lower)
+    settings = dict(tenant.settings or {})
+    metrics = dict(settings.get("metrics") or {})
+    metrics["excluded_engineers"] = names
+    settings["metrics"] = metrics
+    tenant.settings = settings
+    await db.commit()
+    return {"excluded": names}
 
 
 @router.get("/staff-metrics", dependencies=[Depends(require_permission("metrics:view"))])

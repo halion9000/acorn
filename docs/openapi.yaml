@@ -25328,6 +25328,108 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - HTTPBearer: []
+  /api/v1/reports/metrics/excluded:
+    get:
+      tags:
+      - reports
+      summary: Get Excluded
+      description: The engineers marked excluded from the metrics pages, and every
+        engineer name CORE has sent (to choose from).
+      operationId: get_excluded_api_v1_reports_metrics_excluded_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Get Excluded Api V1 Reports Metrics Excluded Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - reports
+      summary: Put Excluded
+      description: 'Replace the list of engineers left out of what the metrics pages
+        show. Nothing is deleted: the tickets, hours and calls stay in the data and
+        in every client total.'
+      operationId: put_excluded_api_v1_reports_metrics_excluded_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: First month of a custom range, YYYY-MM (needs end)
+          title: Start
+        description: First month of a custom range, YYYY-MM (needs end)
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+          description: Last month of a custom range, YYYY-MM (needs start)
+          title: End
+        description: Last month of a custom range, YYYY-MM (needs start)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExcludedIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Put Excluded Api V1 Reports Metrics Excluded Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/reports/metrics/staff-metrics:
     get:
       tags:
@@ -48415,6 +48517,18 @@ components:
       - access_token
       - refresh_token
       title: ExchangeResponse
+    ExcludedIn:
+      properties:
+        excluded:
+          items:
+            type: string
+          type: array
+          maxItems: 500
+          title: Excluded
+      type: object
+      required:
+      - excluded
+      title: ExcludedIn
     ExecuteRuleRequest:
       properties:
         events:

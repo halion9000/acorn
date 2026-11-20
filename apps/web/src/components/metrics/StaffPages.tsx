@@ -305,6 +305,9 @@ export function ScorecardView() {
         <Link href="/settings/scorecard" className="text-sm text-blue-300 underline">
           Scorecard settings (weights and brackets)
         </Link>
+        <Link href="/settings/metrics-people" className="text-sm text-blue-300 underline">
+          Leave people out of the metrics
+        </Link>
       </div>
       {data?.received_at && (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">

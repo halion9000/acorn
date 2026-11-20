@@ -268,6 +268,28 @@ def meetings(payload: dict[str, Any] | None, months: int, team: str | None = Non
     }
 
 
+def _name_key(name: Any) -> str:
+    return " ".join(str(name or "").lower().split())
+
+
+def without_excluded(key: str, payload: dict[str, Any] | None, excluded: list[str]) -> dict[str, Any] | None:
+    """The dataset with the people marked excluded left out of what is shown (pure). Only people-shaped rows go: the weekly staff, Dialpad and meeting rows by engineer, and the stale tickets by their tech. Tickets, client counts and totals worked out from client rows are untouched."""
+    skip = {_name_key(n) for n in excluded if _name_key(n)}
+    if not payload or not skip:
+        return payload
+    out = dict(payload)
+    if key in ("staff-weekly", "dialpad-weekly", "meetings-weekly") and isinstance(payload.get("rows"), list):
+        out["rows"] = [r for r in payload["rows"] if _name_key(r.get("engineer")) not in skip]
+    elif key == "ticket-detail" and isinstance(payload.get("stale"), list):
+        out["stale"] = [s for s in payload["stale"] if _name_key(s.get("agent")) not in skip]
+    return out
+
+
+def engineers_of(payload: dict[str, Any] | None) -> list[str]:
+    """Every engineer name in the weekly staff data, sorted without regard to case (pure)."""
+    return sorted({str(r.get("engineer")) for r in (payload or {}).get("rows") or [] if r.get("engineer")}, key=str.lower)
+
+
 def weekly_comparison(payload: dict[str, Any] | None, week: str | None = None) -> dict[str, Any]:
     """The Weekly Tech Comparison for one week (the newest in the data when none is asked for): per engineer, grouped by pod, the days worked, tickets new, opened and closed the same week, older tickets closed, closed in all, net (closed less new), new and closed per day worked, and the Dialpad call tickets left out; and the same for all pods.
 
