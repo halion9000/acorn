@@ -18669,6 +18669,17 @@ paths:
           maxLength: 100
           default: ''
           title: Q
+      - name: inactive
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: The controls of the frameworks that are not turned on (the
+            Inactive tab) instead of the ones that are
+          default: false
+          title: Inactive
+        description: The controls of the frameworks that are not turned on (the Inactive
+          tab) instead of the ones that are
       - name: client_id
         in: query
         required: false

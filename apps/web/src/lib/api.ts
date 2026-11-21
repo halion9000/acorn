@@ -8348,8 +8348,9 @@ export interface ControlList {
   rows: ControlRowT[];
 }
 export const controlsApi = {
-  list: (clientId: string, f: { framework?: string; state?: string; q?: string } = {}) => {
+  list: (clientId: string, f: { framework?: string; state?: string; q?: string; inactive?: boolean } = {}) => {
     const extra = new URLSearchParams();
+    if (f.inactive) extra.set('inactive', 'true');
     if (f.framework) extra.set('framework', f.framework);
     if (f.state) extra.set('state', f.state);
     if (f.q) extra.set('q', f.q);

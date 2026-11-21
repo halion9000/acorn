@@ -135,6 +135,14 @@ async def owners_by_control(db: Any, tenant: Any, frameworks: list[str]) -> dict
     return {(r.framework, r.control_id): r.owner for r in rows}
 
 
+def inactive_frameworks(enabled: list[str], framework: str | None = None) -> list[str]:
+    """The frameworks shown on the Inactive tab (pure): every framework that is not turned on, or the one asked for when it is one of those (none when it is on)."""
+    off = [f for f in FRAMEWORKS if f not in enabled]
+    if framework:
+        return [framework] if framework in off else []
+    return off
+
+
 _ORDER = {"unhealthy": 0, "at_risk": 1, "not_tested": 2, "healthy": 3}
 
 
@@ -146,12 +154,13 @@ async def list_controls(
     framework: str | None = Query(default=None, max_length=20),
     state: str | None = Query(default=None, pattern="^(healthy|at_risk|unhealthy|not_tested)$"),
     q: str = Query(default="", max_length=100),
+    inactive: bool = Query(default=False, description="The controls of the frameworks that are not turned on (the Inactive tab) instead of the ones that are"),
 ) -> ControlList:
     now = datetime.now(UTC)
     enabled = sorted(
         (await db.execute(select(ComplianceEnabledFramework.framework).where(ComplianceEnabledFramework.tenant_id == tenant))).scalars()
     )
-    shown = [framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS])
+    shown = inactive_frameworks(enabled, framework) if inactive else ([framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS]))
     evidence = await evidence_by_control(db, tenant, shown)
     everything = build_rows(shown, evidence, now, q, await owners_by_control(db, tenant, shown))
     counts = dict.fromkeys(compliance_health.STATES, 0)

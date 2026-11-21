@@ -100,6 +100,7 @@ export function ControlsView() {
   const isHome = useIsHomeClient(clientId);
   const [state, setState] = useState<State>('all');
   const [framework, setFramework] = useState('');
+  const [inactive, setInactive] = useState(false);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [data, setData] = useState<ControlList | null>(null);
@@ -128,12 +129,12 @@ export function ControlsView() {
 
   const load = useCallback(async () => {
     try {
-      setData(await controlsApi.list(clientId, { framework, state: state === 'all' ? '' : state, q: debounced }));
+      setData(await controlsApi.list(clientId, { framework, state: state === 'all' ? '' : state, q: debounced, inactive }));
       setProblem('');
     } catch (e) {
       setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not load the controls.'));
     }
-  }, [clientId, framework, state, debounced]);
+  }, [clientId, framework, state, debounced, inactive]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -157,13 +158,21 @@ export function ControlsView() {
         </div>
       </div>
       {(!clientId || isHome) && <SecureframeCard />}
+      <div role="tablist" aria-label="Which controls" className="flex items-center gap-1">
+        {([[false, 'Implemented'], [true, 'Inactive']] as [boolean, string][]).map(([value, label]) => (
+          <button key={label} role="tab" aria-selected={inactive === value} type="button" onClick={() => { setInactive(value); setFramework(''); }} className={`rounded px-3 py-1 text-sm ${inactive === value ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {inactive && <p className="text-sm text-gray-400">Controls of the frameworks that are not turned on. Turn a framework on in the Compliance overview to start collecting evidence for them.</p>}
       <div role="tablist" className="flex flex-wrap items-center gap-1 border-b border-gray-800">
         {tab('all', 'All', data ? all : undefined)}
         {(Object.keys(STATE_LABEL) as Exclude<State, 'all'>[]).map((s) => tab(s, STATE_LABEL[s], data?.counts[s]))}
         <span className="flex-1" />
         <div className="flex items-center gap-2 pb-1">
           <select aria-label="Framework" value={framework} onChange={(e) => setFramework(e.target.value)} className={field}>
-            <option value="">Frameworks that are on</option>
+            <option value="">{inactive ? 'Frameworks that are off' : 'Frameworks that are on'}</option>
             {['SOC2', 'ISO27001', 'NIST-CSF', 'PCI-DSS', 'HIPAA', 'CIS-IG1'].map((f) => (
               <option key={f} value={f}>
                 {f}
@@ -187,7 +196,7 @@ export function ControlsView() {
         </p>
       )}
       {data === null && !problem && <p className="text-sm text-gray-400">Loading...</p>}
-      {data && data.frameworks.length === 0 && (
+      {data && data.frameworks.length === 0 && !inactive && (
         <p className="text-sm text-gray-400" data-testid="controls-none-on">
           No framework is turned on. Turn one on in the Compliance overview, or choose one above to look at its controls anyway.
         </p>

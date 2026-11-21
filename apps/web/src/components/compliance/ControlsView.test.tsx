@@ -50,14 +50,14 @@ describe('ControlsView', () => {
   it('a tab, the framework choice and the search each ask the server for just that, and the client in the address is kept on the links', async () => {
     window.history.replaceState(null, '', '/compliance/controls?client=c9');
     render(<ControlsView />);
-    await waitFor(() => expect(api.list).toHaveBeenCalledWith('c9', { framework: '', state: '', q: '' }));
+    await waitFor(() => expect(api.list).toHaveBeenCalledWith('c9', { framework: '', state: '', q: '', inactive: false }));
     expect(within(await screen.findByTestId('control-row')).getByRole('link', { name: 'CC1.1' })).toHaveAttribute('href', '/compliance/soc2?client=c9');
     await userEvent.click(screen.getByRole('tab', { name: 'At risk (0)' }));
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: '', state: 'at_risk', q: '' }));
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: '', state: 'at_risk', q: '', inactive: false }));
     await userEvent.selectOptions(screen.getByLabelText('Framework'), 'HIPAA');
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: 'HIPAA', state: 'at_risk', q: '' }));
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: 'HIPAA', state: 'at_risk', q: '', inactive: false }));
     await userEvent.type(screen.getByLabelText('Search controls'), 'access');
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: 'HIPAA', state: 'at_risk', q: 'access' }));
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('c9', { framework: 'HIPAA', state: 'at_risk', q: 'access', inactive: false }));
   });
 
   it('says to turn a framework on when none is, says when nothing matches, and says when the list was cut', async () => {
@@ -180,11 +180,24 @@ describe('ControlsView: opened from a search result', () => {
   it('starts narrowed to the framework and control the address names, and ignores a framework it does not know', async () => {
     window.history.replaceState(null, '', '/compliance/controls?framework=SOC2&search=CC6.1');
     render(<ControlsView />);
-    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: 'SOC2', state: '', q: 'CC6.1' }));
+    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: 'SOC2', state: '', q: 'CC6.1', inactive: false }));
     expect(screen.getByLabelText('Search controls')).toHaveValue('CC6.1');
     api.list.mockClear();
     window.history.replaceState(null, '', '/compliance/controls?framework=Nope');
     render(<ControlsView />);
-    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: '', state: '', q: '' }));
+    await waitFor(() => expect(api.list).toHaveBeenCalledWith('', { framework: '', state: '', q: '', inactive: false }));
+  });
+
+  it('has an Inactive tab that asks for the controls of the frameworks that are off, and comes back to the implemented ones', async () => {
+    render(<ControlsView />);
+    await screen.findAllByTestId('control-row');
+    api.list.mockResolvedValue(list([row({ framework: 'HIPAA', control_id: '164.308', title: 'Security management', state: 'not_tested' })], { frameworks: ['HIPAA'], counts: { healthy: 0, at_risk: 0, unhealthy: 0, not_tested: 1 } }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Inactive' }));
+    expect(await screen.findByText('Security management')).toBeInTheDocument();
+    expect(api.list).toHaveBeenLastCalledWith('', expect.objectContaining({ inactive: true }));
+    expect(screen.getByText(/not turned on/)).toBeInTheDocument();
+    expect(screen.queryByText(/No framework is turned on/)).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: 'Implemented' }));
+    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('', expect.objectContaining({ inactive: false })));
   });
 });

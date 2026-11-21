@@ -182,3 +182,15 @@ async def test_naming_an_owner_for_a_control_that_does_not_exist_is_refused(worl
         with pytest.raises(HTTPException) as err:
             await run(w.acme, lambda db: ep.set_owner(fw, cid, ep.OwnerIn(owner="x"), w.acme, db, user))
         assert err.value.status_code == 404
+
+
+def test_the_inactive_tab_lists_the_frameworks_that_are_off_or_the_one_asked_for_when_it_is_off():
+    from app.api.v1.endpoints.compliance import FRAMEWORKS
+
+    names = list(FRAMEWORKS)
+    on = [names[0]]
+    assert ep.inactive_frameworks(on) == [f for f in names if f != names[0]]
+    assert ep.inactive_frameworks(on, names[1]) == [names[1]]
+    assert ep.inactive_frameworks(on, names[0]) == [], "a framework that is on is not inactive"
+    assert ep.inactive_frameworks(names) == []
+    assert ep.inactive_frameworks(on, "NOPE") == []
