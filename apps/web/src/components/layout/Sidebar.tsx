@@ -287,6 +287,11 @@ const navSections: NavSection[] = [
         icon: <SparklesIcon />,
       },
       {
+        label: 'Event search',
+        href: '/events',
+        icon: <ScanIcon />,
+      },
+      {
         label: 'Coverage Advisor',
         href: '/coverage-advisor',
         icon: <ShieldIcon />,

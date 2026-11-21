@@ -18821,6 +18821,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/events/search:
+    get:
+      tags:
+      - events
+      summary: Search the stored events of an organization or one of its clients
+      operationId: search_events_api_v1_events_search_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(none|[0-9a-fA-F-]{36})$
+          - type: 'null'
+          title: Client Id
+      - name: source
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Source
+      - name: kind
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Kind
+      - name: since
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Since
+      - name: until
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Until
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+          default: ''
+          title: Q
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Before
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/events/{event_id}:
+    get:
+      tags:
+      - events
+      summary: One stored event, whole
+      operationId: get_event_api_v1_events__event_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Event Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFull'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/frameworks/enabled:
     get:
       tags:
@@ -48426,6 +48538,53 @@ components:
         asserts it fires on every positive fixture and stays silent on every
 
         negative one. Approval now requires this verdict to pass.'
+    EventFull:
+      properties:
+        id:
+          type: integer
+          title: Id
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        source:
+          type: string
+          title: Source
+        kind:
+          type: string
+          title: Kind
+        event_time:
+          type: string
+          format: date-time
+          title: Event Time
+        pulled_at:
+          type: string
+          format: date-time
+          title: Pulled At
+        external_id:
+          type: string
+          title: External Id
+        preview:
+          type: string
+          title: Preview
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+      type: object
+      required:
+      - id
+      - client_id
+      - source
+      - kind
+      - event_time
+      - pulled_at
+      - external_id
+      - preview
+      - payload
+      title: EventFull
     EventListResponse:
       properties:
         items:
@@ -48453,6 +48612,70 @@ components:
       - since
       - next_seq
       title: EventListResponse
+    EventPage:
+      properties:
+        rows:
+          items:
+            $ref: '#/components/schemas/EventRow'
+          type: array
+          title: Rows
+        next_before:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Next Before
+        sources:
+          items:
+            type: string
+          type: array
+          title: Sources
+      type: object
+      required:
+      - rows
+      - sources
+      title: EventPage
+    EventRow:
+      properties:
+        id:
+          type: integer
+          title: Id
+        client_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Client Id
+        source:
+          type: string
+          title: Source
+        kind:
+          type: string
+          title: Kind
+        event_time:
+          type: string
+          format: date-time
+          title: Event Time
+        pulled_at:
+          type: string
+          format: date-time
+          title: Pulled At
+        external_id:
+          type: string
+          title: External Id
+        preview:
+          type: string
+          title: Preview
+      type: object
+      required:
+      - id
+      - client_id
+      - source
+      - kind
+      - event_time
+      - pulled_at
+      - external_id
+      - preview
+      title: EventRow
     EventsIn:
       properties:
         events:
