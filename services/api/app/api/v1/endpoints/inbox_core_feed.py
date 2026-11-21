@@ -1522,6 +1522,7 @@ async def report_core_feed_profitability(tenant_token: str, body: ProfitSnapshot
         db.add(FinanceProfitSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
     else:
         row.payload, row.received_at = merge_profit(row.payload, payload), now
+    await keep_version(db, tenant_id, "profitability", row.payload if row is not None else payload, now)
     await db.commit()
     return ProfitSnapshotOut(invoices=len(body.invoices), hours=len(body.hours), agents=len(body.agents))
 
@@ -1632,6 +1633,7 @@ async def report_core_feed_ticket_stats(tenant_token: str, body: TicketStatsIn, 
         if payload.get("volume") is None and (row.payload or {}).get("volume") is not None:
             payload["volume"] = row.payload["volume"]
         row.payload, row.received_at = payload, now
+    await keep_version(db, tenant_id, "ticket-stats", payload, now)
     await db.commit()
     return TicketStatsOut(rows=len(body.rows), open_clients=len(body.open_now))
 
@@ -1678,6 +1680,7 @@ async def report_core_feed_csat(tenant_token: str, body: CsatIn, db: DBSession) 
         db.add(CsatSnapshot(tenant_id=tenant_id, payload=payload, received_at=now))
     else:
         row.payload, row.received_at = payload, now
+    await keep_version(db, tenant_id, "csat", payload, now)
     await db.commit()
     return CsatOut(rows=len(body.rows), recent=len(body.recent))
 

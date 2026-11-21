@@ -90,3 +90,22 @@ async def test_sending_a_dataset_through_the_feed_keeps_a_version(world):
         assert kept == [("staff-weekly", ["2026-11-16"])]
     finally:
         feed._verify_core_feed_token = original
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_ticket_statistics_the_csat_summary_and_the_profitability_summary_keep_versions_too(world):
+    from app.api.v1.endpoints import inbox_core_feed as feed
+
+    async def verified(db, token):
+        return world.a
+
+    original, feed._verify_core_feed_token = feed._verify_core_feed_token, verified
+    try:
+        await with_db(world.a, lambda db: feed.report_core_feed_ticket_stats("t", feed.TicketStatsIn(months=["2026-11"], rows=[], open_now=[]), db))
+        await with_db(world.a, lambda db: feed.report_core_feed_csat("t", feed.CsatIn(months=["2026-11"], rows=[], recent=[]), db))
+        await with_db(world.a, lambda db: feed.report_core_feed_profitability("t", feed.ProfitSnapshotIn(months=["2026-11"], invoices=[], hours=[], agents=[]), db))
+        kept = (await with_db(world.a, lambda db: db.execute(text("select key from dataset_versions order by key")))).scalars().all()
+        assert kept == ["csat", "profitability", "ticket-stats"]
+    finally:
+        feed._verify_core_feed_token = original
