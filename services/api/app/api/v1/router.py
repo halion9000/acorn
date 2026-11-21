@@ -55,6 +55,7 @@ from app.api.v1.endpoints import (
     client_vulnerabilities,
     compliance,
     compliance_controls,
+    event_export,
     event_search,
     compliance_dashboard,
     compliance_notices,
@@ -326,6 +327,7 @@ api_router.include_router(alert_push.router)
 api_router.include_router(toolbox.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
+api_router.include_router(event_export.router)
 api_router.include_router(event_search.router)
 api_router.include_router(compliance_dashboard.router)
 api_router.include_router(compliance_notices.router)

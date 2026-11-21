@@ -2543,9 +2543,9 @@
     "title": "SIEM style storage, step 5: export everything for a client when the client asks",
     "detail": "Hal 2026-11-20: A.C.O.R.N should act like a SIEM. All data pulled in from every source is stored and can be retrieved; it is exported at client level only when a client asks (staff run it). Retention is infinite by default and can be changed per client to 1, 3, 5, 7 or 10 years or infinite. Today alerts keep their raw event and the audit log is append-only, but most pulled-in data is a latest snapshot that is replaced, HaloPSA tickets are only counted, there is no search index and exports are one CSV per feature. Step 5 of 5. A staff-run export job for one client: choose sources and dates (or everything), get a zip of NDJSON or CSV with a manifest of counts and SHA-256 checksums per file. Its own permission, every export audit logged with who, which client and what range, and the download link expires. Later, optionally, scheduled pushes to the client's storage or a syslog/CEF forward.",
     "area": "Platform",
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "claude",
-    "note": "Hal answered the open questions 2026-11-20: export only when a client asks; retention infinite by default and per client 1, 3, 5, 7, 10 or infinite; every source that is pulled in. Added to the working list.",
+    "note": "2026-11-20: Export this client is built for the events: /events/export (mssp:manage, audit logged) gives a zip with events.ndjson and a manifest with record counts and SHA-256, optionally one source and a date range, refused over 200000 events; the button is on Event search. Still to do: the dataset versions and other stored data in the export, CSV as well as NDJSON, a background job for very large exports.",
     "completed_ref": null,
     "added": "2026-11-20",
     "completed": null

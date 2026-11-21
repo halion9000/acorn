@@ -41,6 +41,13 @@ export function searchQuery(f: { client: string; source: string; kind: string; q
   return p.toString();
 }
 
+/** The address of the export for one client: the client and, when set, the source and the dates (pure; a client is required). */
+export function exportQuery(f: { client: string; source: string; since: string; until: string }): string {
+  const p = new URLSearchParams(searchQuery({ client: '', source: f.source, kind: '', q: '', since: f.since, until: f.until }));
+  p.set('client_id', f.client);
+  return p.toString();
+}
+
 const field = 'rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100';
 
 export function EventSearchView() {
@@ -83,6 +90,24 @@ export function EventSearchView() {
     void run(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const exportZip = async (): Promise<void> => {
+    setProblem('');
+    try {
+      const res = await authFetch(`/api/v1/events/export?${exportQuery({ client, source, since, until })}`);
+      if (res.status === 403) throw new Error('Exporting needs the manage permission.');
+      if (res.status === 413) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? 'That is too many events; choose a shorter date range.');
+      if (!res.ok) throw new Error(`The API answered ${res.status}`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `events-${client.slice(0, 8)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not export');
+    }
+  };
 
   const show = async (row: EventRow): Promise<void> => {
     if (open?.id === row.id) return setOpen(null);
@@ -139,6 +164,9 @@ export function EventSearchView() {
         </label>
         <button type="submit" disabled={busy} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-100 hover:bg-gray-800 disabled:opacity-50">
           {busy ? 'Searching…' : 'Search'}
+        </button>
+        <button type="button" disabled={!client} title={client ? 'A zip of the events of this client with a manifest, for when the client asks' : 'Choose a client first'} onClick={() => void exportZip()} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-100 hover:bg-gray-800 disabled:opacity-50">
+          Export this client
         </button>
       </form>
       {problem && <p className="text-sm text-amber-300">{problem}</p>}
