@@ -76,7 +76,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/compliance/vendors': { title: 'Vendors', description: 'Third parties you depend on, their risk and reviews' },
   '/compliance/frameworks': { title: 'Frameworks', description: 'Controls and evidence for each framework' },
   '/compliance': { title: 'Compliance', description: 'Frameworks, control health, risks and what needs doing' },
-  '/mssp': { title: 'MSSP', description: 'Cross-tenant operations for the clients you manage' },
+  '/mssp': { title: 'MSP Dashboard', description: 'Cross-tenant operations for the clients you manage' },
   '/sla': { title: 'SLA Tracking', description: 'Response time targets and breach risk' },
   '/settings/audit': { title: 'Audit Log', description: 'Platform activity and security events' },
   '/settings': { title: 'Settings', description: 'Platform configuration' },

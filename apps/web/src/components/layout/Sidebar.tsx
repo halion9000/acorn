@@ -154,34 +154,14 @@ const navSections: NavSection[] = [
         icon: <ChartBarIcon />,
       },
       {
-        label: 'SOC Insights',
-        href: '/dashboards/soc-insights',
-        icon: <ChartBarIcon />,
-      },
-      {
-        label: 'Get started',
-        href: '/onboarding',
-        icon: <SparklesIcon />,
-      },
-      {
-        label: 'Leafy',
-        href: '/copilot',
-        icon: <SparklesIcon />,
-      },
-      {
-        label: 'MSSP Dashboard',
+        label: 'MSP Dashboard',
         href: '/mssp',
         icon: <GlobeIcon />,
       },
       {
-        label: 'Team Analytics',
-        href: '/analytics/team',
-        icon: <ChartBarIcon />,
-      },
-      {
-        label: 'SLA Tracking',
-        href: '/sla',
-        icon: <ChartBarIcon />,
+        label: 'Identities',
+        href: '/identities',
+        icon: <UserIcon />,
       },
       {
         label: 'Devices',
@@ -194,14 +174,29 @@ const navSections: NavSection[] = [
         icon: <DeviceIcon />,
       },
       {
+        label: 'Leafy',
+        href: '/copilot',
+        icon: <SparklesIcon />,
+      },
+      {
+        label: 'Team Analytics',
+        href: '/analytics/team',
+        icon: <ChartBarIcon />,
+      },
+      {
+        label: 'SLA Tracking',
+        href: '/sla',
+        icon: <ChartBarIcon />,
+      },
+      {
+        label: 'SOC Insights',
+        href: '/dashboards/soc-insights',
+        icon: <ChartBarIcon />,
+      },
+      {
         label: 'Toolbox',
         href: '/toolbox',
         icon: <DeviceIcon />,
-      },
-      {
-        label: 'Identities',
-        href: '/identities',
-        icon: <UserIcon />,
       },
     ],
   },
@@ -280,11 +275,6 @@ const navSections: NavSection[] = [
         label: 'Attack Graph',
         href: '/graph',
         icon: <GraphIcon />,
-      },
-      {
-        label: 'Investigation Chat',
-        href: '/investigate',
-        icon: <SparklesIcon />,
       },
       {
         label: 'Event search',

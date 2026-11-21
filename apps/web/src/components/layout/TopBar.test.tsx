@@ -79,10 +79,10 @@ describe('TopBar', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Some New Page');
   });
 
-  it('writes initialisms in capitals, both for the MSSP page and for an unmapped route', () => {
+  it('writes initialisms in capitals, both for the MSP page and for an unmapped route', () => {
     pathnameMock.mockReturnValue('/mssp');
     const first = renderTopBar();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^MSSP$/);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^MSP Dashboard$/);
     first.unmount();
 
     // An unmapped route takes its title from the URL, and must not turn "edr" or "sso" into "Edr" / "Sso".

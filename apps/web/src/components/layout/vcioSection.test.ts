@@ -5,7 +5,7 @@ import { NAV_CATALOG } from './Sidebar';
 describe('the sidebar order', () => {
   it('starts with Platform (the SOC dashboards first) and ends with Settings on its own', () => {
     expect(NAV_CATALOG[0].title).toBe('Platform');
-    expect(NAV_CATALOG[0].items.map((i) => i.label)).toEqual(['SOC Dashboard', 'SOC Insights', 'Get started', 'Leafy', 'MSSP Dashboard', 'Team Analytics', 'SLA Tracking', 'Devices', 'Client environment', 'Toolbox', 'Identities']);
+    expect(NAV_CATALOG[0].items.map((i) => i.label)).toEqual(['SOC Dashboard', 'MSP Dashboard', 'Identities', 'Devices', 'Client environment', 'Leafy', 'Team Analytics', 'SLA Tracking', 'SOC Insights', 'Toolbox']);
     expect(NAV_CATALOG[0].items[0].href).toBe('/dashboard');
     const last = NAV_CATALOG[NAV_CATALOG.length - 1];
     expect(last.title).toBeUndefined();

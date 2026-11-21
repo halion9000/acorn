@@ -24,10 +24,10 @@ The left sidebar groups the console:
 
 | Area | Pages |
 |---|---|
-| Platform (top) | SOC Dashboard, SOC Insights, Get started, Leafy, **MSSP Dashboard**, Team Analytics, SLA Tracking, **Devices**, Client environment, Identities |
+| Platform (top) | SOC Dashboard, **MSP Dashboard**, Identities, **Devices**, Client environment, Leafy, Team Analytics, SLA Tracking, SOC Insights, Toolbox |
 | Work | **Alerts**, Investigation Queue, **Cases**, Hunt, Explore |
 | Detection | Detection Rules (with Rule packs), Vendor Detections, MITRE Coverage, Detection Tuning, Shifts |
-| Intelligence | Threat Intel, Attack Graph, Investigation Chat, Coverage Advisor, EASM |
+| Intelligence | Threat Intel, Attack Graph, Coverage Advisor, EASM |
 | Client Security | **Client Posture**, **Fleet Posture**, **Client Docs**, **Licenses & Counts**, **Multi-Factor**, **Secure Score**, **Sign-in Scores**, **Client Cleanup**, **Platform Health** |
 | Response & Defense | Playbooks (with Dry Runs), File Integrity, Honeytokens, Purple Team |
 | Automation | Auto Tickets, Auto Scripts, HubSpot |
@@ -69,7 +69,7 @@ On each tool's card in A.C.O.R.N (**Connectors**, named "<Tool> (via CORE)"):
 - **Sync** asks CORE to run that tool now; CORE picks the request up within about 15 seconds.
 - The card shows only the latest message; the connection log keeps history. "Alerts are flowing, but ..." means alerts arrived and a side job (devices, clients, ticket links) failed.
 
-## 4. Mapping clients (MSSP Dashboard > Client mapping)
+## 4. Mapping clients (MSP Dashboard > Client mapping)
 
 Each tool has its own list of customers. Mapping says which of **your** clients each one is.
 
@@ -93,7 +93,7 @@ Each tool has its own list of customers. Mapping says which of **your** clients 
 
 - **Possible duplicates** shows near-identical client names. **Keep this one** merges the others into it; **Not a duplicate** remembers your answer.
 - **Merge two clients** lets you pick one to keep and one to merge into it (**Merge**). The merge is logged and can be undone.
-- A client you no longer want can be **Hidden** (MSSP Dashboard table, **Hide**/**Show**), **archived** (renamed "<name> (archived)", hidden, its tool clients sent back to Unmapped, nothing deleted), or removed. Removal is refused for a client with cases, connectors, worked alerts or audit records; archive it instead.
+- A client you no longer want can be **Hidden** (MSP Dashboard table, **Hide**/**Show**), **archived** (renamed "<name> (archived)", hidden, its tool clients sent back to Unmapped, nothing deleted), or removed. Removal is refused for a client with cases, connectors, worked alerts or audit records; archive it instead.
 - **Remove all client tenants** (type REMOVE to confirm) starts over; **Archive instead (deletes nothing)** is the safe version.
 - **Client cleanup (new, 2026-10-20).** **Client Security > Client Cleanup** lists visible clients that hold nothing (no devices, alerts, cases or mapped tool clients), each with an **Archive** button (it asks first). Nothing is deleted; Show hidden brings an archived client back.
 
@@ -230,7 +230,7 @@ CIPP tenants appear under Client mapping like every other tool; data for an unma
 
 ## 10. Client posture (new)
 
-**Client Security > Client Posture.** Pick a client to see, side by side: devices (total, needing attention, stale agents, not in Huntress, offline), Multi-Factor coverage, open alerts (total, critical, high, **open with no ticket**) and open cases. **Print** produces a page for a client review. A **People in this client** button opens that client's people on the Identities page, and on the MSSP Dashboard a click on a client's line opens its Client Posture. **Every number is a link** to the list behind it, already filtered to that client: devices needing attention (Devices page), people with no Multi-Factor (Multi-Factor page), critical alerts or open alerts with no ticket (Alerts page), open cases (Cases page). A client with no CIPP data says "No Multi-Factor data yet".
+**Client Security > Client Posture.** Pick a client to see, side by side: devices (total, needing attention, stale agents, not in Huntress, offline), Multi-Factor coverage, open alerts (total, critical, high, **open with no ticket**) and open cases. **Print** produces a page for a client review. A **People in this client** button opens that client's people on the Identities page, and on the MSP Dashboard a click on a client's line opens its Client Posture. **Every number is a link** to the list behind it, already filtered to that client: devices needing attention (Devices page), people with no Multi-Factor (Multi-Factor page), critical alerts or open alerts with no ticket (Alerts page), open cases (Cases page). A client with no CIPP data says "No Multi-Factor data yet".
 
 ## 11. Platform health
 
