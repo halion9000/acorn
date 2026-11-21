@@ -87,3 +87,78 @@ def snapshot(now: float | None = None) -> list[dict[str, object]]:
 
 def reset() -> None:
     _WORKERS.clear()
+
+
+# ---- several API processes -----------------------------------------------------------------------------------------------------------------------------------
+# With more than one uvicorn worker the background workers run in ONE process (the one that holds each scheduler lock) while any process may answer the health page. Each process therefore publishes
+# its own snapshot to Redis every PUBLISH_EVERY seconds, and the page merges what every live process published: for each worker the freshest report wins.
+
+PUBLISH_EVERY = 15
+STALE_AFTER = 90  # a process that has not published for this long is gone: its report is ignored
+_KEY = "acorn:worker-heartbeats:"
+
+
+def merge_published(published: list[tuple[float, list[dict[str, object]]]], now_epoch: float) -> list[dict[str, object]]:
+    """The worker rows of every live process merged into one list (pure). `published` is [(when the process published, its snapshot rows)]. A report older than STALE_AFTER is dropped; the ages in a row are advanced by
+    how long ago it was published; for a worker several processes know of, the report with the most recent pass wins (a process that only knows it is waiting loses to one that has a pass)."""
+    order = {"late": 0, "failing": 1, "waiting": 2, "ok": 3}
+    best: dict[str, dict[str, object]] = {}
+    for published_at, rows in published:
+        age = max(0.0, now_epoch - published_at)
+        if age > STALE_AFTER:
+            continue
+        for row in rows:
+            r = dict(row)
+            since = r.get("seconds_since_pass")
+            if isinstance(since, int | float):
+                r["seconds_since_pass"] = int(since + age)
+            r["recent"] = [{**p, "seconds_ago": int(p.get("seconds_ago", 0) + age)} for p in r.get("recent", [])]  # type: ignore[union-attr]
+            name = str(r["name"])
+            mine = r.get("seconds_since_pass")
+            theirs = best.get(name, {}).get("seconds_since_pass")
+            if name not in best or (mine is not None and (theirs is None or mine < theirs)):
+                best[name] = r
+    return sorted(best.values(), key=lambda r: (order.get(str(r["status"]), 9), str(r["name"])))
+
+
+async def publish_once(client: object, pid: int, now_epoch: float | None = None) -> None:
+    """Write this process's snapshot to Redis (it expires by itself)."""
+    import json
+    import time as _time
+
+    payload = json.dumps({"at": _time.time() if now_epoch is None else now_epoch, "rows": snapshot()})
+    await client.set(f"{_KEY}{pid}", payload, ex=STALE_AFTER * 2)  # type: ignore[attr-defined]
+
+
+async def publish_loop(client: object, pid: int) -> None:
+    """Run in every API process: publish now and every PUBLISH_EVERY seconds. A Redis failure never ends it."""
+    import asyncio
+
+    while True:
+        try:
+            await publish_once(client, pid)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            pass
+        await asyncio.sleep(PUBLISH_EVERY)
+
+
+async def shared_snapshot(client: object) -> list[dict[str, object]]:
+    """What the health page shows: every live process's workers merged; this process's own snapshot alone when Redis cannot be read."""
+    import json
+    import time as _time
+
+    try:
+        keys = [k async for k in client.scan_iter(match=f"{_KEY}*")]  # type: ignore[attr-defined]
+        published: list[tuple[float, list[dict[str, object]]]] = []
+        for k in keys:
+            raw = await client.get(k)  # type: ignore[attr-defined]
+            if raw:
+                d = json.loads(raw)
+                published.append((float(d["at"]), list(d["rows"])))
+        merged = merge_published(published, _time.time()) if published else []
+    except Exception:  # noqa: BLE001
+        return snapshot()
+    own = snapshot()
+    return merged if merged else own

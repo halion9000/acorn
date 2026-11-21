@@ -50,6 +50,7 @@ services:
       MS_SSO_PASSWORD_LOGIN: ${MS_SSO_PASSWORD_LOGIN:-admins}
       MS_SSO_WEB_URL: ${MS_SSO_WEB_URL:-}
       CONSOLE_PUBLIC_BASE_URL: ${CONSOLE_PUBLIC_BASE_URL:-https://acorn.goliveoak.com}   # the address a ticket's "release this message" link opens (set it in .env to use another)
+      ACORN_API_WORKERS: ${ACORN_API_WORKERS:-3}   # API processes (Hal: go, 2026-11-21): one slow request, such as a big CORE feed post, no longer stalls every page. 1 in .env restores the single process. Background workers still run in one process (scheduler locks) and Platform health merges all of them.
       AISOC_RATE_LIMIT_MODE: ${AISOC_RATE_LIMIT_MODE:-enforce}   # a caller over 300 requests a minute gets 429 with Retry-After (approved 2026-11-18); log or off in .env undoes it. The CORE feed and the health routes are never limited.
       ACORN_AZURE_SPEND_SCOPE: /subscriptions/34497679-4e8a-41d5-a9ae-a3e03c24981f/resourceGroups/rg-liveoak-ops   # Settings > Azure spend reads costs here (read-only, VM identity)
     volumes:

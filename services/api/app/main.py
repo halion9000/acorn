@@ -320,6 +320,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # How late the event loop wakes up, for Platform health: one busy request shows as a delay for everyone.
     start_loop_sampler()
 
+    # With several API processes, each publishes the state of its background workers so the health page sees them all (see app.services.worker_heartbeat).
+    heartbeat_task: asyncio.Task | None = None
+    try:
+        import os as _os  # noqa: PLC0415
+
+        from app.core.token_revocation import _get_client as _heartbeat_client  # noqa: PLC0415
+        from app.services import worker_heartbeat as _wh  # noqa: PLC0415
+
+        heartbeat_task = asyncio.create_task(_wh.publish_loop(_heartbeat_client(), _os.getpid()), name="worker_heartbeat_publish")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("worker heartbeat publishing did not start", error=type(exc).__name__)
+
     # Create all database tables (dev only; use Alembic migrations in prod).
     # We keep this narrowly scoped to the canonical ``"development"`` label
     # so demo / test / local don't quietly run ``create_all`` on top of a
@@ -604,6 +616,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
     stop_loop_sampler()
+    if heartbeat_task is not None:
+        heartbeat_task.cancel()
 
     # Phase 2.6 — flip /readyz to 503 the instant we begin
     # shutdown, so the orchestrator drains in-flight requests

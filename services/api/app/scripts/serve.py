@@ -26,6 +26,58 @@ import socket
 import sys
 
 
+def worker_count(value: str | None) -> int:
+    """How many API processes to run (pure): ACORN_API_WORKERS, 1 to 8, 1 when it is missing or not a number."""
+    try:
+        return max(1, min(8, int(value or "1")))
+    except ValueError:
+        return 1
+
+
+def uvicorn_command(fd: int) -> list[str]:
+    """The command of one API process that serves on the shared, already bound socket (pure)."""
+    return [sys.executable, "-m", "uvicorn", "app.main:app", "--fd", str(fd)]
+
+
+def supervise(cmd: list[str], workers: int, fd: int) -> None:
+    """Run `workers` API processes on the one listening socket (the kernel hands each connection to one of them) so a slow request in one does not stall the others. A process that exits is started again;
+    on SIGTERM or SIGINT every process is told to stop and this one waits for them. uvicorn's own --workers is not used: it binds its own socket and would drop the dual-stack listener above."""
+    import signal
+    import subprocess
+    import time
+
+    children: list[subprocess.Popen] = []
+    stopping = False
+
+    def start() -> subprocess.Popen:
+        return subprocess.Popen(cmd, pass_fds=[fd])
+
+    def stop(_signum: int, _frame: object) -> None:
+        nonlocal stopping
+        stopping = True
+        for c in children:
+            if c.poll() is None:
+                c.terminate()
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    children.extend(start() for _ in range(workers))
+    last_restart = [0.0] * workers
+    while not stopping:
+        time.sleep(1)
+        for i, c in enumerate(children):
+            if c.poll() is not None and not stopping:
+                if time.monotonic() - last_restart[i] < 5:
+                    time.sleep(5)  # a process that dies at once is not started in a tight loop
+                last_restart[i] = time.monotonic()
+                children[i] = start()
+    for c in children:
+        try:
+            c.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            c.kill()
+
+
 def main() -> None:
     port = int(os.environ.get("PORT", "8000"))
 
@@ -40,17 +92,11 @@ def main() -> None:
     # the descriptor as inheritable before handing off.
     os.set_inheritable(sock.fileno(), True)
 
-    os.execvp(
-        sys.executable,
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "app.main:app",
-            "--fd",
-            str(sock.fileno()),
-        ],
-    )
+    workers = worker_count(os.environ.get("ACORN_API_WORKERS"))
+    cmd = uvicorn_command(sock.fileno())
+    if workers == 1:
+        os.execvp(cmd[0], cmd)  # the old behaviour: this process becomes uvicorn
+    supervise(cmd, workers, sock.fileno())
 
 
 if __name__ == "__main__":

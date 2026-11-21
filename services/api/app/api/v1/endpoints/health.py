@@ -96,6 +96,12 @@ from app.services.runtime_stats import feed_receipts, loop_lag, slow_routes
 
 logger = logging.getLogger(__name__)
 
+def _redis_for_workers() -> Any:
+    from app.core.token_revocation import _get_client  # noqa: PLC0415
+
+    return _get_client()
+
+
 router = APIRouter(prefix="/health", tags=["health"])
 
 
@@ -1306,7 +1312,7 @@ async def platform_services(user: AuthUser, db: DBSession) -> dict[str, Any]:
     disk = disk_row()
     pending = await pending_migrations(db)
     loop = loop_lag(time.time())
-    workers = worker_heartbeat.snapshot()
+    workers = await worker_heartbeat.shared_snapshot(_redis_for_workers())
     failing = await _failing_connectors_or_none(db, user)
     secret = secret_expiry_row(settings.MICROSOFT_CLIENT_SECRET_EXPIRES, datetime.now(UTC).date())
     expiries = await _credential_expiries_or_none(db, user)
