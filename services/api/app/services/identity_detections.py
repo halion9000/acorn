@@ -954,6 +954,7 @@ PLAYBOOK_TAGS: dict[str, list[str]] = {
     "aisoc-id-admin-security-info": ["account-takeover"],
     "aisoc-id-app-consent": ["account-takeover"],
     "aisoc-id-dormant-active": ["account-takeover"],
+    "aisoc-id-takeover-chain": ["account-takeover"],
 }
 
 
@@ -997,7 +998,114 @@ def alert_values(tenant_id: uuid.UUID, finding: Finding, now: datetime) -> dict[
     }
 
 
-async def save_findings(db: Any, tenant_id: uuid.UUID, findings: list[Finding], now: datetime | None = None) -> int:
+# ---- likely account takeover: an entry sign joined to a foothold sign -----------------------------------------------------------------------------------------
+# Each identity rule raises its own medium or high alert. A real takeover is several of them on one person (the 60-day review found accounts with password guessing, a deleted sign-in method, a new app credential and a
+# BEC search rated High, each a separate alert and nothing joining them). This joins them: within CHAIN_WINDOW, one ENTRY sign (how someone got in) followed by one FOOTHOLD sign (what they did to stay) on the same person
+# raises ONE critical alert per person and day. It reads the alerts already saved, so it needs no new feed.
+CHAIN_RULE_ID = "aisoc-id-takeover-chain"
+CHAIN_WINDOW = timedelta(hours=24)
+CHAIN_ENTRY = {
+    "aisoc-id-guessed-password": "password guessed",
+    "aisoc-id-rare-country": "sign-in from a new country",
+    "aisoc-id-impossible-travel": "impossible travel",
+    "aisoc-id-device-code": "device-code sign-in",
+    "aisoc-id-mfa-fatigue": "multi-factor prompt flood",
+    "aisoc-id-risky-signin": "Microsoft rated the sign-in risky",
+    "aisoc-id-dormant-active": "dormant account signed in",
+    "aisoc-id-failed-after-revoke": "sign-ins attempted after sessions were revoked",
+}
+CHAIN_FOOTHOLD = {
+    "aisoc-id-admin-security-info": "sign-in methods changed by an administrator",
+    "aisoc-id-app-consent": "an application was given consent",
+    "aisoc-id-app-credentials": "a credential was added to an application",
+    "aisoc-id-role-change": "added to a directory role",
+    "aisoc-id-ca-policy-change": "a Conditional Access policy changed",
+    "aisoc-id-bec-findings": "a BEC search found signs of compromise",
+}
+
+
+@dataclass
+class ChainSign:
+    rule_id: str
+    title: str
+    at: datetime
+    user: str
+    alert_id: str
+
+
+def detect_takeover_chain(signs: list[ChainSign]) -> list[Finding]:
+    """One critical finding per person and day who has an entry sign followed, within a day, by a foothold sign (pure). Signs of other kinds are ignored."""
+    by_user: dict[str, list[ChainSign]] = defaultdict(list)
+    for sg in signs:
+        if sg.rule_id in CHAIN_ENTRY or sg.rule_id in CHAIN_FOOTHOLD:
+            by_user[sg.user.lower()].append(sg)
+    out: list[Finding] = []
+    for user, items in by_user.items():
+        items.sort(key=lambda x: _utc(x.at))
+        entries = [x for x in items if x.rule_id in CHAIN_ENTRY]
+        footholds = [x for x in items if x.rule_id in CHAIN_FOOTHOLD]
+        pair = next(((e, f) for e in entries for f in footholds if timedelta(0) <= _utc(f.at) - _utc(e.at) <= CHAIN_WINDOW), None)
+        if pair is None:
+            continue
+        entry, foothold = pair
+        involved = [x for x in items if x.rule_id in {*CHAIN_ENTRY, *CHAIN_FOOTHOLD}]
+        kinds = sorted({CHAIN_ENTRY.get(x.rule_id) or CHAIN_FOOTHOLD[x.rule_id] for x in involved})
+        out.append(
+            Finding(
+                rule_id=CHAIN_RULE_ID,
+                rule_name="Likely account takeover",
+                title=f"Likely account takeover - {user}",
+                severity="critical",
+                tactic="Persistence",
+                technique="T1078",
+                key=f"chain:{user}:{_utc(foothold.at):%Y-%m-%d}",
+                occurred_at=foothold.at,
+                summary=(
+                    f"{user} shows how someone got in ({CHAIN_ENTRY[entry.rule_id]}, {_stamp(entry.at)}) and then what they did to stay ({CHAIN_FOOTHOLD[foothold.rule_id]}, {_stamp(foothold.at)}), "
+                    "within a day. Treat the account as taken over until the person confirms otherwise: sign them out, reset the password and multi-factor, and check the mailbox for rules."
+                ),
+                fields=[("Person", user), ("Signs", "; ".join(kinds)), ("Alerts joined", str(len(involved)))],
+                users=[user],
+                source_ids=[x.alert_id for x in involved][:30],
+            )
+        )
+    return out
+
+
+async def run_takeover_chain(db: Any, tenant_id: uuid.UUID, users: list[str], now: datetime) -> int:
+    """After new identity alerts were saved: look for the chain on the people they name. Never raises. Returns how many chain alerts were new."""
+    people = sorted({u.lower() for u in users if u})
+    if not people:
+        return 0
+    try:
+        from sqlalchemy import select  # noqa: PLC0415
+
+        from app.models.alert import Alert  # noqa: PLC0415
+
+        since = now - CHAIN_WINDOW - timedelta(hours=1)
+        rows = (
+            await db.execute(
+                select(Alert.id, Alert.rule_id, Alert.title, Alert.event_time, Alert.affected_users).where(
+                    Alert.tenant_id == tenant_id,
+                    Alert.rule_id.in_([*CHAIN_ENTRY, *CHAIN_FOOTHOLD]),
+                    Alert.event_time >= since,
+                )
+            )
+        ).all()
+        signs = [
+            ChainSign(rule_id=r.rule_id, title=r.title, at=r.event_time, user=str(u), alert_id=str(r.id))
+            for r in rows
+            for u in (r.affected_users if isinstance(r.affected_users, list) else [])
+            if str(u).lower() in people
+        ]
+        findings = detect_takeover_chain(signs)
+    except Exception:  # noqa: BLE001
+        logger.warning("identity detections: the takeover chain rule failed for tenant=%s", tenant_id, exc_info=True)
+        return 0
+    return await save_findings(db, tenant_id, findings, now, chain=False)
+
+
+async def save_findings(db: Any, tenant_id: uuid.UUID, findings: list[Finding], now: datetime | None = None, chain: bool = True) -> int:
     """Insert an alert for each finding that has none yet; returns how many were new. Never raises: a failure here must not lose the sign-ins or audits it was triggered by."""
     if not findings:
         return 0
@@ -1026,6 +1134,9 @@ async def save_findings(db: Any, tenant_id: uuid.UUID, findings: list[Finding], 
         from app.services.bec_auto import auto_bec  # noqa: PLC0415
 
         await auto_bec(db, tenant_id, fresh, settings, now)
+    if chain and fresh:
+        # New identity alerts may complete a chain (an entry sign and a foothold sign on one person): join them.
+        made += await run_takeover_chain(db, tenant_id, [u for f in fresh for u in f.users], now)
     return made
 
 
