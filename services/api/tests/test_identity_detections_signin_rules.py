@@ -97,9 +97,24 @@ def test_a_new_success_after_five_wrong_passwords_is_raised_once_and_names_both_
     found = detect_guessed_password([*fails, ok], {"s10"})
     assert len(found) == 1
     f = found[0]
-    assert f.title == "Sign-in succeeded after 5 wrong passwords - a@x.com"
+    assert f.title == "Sign-in succeeded after repeated wrong passwords - a@x.com"  # the count is not in the title
+    assert ("Wrong passwords", "5") in f.fields and "failed 5 password attempts" in f.summary
     assert "2.2.2.2" in f.ips and "1.1.1.1" in f.ips
     assert ("Multi-factor", "not used") in f.fields
+
+
+
+def test_a_run_of_successes_is_one_alert_per_person_day_and_address_whatever_the_count():
+    # An attacker who keeps guessing makes several successes; each used to be its own alert with its own title ("after 24 ...", "after 28 ...").
+    fails = [row(i, code=50126, ip="1.1.1.1", at=T0 + timedelta(minutes=i)) for i in range(6)]
+    first = row(10, code=0, ip="2.2.2.2", at=T0 + timedelta(minutes=10))
+    more = [row(20 + i, code=50126, ip="1.1.1.1", at=T0 + timedelta(minutes=20 + i)) for i in range(4)]
+    second = row(30, code=0, ip="2.2.2.2", at=T0 + timedelta(minutes=30))
+    other_address = row(31, code=0, ip="3.3.3.3", at=T0 + timedelta(minutes=31))
+    found = detect_guessed_password([*fails, first, *more, second, other_address], {"s10", "s30", "s31"})
+    assert len({f.title for f in found}) == 1
+    assert len({f.key for f in found if "2.2.2.2" in f.ips}) == 1  # the two successes from one address are one alert
+    assert len({f.key for f in found}) == 2  # a success from a different address is its own
 
 
 def test_a_forgotten_password_at_the_persons_own_address_is_not_a_guessed_one():

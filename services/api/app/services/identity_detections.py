@@ -410,11 +410,12 @@ def detect_guessed_password(rows: list[Any], new_ids: set[str], known_ips: dict[
                 Finding(
                     rule_id="aisoc-id-guessed-password",
                     rule_name="Sign-in after many wrong passwords",
-                    title=f"Sign-in succeeded after {len(fails)} wrong passwords - {user}",
+                    # The count is in the summary and fields, NOT the title: with it in the title every new success (the attacker keeps going) read as a new kind of alert (60 days showed one account with 22 different titles).
+                    title=f"Sign-in succeeded after repeated wrong passwords - {user}",
                     severity="high",
                     tactic="Credential Access",
                     technique="T1110",
-                    key=f"guessed:{user}:{r.source_id}",
+                    key=f"guessed:{user}:{_utc(r.occurred_at):%Y-%m-%d}:{r.ip_address or 'unknown'}",  # one alert per person, day and address signed in from
                     occurred_at=r.occurred_at,
                     summary=f"{user} failed {len(fails)} password attempts within an hour and then signed in successfully. The password may have been guessed; confirm with the person.",
                     fields=[
@@ -605,23 +606,30 @@ def detect_guest_burst(audits: list[Any]) -> list[Finding]:
     return out
 
 
+# Microsoft's own partner service adds the partner's (the MSP's) administrators to roles when a delegated admin (GDAP) relationship is used; one client produced 256 high alerts in 60 days from it.
+EXPECTED_ROLE_ADDERS = frozenset({"partner customer delegated admin offline processor"})
+
+
 def detect_privileged_role_change(audits: list[Any]) -> list[Finding]:
-    """Someone was added to a directory role."""
+    """Someone was added to a directory role. Low when Microsoft's partner service (an expected GDAP step) did it; high when another app did; medium when a person did."""
     out: list[Finding] = []
     for a in audits:
         if not a.success or not _ROLE_ADD.search(a.activity or ""):
             continue
+        expected = (a.actor or "").strip().lower() in EXPECTED_ROLE_ADDERS
         out.append(
             Finding(
                 rule_id="aisoc-id-role-change",
                 rule_name="Someone was added to a directory role",
-                title=f"Added to a directory role - {a.target or 'unknown'}",
-                severity="high" if a.actor_is_app else "medium",
+                # With no target the title says who did it (it used to end in "unknown", the same for every alert).
+                title=f"Added to a directory role - {a.target}" if a.target else f"Added to a directory role by {a.actor}",
+                severity="low" if expected else "high" if a.actor_is_app else "medium",
                 tactic="Privilege Escalation",
                 technique="T1098",
                 key=f"role:{a.source_id}",
                 occurred_at=a.occurred_at,
-                summary=f"{a.actor} added {a.target or 'an account'} to a directory role ({a.activity}).",
+                summary=f"{a.actor} added {a.target or 'an account'} to a directory role ({a.activity})."
+                + (" Expected: Microsoft's partner service adds the partner's administrators this way when a delegated admin relationship is used." if expected else ""),
                 fields=[
                     ("Actor", a.actor + (" (an app)" if a.actor_is_app else "")),
                     ("Target", a.target or "unknown"),

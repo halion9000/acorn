@@ -119,6 +119,12 @@ def test_a_role_addition_and_a_conditional_access_change_are_flagged_and_an_app_
     assert detect_privileged_role_change([audit(1, "Add member to role")])[0].severity == "medium"
     assert detect_privileged_role_change([audit(1, "Add member to role", actor="Some app", actor_is_app=True)])[0].severity == "high"
     assert detect_privileged_role_change([audit(1, "Remove member from role"), audit(2, "Update user")]) == []
+    # Microsoft's partner service adds the partner's administrators when a delegated admin relationship is used: low, and said to be expected.
+    expected = detect_privileged_role_change([audit(1, "Add member to role", actor="Partner Customer Delegated Admin Offline Processor", target=None, actor_is_app=True)])[0]
+    assert expected.severity == "low" and "Expected" in expected.summary
+    # With no target the title names who did it, instead of ending in "unknown".
+    unnamed = detect_privileged_role_change([audit(1, "Add member to role", actor="AssistAPI", target=None, actor_is_app=True)])[0]
+    assert unnamed.title == "Added to a directory role by AssistAPI" and unnamed.severity == "high"
     assert detect_ca_policy_change([audit(1, "Update conditional access policy", target="Require MFA")])[0].severity == "medium"
     assert detect_ca_policy_change([audit(1, "Delete conditional access policy", target="Require MFA")])[0].severity == "high"
     assert detect_ca_policy_change([audit(1, "Update user")]) == []

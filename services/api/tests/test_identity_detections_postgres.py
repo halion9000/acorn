@@ -133,7 +133,7 @@ async def test_wrong_passwords_then_a_success_is_an_alert_unless_it_is_all_at_th
     assert await run_signin_detections(db, tid, new, NOW) == 1
     await db.commit()
     await db.close()
-    assert [r[0] for r in await alerts(engine, tid)] == ["Sign-in succeeded after 6 wrong passwords - b@x.com"]
+    assert [r[0] for r in await alerts(engine, tid)] == ["Sign-in succeeded after repeated wrong passwords - b@x.com"]
 
 
 @pytest.mark.asyncio
