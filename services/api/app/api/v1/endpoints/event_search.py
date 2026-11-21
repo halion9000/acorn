@@ -100,7 +100,7 @@ async def search_events(
     since: datetime | None = None,
     until: datetime | None = None,
     q: Annotated[str, Query(max_length=200)] = "",
-    before: Annotated[int | None, Query(ge=1)] = None,
+    before: Annotated[int | None, Query(ge=1, le=9_000_000_000_000)] = None,
 ) -> EventPage:
     where, values = build_query(client_id, source, kind, since, until, q, before)
     rows = (

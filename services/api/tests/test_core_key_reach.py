@@ -29,6 +29,9 @@ USED_BY_A_TOOL = {
 # What the key can reach that NO tool calls, and why each is left open (or why it is a problem still). Adding a route here is a decision,
 # not a formality.
 LEFT_OPEN = {
+    # The Refresh data buttons: each only asks CORE to read again (it queues a sync request), a read-like action behind the read permission of its page.
+    ("POST", "/billing/sync/refresh"): "asks CORE to read the license counts again: queues a sync request, reads and writes nothing else",
+    ("POST", "/reports/metrics/refresh"): "asks CORE to send the metrics datasets again: queues a sync request, reads and writes nothing else",
     # Previewing what a public replay would hide: a read (cases:read) despite the POST. PUBLISHING one needs cases:write AND a signed-in
     # person.
     ("POST", "/ledger/{run_id}/publish/preview"): "preview what a public replay would hide: cases:read, a read despite the POST",

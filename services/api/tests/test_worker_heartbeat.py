@@ -319,3 +319,16 @@ def test_only_the_latest_ten_passes_are_kept_and_a_worker_that_never_ran_has_non
     assert len(rows["sweep"]["recent"]) == wh.RECENT_PASSES and rows["sweep"]["passes"] == 13
     assert rows["sweep"]["recent_failed"] == 0, "the failure is older than the ten passes kept"
     assert rows["idle"]["recent"] == [] and rows["idle"]["recent_failed"] == 0
+
+
+@pytest.fixture(autouse=True)
+def _no_triage_sweeps(monkeypatch):
+    """The built-in alert triage sweeps (ATT&CK mapping, by-design alerts, repeats) have their own tests; these tests are about when the worker's other passes run."""
+
+    from app.workers import suppression_sweeper as sw
+
+    async def nothing(_session):
+        return 0
+
+    for name in ("sweep_attack_mapping", "sweep_by_design", "sweep_repeats"):
+        monkeypatch.setattr(sw, name, nothing)

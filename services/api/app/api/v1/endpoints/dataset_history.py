@@ -54,7 +54,7 @@ async def list_datasets(user: AuthUser, db: DBSession) -> list[DatasetSummary]:
 
 
 @router.get("/{key}", response_model=list[VersionRow], dependencies=[Depends(require_permission("reports:read"))], summary="The saved versions of one dataset, newest first")
-async def list_versions(key: str, user: AuthUser, db: DBSession, before: Annotated[int | None, Query(ge=1)] = None) -> list[VersionRow]:
+async def list_versions(key: str, user: AuthUser, db: DBSession, before: Annotated[int | None, Query(ge=1, le=9_000_000_000_000)] = None) -> list[VersionRow]:
     rows = (
         await db.execute(
             text(
