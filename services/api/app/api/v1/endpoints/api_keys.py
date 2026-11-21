@@ -49,6 +49,7 @@ VALID_SCOPES: frozenset[str] = frozenset(
         "connectors:view",
         "billing:view",
         "metrics:view",
+        "compliance:read",
         "billing:push",
         "identities:respond",
         "identities:bec",

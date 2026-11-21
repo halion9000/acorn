@@ -107,7 +107,7 @@ def _out(results: list[dict], enabled: list[str], held: int) -> TestsOut:
 
 @router.get("", response_model=TestsOut, summary="How the client's checks answer each security practice, worked out now")
 async def list_tests(
-    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> TestsOut:
     checks = await _checks(db, tenant)
     return _out(engine.evaluate_all(checks, await _disabled(db, tenant)), await _enabled(db, tenant), len(checks))

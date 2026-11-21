@@ -35,6 +35,12 @@ WORK_ROUTES = {
 }
 STAY_ROUTES = {
     ("POST", "/cases"),
+    # A person linking a HaloPSA ticket to a case, or asking CORE to open one (2026-11-21); the toolbox requests need cases:write as well.
+    ("POST", "/cases/{case_id}/tickets"),
+    ("POST", "/cases/{case_id}/tickets/create"),
+    ("POST", "/toolbox/request"),
+    ("POST", "/toolbox/groups"),
+    ("GET", "/toolbox/groups/{request_id}"),
     ("POST", "/cases/{case_id}/alerts"),
     ("POST", "/cases/{case_id}/notes"),
     ("POST", "/cases/{case_id}/observables"),
@@ -128,7 +134,7 @@ class TestTheRoutes:
         found = {
             (m, p) for p, r in ALL_ROUTES if "cases:write" in required_permissions(r) for m in r.methods if m not in {"HEAD", "OPTIONS"}
         }
-        assert found == STAY_ROUTES and len(found) == 14
+        assert found == STAY_ROUTES and len(found) == 19
         assert not (_satisfied_by(["cases:work"]) & STAY_ROUTES)
 
     def test_whoever_held_cases_write_still_reaches_every_one_of_these_routes(self):

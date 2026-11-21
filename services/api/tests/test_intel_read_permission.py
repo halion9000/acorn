@@ -109,6 +109,7 @@ class TestTheImplication:
             "inventory:checkout": ("inventory:write",),
             "billing:view": ("alerts:read",),
             "metrics:view": ("reports:read",),
+            "compliance:read": ("reports:read",),
             "inventory:write": ("mssp:manage",),
             "vcio:assess": ("mssp:manage",),
             **_SETTINGS_AREAS,

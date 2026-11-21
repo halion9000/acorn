@@ -33,6 +33,7 @@ NEW = [
     "hunts:read",
     "intel:read",
     "metrics:view",
+    "compliance:read",
 ]
 OWNER = uuid.uuid4()
 OTHER_TENANT = uuid.uuid4()

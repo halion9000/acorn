@@ -177,7 +177,7 @@ async def _systems(db: DBSession, tenant: uuid.UUID) -> list[SystemChoice]:
 
 @router.get("", response_model=ReviewList, summary="The access reviews, newest first, and the systems whose people can be snapshotted")
 async def list_reviews(
-    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> ReviewList:
     reviews = (
         (await db.execute(select(AccessReview).where(AccessReview.tenant_id == tenant).order_by(AccessReview.created_at.desc())))
@@ -330,7 +330,7 @@ async def delete_schedule(
 
 @router.get("/{review_id}", response_model=ReviewDetail, summary="One review with every person and the decision for each")
 async def get_review(
-    review_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    review_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> ReviewDetail:
     return await _detail(db, tenant, await _review(db, tenant, review_id))
 

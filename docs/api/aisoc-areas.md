@@ -38,7 +38,7 @@ A.C.O.R.N has **1050** operations in **126** areas. This is a MAP, not a list of
 - **client-review**: 3 reads, 4 changes; protection: `alerts:read`, `mssp:manage`; e.g. One client's coverage, identity, alerts and cases for a review, with a cyber-insurance readiness checklist; Type an answer or a note into one question of a client's review
 - **client-status-links**: 2 reads, 4 changes; protection: `settings_clients:manage`, `settings_clients:view`; e.g. List links; Create link
 - **client-vulnerabilities**: 1 reads, 0 changes; protection: `alerts:read`; e.g. The vulnerabilities found at one client, or at all the caller's clients, one line each, worst first
-- **compliance**: 32 reads, 52 changes; protection: `reports:read`, `reports:write`; e.g. The access reviews, newest first, and the systems whose people can be snapshotted; Start a review: snapshot the people with access to a system
+- **compliance**: 32 reads, 52 changes; protection: `compliance:read`, `reports:read`, `reports:write`; e.g. The access reviews, newest first, and the systems whose people can be snapshotted; Start a review: snapshot the people with access to a system
 - **connectors**: 7 reads, 9 changes; protection: `connectors:delete`, `connectors:view`, `connectors:write`; e.g. List connectors; Create connector
 - **copilot**: 2 reads, 3 changes; protection: `copilot:use`; e.g. Confirm a destructive action the Copilot asked for; Send a message to the AI copilot and get a real LLM response.
 - **costs**: 1 reads, 0 changes; protection: `reports:read`; e.g. LLM spend, action counts, top-cost cases, and BYOK savings for the tenant

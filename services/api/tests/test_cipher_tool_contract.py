@@ -124,6 +124,15 @@ CIPHER_CALLS = [
     ("aisoc_score_breakdown", "GET", "/client-posture/{client_id}/score-breakdown", [], None, False),
     ("aisoc_client_compare", "GET", "/client-posture/{client_id}/compare", [], None, False),
     ("aisoc_check_weights", "GET", "/client-posture/fleet/weights", [], None, False),
+    # The compliance records, read through the narrow compliance:read scope (Hal approved the four compliance skills, 2026-11-21).
+    ("aisoc_answer_library", "GET", "/compliance/answer-library", ["client_id"], None, False),
+    ("aisoc_questionnaires", "GET", "/compliance/questionnaires", ["client_id"], None, False),
+    ("aisoc_questionnaire", "GET", "/compliance/questionnaires/{questionnaire_id}", ["client_id"], None, False),
+    ("aisoc_access_reviews", "GET", "/compliance/access-reviews", ["client_id"], None, False),
+    ("aisoc_access_review", "GET", "/compliance/access-reviews/{review_id}", ["client_id"], None, False),
+    ("aisoc_vendors", "GET", "/compliance/vendors", ["client_id", "archived"], None, False),
+    ("aisoc_vendor", "GET", "/compliance/vendors/{vendor_id}", ["client_id"], None, False),
+    ("aisoc_compliance_tests", "GET", "/compliance/tests", ["client_id"], None, False),
     ("aisoc_fleet_boards", "GET", "/client-posture/fleet/boards", [], None, False),
     ("aisoc_fleet_board", "GET", "/client-posture/fleet/boards/{board}", ["include_met", "limit"], None, False),
     ("aisoc_fleet_changes", "GET", "/client-posture/fleet/changes", ["days", "limit"], None, False),
@@ -300,7 +309,7 @@ def test_the_page_size_cap_is_at_least_what_core_sends(path):
 
 def test_the_table_covers_all_fifty_three_tools():
     tools = {re.sub(r" \(.*\)$", "", name) for name in CALL_IDS}
-    assert len(tools) == 89, sorted(tools)
+    assert len(tools) == 97, sorted(tools)
 
 
 READ_ONLY_TOOLS = [c for c in CIPHER_CALLS if c[1] == "GET"]
@@ -371,7 +380,7 @@ def test_every_tool_in_the_contract_is_a_get():
 
 def test_the_contract_has_no_tool_listed_twice():
     names = [r["tool"] for r in CONTRACT]
-    assert len(names) == len(set(names)) == 71
+    assert len(names) == len(set(names)) == 79
 
 
 def test_the_copy_is_the_same_as_the_file_in_the_core_checkout_when_one_is_next_to_this_repo():
@@ -460,6 +469,19 @@ def test_a_hunting_tool_needs_exactly_hunts_read_and_nothing_that_queries_teleme
     assert "lake:query" not in CORE_KEY_SCOPES and "hunts:read" in CORE_KEY_SCOPES
 
 
+# The compliance records are open to the agents ONLY through these eight GET paths, behind the narrow compliance:read scope (Hal approved the four compliance skills, 2026-11-21); everything else under /compliance stays out of reach.
+COMPLIANCE_READ_PATHS = {
+    "/compliance/answer-library",
+    "/compliance/questionnaires",
+    "/compliance/questionnaires/{questionnaire_id}",
+    "/compliance/access-reviews",
+    "/compliance/access-reviews/{review_id}",
+    "/compliance/vendors",
+    "/compliance/vendors/{vendor_id}",
+    "/compliance/tests",
+}
+
+
 def test_no_tool_in_the_table_can_reach_a_run_a_result_or_a_query():
     """Run results are event rows from the lake; running is a write. No Cipher tool, hand-written or declared, may name such a route."""
     for name, method, path, *_ in CIPHER_CALLS:
@@ -479,6 +501,8 @@ def test_no_tool_in_the_table_can_reach_a_run_a_result_or_a_query():
             "/compliance",
             "/effective-permissions",
         ):  # noqa: E501
+            if forbidden == "/compliance" and path in COMPLIANCE_READ_PATHS:
+                continue  # the eight read-only compliance paths (below)
             assert forbidden not in path, f"{name} ({method} {path}) reaches a route containing {forbidden}"
 
 
@@ -607,10 +631,11 @@ def test_the_estate_routes_are_gets_with_no_side_effects_in_their_handlers():
 
 
 def test_the_sensitive_areas_have_no_tool_and_say_why_in_the_table():
-    """Insider threat (per-employee risk scores, indicators, watchlists) and compliance (needs reports:read; GET /compliance/report writes a
-    record) are deliberately out of reach."""
+    """Insider threat (per-employee risk scores, indicators, watchlists) is deliberately out of reach, and so is compliance except for eight read-only paths behind
+    compliance:read (GET /compliance/report writes a record and stays out of reach)."""
     for _n, _m, path, *_ in CIPHER_CALLS:
-        assert not path.startswith(("/insider-threat", "/compliance")), path
+        assert not path.startswith("/insider-threat"), path
+        assert not path.startswith("/compliance") or (path in COMPLIANCE_READ_PATHS and _m == "GET"), path
         # Nothing under /identity/ except the per-client COUNTS of people with and without Multi-Factor and each client's Microsoft Secure Score (a number per client): no
         # names. The lists of people, the audit scores and the posture detail stay out of reach.
         assert not path.startswith("/identity/") or path in ("/identity/mfa-summary", "/identity/secure-scores/brief"), path

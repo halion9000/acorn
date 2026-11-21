@@ -259,7 +259,7 @@ async def _audit(
 async def list_vendors(
     tenant: ScopeTenant,
     db: DBSession,
-    _user: Annotated[AuthUser, Depends(require_permission("reports:read"))],
+    _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))],
     archived: bool = Query(False, description="True lists the archived vendors instead of the active ones."),
 ) -> VendorList:
     today = datetime.now(UTC).date()
@@ -466,7 +466,7 @@ async def export_vendors(
 
 @router.get("/{vendor_id}", response_model=VendorDetail, summary="One vendor with its reviews, documents and history")
 async def get_vendor(
-    vendor_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    vendor_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> VendorDetail:
     return await _detail(db, tenant, vendor_id)
 

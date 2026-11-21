@@ -81,6 +81,7 @@ CORE_KEY_SCOPES = [
     "cases:work",
     "proposals:log",
     "metrics:view",
+    "compliance:read",
     "connectors:view",
     "rules:view",
     "hunts:read",

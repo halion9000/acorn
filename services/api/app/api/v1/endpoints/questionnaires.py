@@ -197,7 +197,7 @@ async def _library(db: DBSession, tenant: uuid.UUID) -> list[QuestionnaireAnswer
 
 @library_router.get("", response_model=list[LibraryOut], summary="The answers kept for next time")
 async def list_library(
-    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> list[LibraryOut]:
     return [_library_out(a) for a in await _library(db, tenant)]
 
@@ -274,7 +274,7 @@ async def archive_library(
 
 @router.get("", response_model=QuestionnaireList, summary="The questionnaires, newest first")
 async def list_questionnaires(
-    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> QuestionnaireList:
     qs = (
         (await db.execute(select(Questionnaire).where(Questionnaire.tenant_id == tenant).order_by(Questionnaire.created_at.desc())))
@@ -332,7 +332,7 @@ async def start_questionnaire(
 
 @router.get("/{questionnaire_id}", response_model=QuestionnaireDetail, summary="One questionnaire with every question and its answer")
 async def get_questionnaire(
-    questionnaire_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+    questionnaire_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("compliance:read"))]
 ) -> QuestionnaireDetail:
     return await _detail(db, tenant, await _questionnaire(db, tenant, questionnaire_id))
 

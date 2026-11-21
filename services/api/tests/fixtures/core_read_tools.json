@@ -984,5 +984,86 @@
         "max": 10000
       }
     }
+  },
+  {
+    "tool": "aisoc_answer_library",
+    "method": "GET",
+    "path": "/compliance/answer-library",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_questionnaires",
+    "method": "GET",
+    "path": "/compliance/questionnaires",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_questionnaire",
+    "method": "GET",
+    "path": "/compliance/questionnaires/{questionnaire_id}",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_access_reviews",
+    "method": "GET",
+    "path": "/compliance/access-reviews",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_access_review",
+    "method": "GET",
+    "path": "/compliance/access-reviews/{review_id}",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_vendors",
+    "method": "GET",
+    "path": "/compliance/vendors",
+    "query": [
+      "client_id",
+      "archived"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_vendor",
+    "method": "GET",
+    "path": "/compliance/vendors/{vendor_id}",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
+  },
+  {
+    "tool": "aisoc_compliance_tests",
+    "method": "GET",
+    "path": "/compliance/tests",
+    "query": [
+      "client_id"
+    ],
+    "enums": {},
+    "numbers": {}
   }
 ]

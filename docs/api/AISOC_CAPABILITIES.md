@@ -44,7 +44,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | [client-review](#client-review) | 3 | 4 | `alerts:read`, `mssp:manage` |
 | [client-status-links](#client-status-links) | 2 | 4 | `settings_clients:manage`, `settings_clients:view` |
 | [client-vulnerabilities](#client-vulnerabilities) | 1 | 0 | `alerts:read` |
-| [compliance](#compliance) | 32 | 52 | `reports:read`, `reports:write` |
+| [compliance](#compliance) | 32 | 52 | `compliance:read`, `reports:read`, `reports:write` |
 | [connectors](#connectors) | 7 | 9 | `connectors:delete`, `connectors:view`, `connectors:write` |
 | [copilot](#copilot) | 2 | 3 | `copilot:use` |
 | [costs](#costs) | 1 | 0 | `reports:read` |
@@ -548,16 +548,16 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 
 | Method | Path | What it does | Permission |
 | --- | --- | --- | --- |
-| GET | `/compliance/access-reviews` | The access reviews, newest first, and the systems whose people can be snapshotted | `reports:read` |
+| GET | `/compliance/access-reviews` | The access reviews, newest first, and the systems whose people can be snapshotted | `compliance:read` |
 | POST | `/compliance/access-reviews` | Start a review: snapshot the people with access to a system | `reports:write` |
 | GET | `/compliance/access-reviews/schedules` | The reviews that start themselves, one per system | `reports:read` |
 | PUT | `/compliance/access-reviews/schedules` | Start a review of a system by itself every so many days (one schedule per system) | `reports:write` |
 | DELETE | `/compliance/access-reviews/schedules/{schedule_id}` | Stop a review starting itself | `reports:write` |
-| GET | `/compliance/access-reviews/{review_id}` | One review with every person and the decision for each | `reports:read` |
+| GET | `/compliance/access-reviews/{review_id}` | One review with every person and the decision for each | `compliance:read` |
 | POST | `/compliance/access-reviews/{review_id}/complete` | Complete the review once everyone is decided | `reports:write` |
 | POST | `/compliance/access-reviews/{review_id}/decide-all` | Decide for everyone still pending (by default only the people with no flag) | `reports:write` |
 | PATCH | `/compliance/access-reviews/{review_id}/entries/{entry_id}` | Decide for one person: keep or remove their access | `reports:write` |
-| GET | `/compliance/answer-library` | The answers kept for next time | `reports:read` |
+| GET | `/compliance/answer-library` | The answers kept for next time | `compliance:read` |
 | POST | `/compliance/answer-library` | Add an answer to the library | `reports:write` |
 | DELETE | `/compliance/answer-library/{answer_id}` | Remove an answer from the library (it is archived, not deleted) | `reports:write` |
 | PATCH | `/compliance/answer-library/{answer_id}` | Change an answer, or confirm it is still true | `reports:write` |
@@ -599,10 +599,10 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | GET | `/compliance/notices` | Get notice | `reports:read` |
 | PUT | `/compliance/notices` | Save notice | `reports:write` |
 | POST | `/compliance/notices/send` | Send now | `reports:write` |
-| GET | `/compliance/questionnaires` | The questionnaires, newest first | `reports:read` |
+| GET | `/compliance/questionnaires` | The questionnaires, newest first | `compliance:read` |
 | POST | `/compliance/questionnaires` | Start a questionnaire from pasted questions, drafting answers from the library | `reports:write` |
 | DELETE | `/compliance/questionnaires/{questionnaire_id}` | Delete a questionnaire and its questions (answers kept in the library stay) | `reports:write` |
-| GET | `/compliance/questionnaires/{questionnaire_id}` | One questionnaire with every question and its answer | `reports:read` |
+| GET | `/compliance/questionnaires/{questionnaire_id}` | One questionnaire with every question and its answer | `compliance:read` |
 | POST | `/compliance/questionnaires/{questionnaire_id}/approve-drafts` | Approve every drafted answer that came from the library with a close match | `reports:write` |
 | POST | `/compliance/questionnaires/{questionnaire_id}/complete` | Complete the questionnaire once every question is approved | `reports:write` |
 | GET | `/compliance/questionnaires/{questionnaire_id}/export.csv` | The questions and answers as a CSV file for the customer | `reports:read` |
@@ -613,7 +613,7 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | DELETE | `/compliance/report-schedules/{schedule_id}` | Delete a schedule | `reports:write` |
 | PATCH | `/compliance/report-schedules/{schedule_id}` | Change a schedule | `reports:write` |
 | POST | `/compliance/report-schedules/{schedule_id}/send-now` | Send this report now and record how it went | `reports:write` |
-| GET | `/compliance/tests` | How the client's checks answer each security practice, worked out now | `reports:read` |
+| GET | `/compliance/tests` | How the client's checks answer each security practice, worked out now | `compliance:read` |
 | PUT | `/compliance/tests/library` | Turn tests on or off for the client (the test library) | `reports:write` |
 | POST | `/compliance/tests/record` | Write the results as evidence for the controls of the frameworks that are on | `reports:write` |
 | GET | `/compliance/tests/schedule` | Whether the results are recorded as evidence every night | `reports:read` |
@@ -621,10 +621,10 @@ Read this with three cautions. `GET` means the route is *declared* as a read, no
 | GET | `/compliance/trust-center` | The trust center as it is shown, and what can be chosen for it | `reports:read` |
 | PUT | `/compliance/trust-center` | Choose what the trust center shows | `reports:write` |
 | PUT | `/compliance/trust-center/public` | Switch the public share link of the trust center on or off, or make a new link | `reports:write` |
-| GET | `/compliance/vendors` | The vendors of this organization or client, with the dashboard figures | `reports:read` |
+| GET | `/compliance/vendors` | The vendors of this organization or client, with the dashboard figures | `compliance:read` |
 | POST | `/compliance/vendors` | Add a vendor | `reports:write` |
 | GET | `/compliance/vendors/export.csv` | The vendors as a CSV file | `reports:read` |
-| GET | `/compliance/vendors/{vendor_id}` | One vendor with its reviews, documents and history | `reports:read` |
+| GET | `/compliance/vendors/{vendor_id}` | One vendor with its reviews, documents and history | `compliance:read` |
 | PATCH | `/compliance/vendors/{vendor_id}` | Change a vendor | `reports:write` |
 | POST | `/compliance/vendors/{vendor_id}/archive` | Archive a vendor (it stays in the history and can be restored) | `reports:write` |
 | POST | `/compliance/vendors/{vendor_id}/documents` | Record a document held for a vendor | `reports:write` |

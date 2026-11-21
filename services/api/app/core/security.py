@@ -357,6 +357,7 @@ _UNGRANTED_PERMISSIONS = frozenset(
         "proposals:log",
         "billing:view",
         "metrics:view",
+        "compliance:read",
         "identities:respond",
         "identities:bec",
         "inventory:write",
@@ -441,6 +442,7 @@ IMPLIED_BY: dict[str, tuple[str, ...]] = {
     "proposals:log": ("cases:write",),
     "billing:view": ("alerts:read",),
     "metrics:view": ("reports:read",),
+    "compliance:read": ("reports:read",),  # the compliance records for reading (answer library, questionnaires, access reviews, vendors, tests): CORE's key holds only this, so its agents can read them and nothing else under reports
     "inventory:checkout": (
         "inventory:write",
     ),  # checking a device out and in: held by the technician roles; administrators hold it through inventory:write
