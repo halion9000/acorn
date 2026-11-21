@@ -143,6 +143,7 @@ async def test_approving_queues_a_push_of_the_counted_quantity_for_core_and_asks
         "invoice_item": "Microsoft 365 Business Premium",
         "quantity": 12,
         "previous": 10,
+        "create_license": False,
     }
 
     again = await with_db(world.owner, lambda db: ep.approve(ep.ApproveIn(items=[item]), req, world.user, db))
@@ -267,3 +268,17 @@ def test_the_link_of_a_row_is_linked_when_a_line_carries_a_license_not_linked_wh
     assert link_status("300", "Google Workspace Backup", data) == ("na", None), "another client's license and lines do not count"
     assert link_status("219", "Sentinel Endpoints", None) == ("unknown", None)
     assert link_status(None, "Sentinel Endpoints", data) == ("unknown", None)
+
+
+def test_a_license_named_like_the_item_is_its_license_and_a_row_with_no_license_and_no_line_is_one_to_create_for():
+    from app.api.v1.endpoints.billing_sync import has_line, link_status
+
+    data = {
+        "licenses": [{"id": 8, "client_id": "219", "name": "DNS Filter (PassThru)", "active": True}, {"id": 9, "client_id": "219", "name": "Old", "active": False}],
+        "lines": [{"client_id": "219", "invoice_id": 1, "item": "Managed Services", "licence_ids": []}],
+    }
+    assert link_status("219", "dns filter (passthru)", data) == ("not_linked", 8), "the exact name, whatever the case"
+    assert link_status("219", "Old", data) == ("na", None), "an inactive license is not used"
+    assert has_line("219", "managed services", data) is True
+    assert has_line("219", "DNS Filter (PassThru)", data) is False
+    assert has_line("300", "Managed Services", data) is False and has_line(None, "x", data) is False and has_line("219", "x", None) is False

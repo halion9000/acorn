@@ -132,6 +132,11 @@ def link_status(halo_client_id: str | None, item: str, data: dict[str, Any] | No
     if not data or not halo_client_id:
         return "unknown", None
     want = _norm(item)
+    # A license named exactly like the item is the item's license (the Rewst page names the license after the row's Type).
+    carried_ids = {i for line in data.get("lines") or [] if str(line.get("client_id")) == str(halo_client_id) for i in line.get("licence_ids") or []}
+    for lic in data.get("licenses") or []:
+        if str(lic.get("client_id")) == str(halo_client_id) and lic.get("active") is not False and _norm(str(lic.get("name", ""))) == want and want:
+            return ("linked" if lic.get("id") in carried_ids else "not_linked"), lic.get("id")
     for line in data.get("lines") or []:
         if str(line.get("client_id")) == str(halo_client_id) and _norm(str(line.get("item", ""))) == want:
             ids = [i for i in line.get("licence_ids") or [] if isinstance(i, int)]
@@ -145,6 +150,14 @@ def link_status(halo_client_id: str | None, item: str, data: dict[str, Any] | No
         if len(want) >= 4 and (want in name or (len(name) >= 4 and name in want)):
             return ("linked" if lic.get("id") in carried else "not_linked"), lic.get("id")
     return "na", None
+
+
+def has_line(halo_client_id: str | None, item: str, data: dict[str, Any] | None) -> bool:
+    """Whether a line of the client's recurring invoices carries this item, as far as CORE has read them (pure); False when nothing was sent or the client is not mapped."""
+    if not data or not halo_client_id:
+        return False
+    want = _norm(item)
+    return any(str(line.get("client_id")) == str(halo_client_id) and _norm(str(line.get("item", ""))) == want for line in data.get("lines") or [])
 
 
 # CORE reads what HaloPSA bills about once a day, so for a day after a push that worked the page takes the pushed quantity as what is billed (otherwise a line that was just fixed keeps showing the old number and the old difference).
@@ -270,6 +283,9 @@ async def approve(
     """Queue the push of the counted quantity to HaloPSA for each line. The quantity is the one A.C.O.R.N counts NOW (never one the caller sends), so an approval cannot set an arbitrary number."""
     current = {(r.client_id, r.invoice_item): r for r in await _rows(user, db)}
     halo = await _halo_ids(db, user.tenant_id, list({i.client_id for i in body.items}))
+    licenses = (
+        await db.execute(select(MetricDataset.payload).where(MetricDataset.tenant_id == user.tenant_id, MetricDataset.key == "halo-licenses"))
+    ).scalar_one_or_none()
     now = datetime.now(UTC)
     results: list[ApproveResult] = []
     for item in body.items:
@@ -315,6 +331,8 @@ async def approve(
                 "invoice_item": item.invoice_item[:200],
                 "quantity": int(r.counted),
                 "previous": int(r.billed),
+                # A row with no license and no invoice line has nothing to change: CORE makes the license (as the Rewst Update HaloPSA License workflow does).
+                "create_license": link_status(halo_id, item.invoice_item, licenses)[0] == "na" and not has_line(halo_id, item.invoice_item, licenses) and licenses is not None,
             },
             status="pending",
             requested_by=user.user_id,
