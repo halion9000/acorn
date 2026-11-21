@@ -160,7 +160,7 @@ async def list_controls(
     enabled = sorted(
         (await db.execute(select(ComplianceEnabledFramework.framework).where(ComplianceEnabledFramework.tenant_id == tenant))).scalars()
     )
-    shown = inactive_frameworks(enabled, framework) if inactive else ([framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS]))
+    shown = inactive_frameworks(enabled, framework) if inactive is True else ([framework] if framework and framework in FRAMEWORKS else ([] if framework else [f for f in enabled if f in FRAMEWORKS]))
     evidence = await evidence_by_control(db, tenant, shown)
     everything = build_rows(shown, evidence, now, q, await owners_by_control(db, tenant, shown))
     counts = dict.fromkeys(compliance_health.STATES, 0)
