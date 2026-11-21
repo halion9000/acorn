@@ -71,14 +71,14 @@ def test_a_period_is_the_newest_weeks_and_a_year_is_fifty_two_at_most():
 
 def test_staff_metrics_utilization_is_logged_hours_over_available_hours_the_way_rewst_counts_it_and_filters_by_team():
     r = ms.staff_metrics(STAFF, 1)
-    # a team's week is all its logged hours over all its available hours (40 each, less 8 for each day off): (30 + 5) / 80 and 12 / (24 + 40)
-    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 43.8, 32), (W2, 18.8, 9)]
-    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [("Dan", 65.6, 40, 42.0), ("Vic", 6.2, 1, 5.0)]
-    assert r["members"][0]["by_week"] == {W1: 75.0, W2: 50.0}, "30 / 40 and 12 / 24"
+    # a team's week is all its logged hours over all its available hours (40 each, less time off in hours): (30 + 5) / 80 and 12 / (38 + 40)
+    assert [(w["week"], w["utilization"], w["closed"]) for w in r["weeks"]] == [(W1, 43.8, 32), (W2, 15.4, 9)]
+    assert [(m["engineer"], m["utilization"], m["closed"], m["labor_hours"]) for m in r["members"]] == [("Dan", 53.8, 40, 42.0), ("Vic", 6.2, 1, 5.0)]
+    assert r["members"][0]["by_week"] == {W1: 75.0, W2: 31.58}, "30 / 40 and 12 / 38"
     assert r["teams"] == ["Pod 1", "Pod 2"]
     only = ms.staff_metrics(STAFF, 1, "Pod 2")
     assert [m["engineer"] for m in only["members"]] == ["Vic"] and only["weeks"][0]["utilization"] == 12.5
-    assert ms.week_util({"labor_hours": 5, "days_off": 5}) is None, "nothing available is no utilization, not a divide by zero"
+    assert ms.week_util({"labor_hours": 5, "days_off": 40}) is None, "nothing available is no utilization, not a divide by zero"
 
 
 def test_pods_group_the_engineers_by_team_with_days_off_and_a_week_by_week_list():

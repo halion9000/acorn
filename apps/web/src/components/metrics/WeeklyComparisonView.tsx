@@ -2,7 +2,7 @@
 
 /**
  * Metrics > Weekly Tech Comparison: one week, each engineer under their pod: days worked, tickets new, opened and closed in the week, older tickets closed, closed in all, net (closed less new), new and closed per day worked,
- * and the Dialpad call tickets left out of those counts; and a line for all pods. Days worked is Monday to Friday less full days off and holidays (Rippling).
+ * and the Dialpad call tickets left out of those counts; and a line for all pods. Days worked is Monday to Friday less time off and holidays from Rippling (a day is eight hours; a few hours off count as that fraction).
  */
 import { useCallback, useState } from 'react';
 
@@ -100,7 +100,7 @@ export function WeeklyComparisonView() {
   return (
     <Page
       title="Weekly Tech Comparison"
-      subtitle="Tickets per engineer for one week, Dialpad call tickets left out. Days worked is Monday to Friday less full days off and holidays."
+      subtitle="Tickets per engineer for one week, Dialpad call tickets left out. Days worked is Monday to Friday less time off and holidays (eight hours a day)."
       denied={denied}
       problem={problem}
       loading={data === null && !denied && !problem}

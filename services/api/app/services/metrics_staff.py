@@ -69,8 +69,8 @@ def _mean(values: list[float]) -> float | None:
 
 
 def week_available(r: dict[str, Any]) -> float:
-    """Hours a person could work in a week: 40, less eight for each day of time off and each holiday; 0 when nothing is left."""
-    return max(0.0, 40.0 - 8.0 * (_num(r.get("days_off")) + _num(r.get("holidays"))))
+    """Hours a person could work in a week: 40, less the hours of time off and of holidays (CORE sends both in hours, eight for a day, the way Rewst counts them); 0 when nothing is left."""
+    return max(0.0, 40.0 - _num(r.get("days_off")) - _num(r.get("holidays")))
 
 
 def week_util(r: dict[str, Any]) -> float | None:
