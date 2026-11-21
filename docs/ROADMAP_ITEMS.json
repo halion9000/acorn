@@ -866,7 +866,7 @@
     "area": "Round 7: CORE improvement",
     "status": "in_progress",
     "needs": "claude",
-    "note": "Hal: 'I believe I gave a window above' (tonight 10pm PT). Done together with acorn-rename: see that item for what runs tonight and what waits for you to be at the keyboard.",
+    "note": "Hal: 'I believe I gave a window above' (tonight 10pm PT). Done together with acorn-rename: see that item for what runs tonight and what waits for you to be at the keyboard. 2026-11-21: Not done yet: the 23 remaining aisoc-* files in CORE are knowledge files, three Cipher skills (whose names are also model aliases in the LiteLLM gateway), an exam, tests and the contract file shared with A.C.O.R.N. Renaming them touches both repositories; planned as its own reviewed batch.",
     "added": "2026-11-14"
   },
   {
@@ -1529,7 +1529,7 @@
     "area": "Round 7: CORE feature",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Approved by Hal. Not built yet: the four compliance agent skills (this one and r7-cf-25, 26, 27) need the new narrow read-only key scope for compliance data, which means changing the key CORE uses to talk to A.C.O.R.N. I will not change a live credential while you are away. When you are at the keyboard, say go and I will add the scope, issue the new key, and build the tools and skills in one batch. The tool framework is ready (hud/src/acorn-read-tools.ts).",
+    "note": "Approved by Hal. Not built yet: the four compliance agent skills (this one and r7-cf-25, 26, 27) need the new narrow read-only key scope for compliance data, which means changing the key CORE uses to talk to A.C.O.R.N. I will not change a live credential while you are away. When you are at the keyboard, say go and I will add the scope, issue the new key, and build the tools and skills in one batch. The tool framework is ready (hud/src/acorn-read-tools.ts). 2026-11-21: Built after Hal said go: the narrow read-only permission compliance:read (migration 239; reports:read implies it; the live CORE key now holds it, added in place with the same secret, nothing else changed), eight read-only tools in CORE (answer library, questionnaires, access reviews, vendors, tests) and the skill, in Vera's skills. CORE and A.C.O.R.N both updated. NOT seen live: ask Vera or Cipher to draft answers for a questionnaire and say what she reads. Skill: questionnaire-from-library.",
     "added": "2026-11-14"
   },
   {
@@ -1538,7 +1538,7 @@
     "area": "Round 7: CORE feature",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard.",
+    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard. 2026-11-21: Built after Hal said go: the narrow read-only permission compliance:read (migration 239; reports:read implies it; the live CORE key now holds it, added in place with the same secret, nothing else changed), eight read-only tools in CORE (answer library, questionnaires, access reviews, vendors, tests) and the skill, in Vera's skills. CORE and A.C.O.R.N both updated. NOT seen live: ask Vera or Cipher to draft answers for a questionnaire and say what she reads. Skill: access-review-note.",
     "added": "2026-11-14"
   },
   {
@@ -1547,7 +1547,7 @@
     "area": "Round 7: CORE feature",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard.",
+    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard. 2026-11-21: Built after Hal said go: the narrow read-only permission compliance:read (migration 239; reports:read implies it; the live CORE key now holds it, added in place with the same secret, nothing else changed), eight read-only tools in CORE (answer library, questionnaires, access reviews, vendors, tests) and the skill, in Vera's skills. CORE and A.C.O.R.N both updated. NOT seen live: ask Vera or Cipher to draft answers for a questionnaire and say what she reads. Skill: vendor-review.",
     "added": "2026-11-14"
   },
   {
@@ -1556,7 +1556,7 @@
     "area": "Round 7: CORE feature",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard.",
+    "note": "Same as r7-cf-24: waiting for the new narrow compliance key scope, which changes the live CORE key. Say go when at the keyboard. 2026-11-21: Built after Hal said go: the narrow read-only permission compliance:read (migration 239; reports:read implies it; the live CORE key now holds it, added in place with the same secret, nothing else changed), eight read-only tools in CORE (answer library, questionnaires, access reviews, vendors, tests) and the skill, in Vera's skills. CORE and A.C.O.R.N both updated. NOT seen live: ask Vera or Cipher to draft answers for a questionnaire and say what she reads. Skill: test-failure-fix.",
     "added": "2026-11-14"
   },
   {
@@ -2252,7 +2252,7 @@
     "key": "acorn-rename",
     "title": "Rename AiSOC and Jarvis to A.C.O.R.N and CORE (steps 3 to 6)",
     "detail": "Steps 1 and 2 are done (text and the 251 CORE hud modules). Steps 3 to 6 of docs/RENAME_AUDIT_2026-11-15.md change names other things depend on.",
-    "note": "Hal (core2.docx, 2026-11-18): 'Do it tonight at 10pm PT'. I will NOT run steps 4 to 6 on my own tonight, because they change live state (container names, database tables and the role, VM paths) and a mistake takes both apps down: each needs a database backup, a rollback script and someone watching. What I can safely do in that window, and will prepare for you to say go on: step 3 (new CORE_ and ACORN_ variable names with the old ones as fallbacks; no behavior change). Question: reply 'go 3' for step 3 tonight and tell me when you are at the keyboard for the rest; I will then do one of steps 4, 5 and 6 per window, each with a backup first, and the rename lands over a few evenings instead of one night.",
+    "note": "Hal (core2.docx, 2026-11-18): 'Do it tonight at 10pm PT'. I will NOT run steps 4 to 6 on my own tonight, because they change live state (container names, database tables and the role, VM paths) and a mistake takes both apps down: each needs a database backup, a rollback script and someone watching. What I can safely do in that window, and will prepare for you to say go on: step 3 (new CORE_ and ACORN_ variable names with the old ones as fallbacks; no behavior change). Question: reply 'go 3' for step 3 tonight and tell me when you are at the keyboard for the rest; I will then do one of steps 4, 5 and 6 per window, each with a backup first, and the rename lands over a few evenings instead of one night. 2026-11-21: Step 3 done in CORE (go from Hal): a value under the new name ACORN_* or CORE_* is also found under the old AISOC_* or JARVIS_* when CORE reads a profile .env file; new wins, conflicts are reported by name. process.env readers and the A.C.O.R.N side are not covered yet (the old names still work everywhere). Steps 4 to 6 (tool names, containers, database, VM paths) still need a window with Hal at the keyboard and a backup first.",
     "added": "2026-11-15"
   },
   {
