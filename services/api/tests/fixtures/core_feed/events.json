@@ -1,0 +1,53 @@
+{
+  "route": "events",
+  "method": "POST",
+  "body": {
+    "events": [
+      {
+        "source": "halopsa",
+        "kind": "ticket.created",
+        "event_time": "2026-11-03T09:00:00",
+        "external_id": "101:created",
+        "payload": {
+          "ticket_id": "101",
+          "summary": "Printer",
+          "client_id": "12",
+          "client_name": "Acme Dental",
+          "agent_id": "40",
+          "agent_name": "",
+          "status_id": "9",
+          "priority_id": "2",
+          "tickettype_id": "",
+          "category_1": ""
+        },
+        "client_ref": {
+          "vendor": "halopsa",
+          "id": "12"
+        }
+      },
+      {
+        "source": "halopsa",
+        "kind": "ticket.closed",
+        "event_time": "2026-11-04T10:00:00",
+        "external_id": "101:closed",
+        "payload": {
+          "ticket_id": "101",
+          "summary": "Printer",
+          "client_id": "12",
+          "client_name": "Acme Dental",
+          "agent_id": "40",
+          "agent_name": "",
+          "status_id": "9",
+          "priority_id": "2",
+          "tickettype_id": "",
+          "category_1": "",
+          "closed_by": "40"
+        },
+        "client_ref": {
+          "vendor": "halopsa",
+          "id": "12"
+        }
+      }
+    ]
+  }
+}

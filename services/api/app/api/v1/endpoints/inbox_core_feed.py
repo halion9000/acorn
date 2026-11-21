@@ -34,6 +34,8 @@ from app.models.connector import Connector
 from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_profit import FinanceCostEntry, FinanceCostTransactions, FinancePnlMonth, FinanceProfitSnapshot, FinanceProfitTickets, FinanceQboSales, FinanceVendorCost
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
+from app.models.client_alias import ClientAlias
+from app.services.event_store import append_events
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
 from app.models.vendor_action import VendorAction
@@ -1919,6 +1921,44 @@ async def report_core_feed_metric_halo_licenses(tenant_token: str, body: MetricD
     """CORE's HaloPSA software licenses and the recurring invoice lines that carry them (the Billing sync Linked column): replaces the ones before."""
     tenant_id = await _verify_core_feed_token(db, tenant_token)
     return await _keep_metric_dataset(db, tenant_id, "halo-licenses", body)
+
+
+class EventsIn(BaseModel):
+    """Events from any source, each with its source, kind, time, external id and the whole event; ``client_ref`` ({vendor, id}) names the client in that tool and is turned into the mapped client here."""
+
+    events: list[dict[str, Any]] = Field(max_length=500)
+
+
+class EventsOut(BaseModel):
+    stored: int
+    duplicates: int
+    refused: int
+
+
+@router.post("/core-feed/{tenant_token}/events", response_model=EventsOut)
+async def report_core_feed_events(tenant_token: str, body: EventsIn, db: DBSession) -> EventsOut:
+    """The event store (SIEM style storage): CORE sends what each source reported as events; each is kept once (same source, kind and external id) and never changed."""
+    tenant_id = await _verify_core_feed_token(db, tenant_token)
+    await adopt_tenant(db, tenant_id)
+    refs = {(str(e["client_ref"].get("vendor") or "")[:40], str(e["client_ref"].get("id") or "")[:200]) for e in body.events if isinstance(e.get("client_ref"), dict)}
+    mapped: dict[tuple[str, str], str] = {}
+    if refs:
+        rows = (
+            await db.execute(
+                select(ClientAlias.vendor, ClientAlias.vendor_client_id, ClientAlias.child_tenant_id).where(
+                    ClientAlias.tenant_id == tenant_id, ClientAlias.vendor.in_({v for v, _ in refs}), ClientAlias.vendor_client_id.in_({i for _, i in refs}), ClientAlias.child_tenant_id.is_not(None)
+                )
+            )
+        ).all()
+        mapped = {(r.vendor, r.vendor_client_id): str(r.child_tenant_id) for r in rows}
+    prepared = []
+    for e in body.events:
+        ref = e.get("client_ref")
+        client = mapped.get((str(ref.get("vendor") or "")[:40], str(ref.get("id") or "")[:200])) if isinstance(ref, dict) else None
+        prepared.append({**{k: v for k, v in e.items() if k != "client_ref"}, **({"client_id": client} if client else {})})
+    out = await append_events(db, tenant_id, prepared)
+    await db.commit()
+    return EventsOut(**out)
 
 
 @router.post("/core-feed/{tenant_token}/metric-m365-roles", response_model=MetricDatasetOut)

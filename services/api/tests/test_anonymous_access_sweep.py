@@ -161,6 +161,9 @@ PUBLIC = {
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/metric-halo-licenses"): (
         "CORE's daily HaloPSA software licenses and the invoice lines that carry them: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own dataset."
     ),
+    ("POST", "/api/v1/inbox/core-feed/{tenant_token}/events"): (
+        "CORE's events from every source for the event store: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); each event is appended once to only that organization's own store and never changed."
+    ),
     ("POST", "/api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles"): (
         "CORE's daily Microsoft 365 directory roles and their members per client: authenticated by the secret core-feed token in the URL (401 in the handler otherwise); it replaces only that organization's own dataset."
     ),

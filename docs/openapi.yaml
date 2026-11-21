@@ -35368,6 +35368,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/inbox/core-feed/{tenant_token}/events:
+    post:
+      tags:
+      - inbox-core-feed
+      summary: Report Core Feed Events
+      description: 'The event store (SIEM style storage): CORE sends what each source
+        reported as events; each is kept once (same source, kind and external id)
+        and never changed.'
+      operationId: report_core_feed_events_api_v1_inbox_core_feed__tenant_token__events_post
+      parameters:
+      - name: tenant_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tenant Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/inbox/core-feed/{tenant_token}/metric-m365-roles:
     post:
       tags:
@@ -48418,6 +48453,39 @@ components:
       - since
       - next_seq
       title: EventListResponse
+    EventsIn:
+      properties:
+        events:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          maxItems: 500
+          title: Events
+      type: object
+      required:
+      - events
+      title: EventsIn
+      description: Events from any source, each with its source, kind, time, external
+        id and the whole event; ``client_ref`` ({vendor, id}) names the client in
+        that tool and is turned into the mapped client here.
+    EventsOut:
+      properties:
+        stored:
+          type: integer
+          title: Stored
+        duplicates:
+          type: integer
+          title: Duplicates
+        refused:
+          type: integer
+          title: Refused
+      type: object
+      required:
+      - stored
+      - duplicates
+      - refused
+      title: EventsOut
     EvidenceReport:
       properties:
         case_id:
