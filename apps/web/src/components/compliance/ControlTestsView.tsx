@@ -26,6 +26,7 @@ export function ControlTestsView() {
   const [note, setNote] = useState('');
   const [schedule, setSchedule] = useState<TestSchedule | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showOff, setShowOff] = useState(false);
 
   useEffect(() => {
     setClientId(clientFromAddress(window.location.search));
@@ -78,7 +79,16 @@ export function ControlTestsView() {
     }
   };
 
-  const shown = (data?.results ?? []).filter((r) => state === 'all' || r.state === state);
+  const shown = (data?.results ?? []).filter((r) => (state === 'all' || r.state === state) && (showOff || r.enabled !== false));
+  const off = (data?.results ?? []).filter((r) => r.enabled === false);
+  const turn = async (id: string, on: boolean) => {
+    const disabled = (data?.results ?? []).filter((r) => r.enabled === false && r.id !== id).map((r) => r.id);
+    try {
+      setData(await controlTestsApi.saveLibrary(clientId, on ? disabled : [...disabled, id]));
+    } catch (e) {
+      setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not save that.'));
+    }
+  };
   const tab = (value: State, label: string, n?: number) => (
     <button key={value} role="tab" aria-selected={state === value} type="button" onClick={() => setState(value)} className={`px-3 py-1.5 text-sm ${state === value ? 'border-b-2 border-blue-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
       {label}
@@ -129,9 +139,15 @@ export function ControlTestsView() {
         </p>
       )}
       {data && data.enabled.length === 0 && <p className="text-xs text-gray-500">No framework is turned on, so recording writes nothing. Turn one on in the Compliance overview.</p>}
+      {off.length > 0 && (
+        <label className="flex items-center gap-2 text-xs text-gray-400">
+          <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />
+          Show the {off.length} test{off.length === 1 ? '' : 's'} turned off
+        </label>
+      )}
       <ul className="space-y-2" data-testid="tests-list">
         {shown.map((r) => (
-          <li key={r.id} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid={`test-${r.id}`}>
+          <li key={r.id} className={`rounded-lg border border-gray-800 bg-gray-900/40 p-3 ${r.enabled === false ? 'opacity-60' : ''}`} data-testid={`test-${r.id}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="font-medium text-white">{r.title}</p>
@@ -147,6 +163,10 @@ export function ControlTestsView() {
                 {r.checks.map((c) => `${c.key.replace(/_/g, ' ')}: ${c.status.replace('_', ' ')}`).join(' · ')}
               </p>
             )}
+            <label className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+              <input type="checkbox" aria-label={`Test ${r.title} is on`} checked={r.enabled !== false} onChange={(e) => void turn(r.id, e.target.checked)} />
+              On (a test that is off is not counted and writes no evidence)
+            </label>
             <p className="mt-1 text-xs text-gray-500">
               Answers: {r.controls.map((c) => `${c.framework} ${c.control_id}${c.on ? '' : ' (not on)'}`).join(', ')}
             </p>

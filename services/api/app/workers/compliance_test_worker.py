@@ -33,7 +33,7 @@ async def _due(now: datetime, factory: Callable[[], Any] | None) -> list[uuid.UU
 
 async def record_once(*, now: datetime | None = None, factory: Callable[[], Any] | None = None) -> dict[str, int]:
     """One pass. Returns how many schedules recorded and how many failed."""
-    from app.api.v1.endpoints.compliance_tests import _checks, _enabled  # late: the endpoint module is large
+    from app.api.v1.endpoints.compliance_tests import _checks, _disabled, _enabled  # late: the endpoint module is large
 
     now = now or datetime.now(UTC)
     done = failed = 0
@@ -45,7 +45,7 @@ async def record_once(*, now: datetime | None = None, factory: Callable[[], Any]
                     continue
                 checks = await _checks(s, tenant)
                 enabled = await _enabled(s, tenant)
-                results = engine.evaluate_all(checks)
+                results = engine.evaluate_all(checks, await _disabled(s, tenant))
                 out = await engine.record(s, tenant, engine.evidence_rows(results, set(enabled)), now)
                 row.last_run_at = now
                 row.last_result = f"Recorded {out['written']} result{'' if out['written'] == 1 else 's'} for the frameworks that are on, replacing {out['replaced']}."

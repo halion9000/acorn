@@ -166,3 +166,50 @@ async def test_recording_writes_evidence_for_the_frameworks_that_are_on_replaces
     other = await run(w.birch, lambda db: ep.list_tests(w.birch, db, SimpleNamespace(tenant_id=w.birch, user_id=None)))
     assert other.checks_held == 0 and other.counts["not_tested"] == len(ct.TESTS)
     assert datetime.now(UTC).year >= 2026
+
+
+def test_a_test_turned_off_in_the_library_is_marked_and_writes_no_evidence_and_only_real_tests_count():
+    first = ct.TESTS[0].id
+    assert ct.disabled_of({"compliance_tests": {"disabled": [first, "no-such-test", 5]}}) == frozenset({first})
+    assert ct.disabled_of(None) == frozenset() and ct.disabled_of({}) == frozenset()
+    checks = {k: "met" for t in ct.TESTS for k in t.checks}
+    results = ct.evaluate_all(checks, frozenset({first}))
+    assert [r["enabled"] for r in results if r["test"].id == first] == [False] and all(r["enabled"] for r in results if r["test"].id != first)
+    every = {f for t in ct.TESTS for f, _ in t.controls}
+    rows = ct.evidence_rows(results, every)
+    assert not any(r["payload"]["test"] == first for r in rows), "no evidence for the test that is off"
+    assert any(r["payload"]["test"] != first for r in rows)
+    assert all(r["enabled"] for r in ct.evaluate_all(checks)), "everything is on by default"
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_turning_a_test_off_removes_it_from_the_counts_and_from_what_is_recorded_and_unknown_names_are_refused(world):
+    from fastapi import HTTPException
+
+    w = world
+    before = await run(w.acme, lambda db: ep.list_tests(w.acme, db, w.user))
+    assert before.counts["fail"] == 1 and all(r.enabled for r in before.results)
+
+    async def save(disabled):
+        async def work(db):
+            out = await ep.save_library(ep.LibraryIn(disabled=disabled), w.acme, db, w.user)
+            return out
+
+        return await run(w.acme, work)
+
+    out = await save(["legacy-auth"])
+    by = {r.id: r for r in out.results}
+    assert by["legacy-auth"].enabled is False and by["malware"].enabled is True
+    assert out.counts["fail"] == 0 and out.counts["pass"] == 1, "a test that is off is not counted"
+    listed = await run(w.acme, lambda db: ep.list_tests(w.acme, db, w.user))
+    assert {r.id: r.enabled for r in listed.results}["legacy-auth"] is False, "it is remembered"
+    await run(w.acme, lambda db: ep.record_tests(w.acme, db, w.user))
+    async with w.engine.begin() as conn:
+        tests = (await conn.execute(text("select raw_payload ->> 'test' from aisoc_compliance_evidence where tenant_id = :t and raw_payload ->> 'source' = 'checks'"), {"t": w.acme})).scalars().all()
+    assert "legacy-auth" not in tests and "malware" in tests
+    with pytest.raises(HTTPException) as e:
+        await save(["nope"])
+    assert e.value.status_code == 422
+    back = await save([])
+    assert all(r.enabled for r in back.results) and back.counts["fail"] == 1

@@ -19500,6 +19500,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/tests/library:
+    put:
+      tags:
+      - compliance
+      summary: Turn tests on or off for the client (the test library)
+      description: 'The tests named are turned off: they leave the counts and write
+        no evidence. Names that are not tests are refused. An empty list turns every
+        test back on.'
+      operationId: save_library_api_v1_compliance_tests_library_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/app__api__v1__endpoints__compliance_tests__LibraryIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/questionnaires:
     get:
       tags:
@@ -19923,7 +19967,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LibraryIn'
+              $ref: '#/components/schemas/app__api__v1__endpoints__questionnaires__LibraryIn'
             example:
               question: Do you encrypt data at rest?
               answer: Yes. AES-256 for storage, BitLocker on laptops.
@@ -52981,28 +53025,6 @@ components:
       - days_ago
       - silent
       title: LastReportedRow
-    LibraryIn:
-      properties:
-        question:
-          type: string
-          maxLength: 2000
-          minLength: 3
-          title: Question
-        answer:
-          type: string
-          maxLength: 10000
-          minLength: 1
-          title: Answer
-        category:
-          type: string
-          maxLength: 80
-          title: Category
-          default: General
-      type: object
-      required:
-      - question
-      - answer
-      title: LibraryIn
     LibraryItem:
       properties:
         id:
@@ -66723,6 +66745,10 @@ components:
       title: TestResponse
     TestResult:
       properties:
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
         id:
           type: string
           title: Id
@@ -72186,6 +72212,17 @@ components:
       - name
       - event
       title: ActionItem
+    app__api__v1__endpoints__compliance_tests__LibraryIn:
+      properties:
+        disabled:
+          items:
+            type: string
+          type: array
+          title: Disabled
+      type: object
+      required:
+      - disabled
+      title: LibraryIn
     app__api__v1__endpoints__compliance_tests__ScheduleIn:
       properties:
         nightly:
@@ -74328,6 +74365,28 @@ components:
           default: false
       type: object
       title: ItemPatch
+    app__api__v1__endpoints__questionnaires__LibraryIn:
+      properties:
+        question:
+          type: string
+          maxLength: 2000
+          minLength: 3
+          title: Question
+        answer:
+          type: string
+          maxLength: 10000
+          minLength: 1
+          title: Answer
+        category:
+          type: string
+          maxLength: 80
+          title: Category
+          default: General
+      type: object
+      required:
+      - question
+      - answer
+      title: LibraryIn
     app__api__v1__endpoints__questionnaires__LibraryOut:
       properties:
         id:

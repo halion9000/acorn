@@ -187,10 +187,17 @@ def evaluate(test: ControlTest, checks: dict[str, str]) -> dict[str, Any]:
     return {"state": state, "seen": seen, "met": statuses.count("met"), "total": len(statuses)}
 
 
-def evaluate_all(checks: dict[str, str]) -> list[dict[str, Any]]:
-    """Every test with its result, failing first, then partly, then passing, then those with nothing to go on (pure)."""
+def disabled_of(settings: dict[str, Any] | None) -> frozenset[str]:
+    """The ids of the tests a client turned off in the library (pure): only ids of real tests count."""
+    ids = ((settings or {}).get("compliance_tests") or {}).get("disabled") or []
+    known = {t.id for t in TESTS}
+    return frozenset(i for i in ids if isinstance(i, str) and i in known)
+
+
+def evaluate_all(checks: dict[str, str], disabled: frozenset[str] = frozenset()) -> list[dict[str, Any]]:
+    """Every test with its result and whether it is enabled, failing first, then partly, then passing, then those with nothing to go on (pure)."""
     order = {FAIL: 0, PARTLY: 1, PASS: 2, NOT_TESTED: 3}
-    out = [{"test": t, **evaluate(t, checks)} for t in TESTS]
+    out = [{"test": t, "enabled": t.id not in disabled, **evaluate(t, checks)} for t in TESTS]
     return sorted(out, key=lambda r: (order[r["state"]], r["test"].title))
 
 
@@ -198,6 +205,8 @@ def evidence_rows(results: list[dict[str, Any]], enabled: set[str]) -> list[dict
     """The evidence records to write: one per control a tested test answers, only for frameworks that are on (pure)."""
     rows: list[dict[str, Any]] = []
     for r in results:
+        if r.get("enabled") is False:
+            continue  # a test turned off in the library writes no evidence
         test: ControlTest = r["test"]
         status = EVIDENCE_STATUS.get(r["state"])
         if status is None:

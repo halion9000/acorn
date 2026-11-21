@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ list: vi.fn(), record: vi.fn(), schedule: vi.fn(), saveSchedule: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), record: vi.fn(), schedule: vi.fn(), saveSchedule: vi.fn(), saveLibrary: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), controlTestsApi: api, msspApi: { listChildren: async () => [] } }));
 
 import { ControlTestsView } from './ControlTestsView';
@@ -20,6 +20,7 @@ beforeEach(() => {
   api.record.mockReset();
   api.schedule.mockReset();
   api.saveSchedule.mockReset();
+  api.saveLibrary.mockReset();
   api.schedule.mockResolvedValue({ nightly: false, last_run_at: null, last_result: null });
   api.list.mockResolvedValue(tests());
   window.history.replaceState(null, '', '/compliance/tests');
@@ -83,5 +84,18 @@ describe('recording every night', () => {
     expect(await screen.findByTestId('tests-schedule')).toHaveTextContent('Last run 2026-11-18 03:00 UTC. Recorded 5 results');
     expect((screen.getByLabelText(/Record the results as evidence every night/) as HTMLInputElement).checked).toBe(true);
   });
-});
 
+  it('turns a test off in the library, keeps it out of the list unless asked, and turns it back on', async () => {
+    const withOff = (offIds: string[]) => tests(tests().results.map((r) => ({ ...r, enabled: !offIds.includes(r.id) })));
+    api.saveLibrary.mockImplementation((_c: string, disabled: string[]) => Promise.resolve(withOff(disabled)));
+    render(<ControlTestsView />);
+    await screen.findByTestId('test-mfa');
+    await userEvent.click(screen.getByLabelText('Test Multi-factor sign-in is required is on'));
+    await waitFor(() => expect(api.saveLibrary).toHaveBeenCalledWith('', ['mfa']));
+    await waitFor(() => expect(screen.queryByTestId('test-mfa')).toBeNull());
+    await userEvent.click(screen.getByLabelText(/Show the 1 test turned off/));
+    const mfa = await screen.findByTestId('test-mfa');
+    await userEvent.click(within(mfa).getByLabelText('Test Multi-factor sign-in is required is on'));
+    await waitFor(() => expect(api.saveLibrary).toHaveBeenLastCalledWith('', []));
+  });
+});

@@ -8002,6 +8002,8 @@ export async function downloadCsv(path: string, clientId = '', extra = ''): Prom
 
 /** Automated control tests (GET /api/v1/compliance/tests, POST /api/v1/compliance/tests/record). */
 export interface ControlTestResult {
+  /** False when the client turned the test off in the library. */
+  enabled?: boolean;
   id: string;
   title: string;
   why: string;
@@ -8027,6 +8029,8 @@ export const controlTestsApi = {
   saveSchedule: (clientId: string, nightly: boolean) => request<TestSchedule>(`/api/v1/compliance/tests/schedule?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify({ nightly }) }),
   list: (clientId: string) => request<ControlTests>(`/api/v1/compliance/tests?${riskQs(clientId)}`),
   record: (clientId: string) => request<{ written: number; replaced: number; results: ControlTests }>(`/api/v1/compliance/tests/record?${riskQs(clientId)}`, { method: 'POST' }),
+  /** Turns the tests named off (an empty list turns every test back on). */
+  saveLibrary: (clientId: string, disabled: string[]) => request<ControlTests>(`/api/v1/compliance/tests/library?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify({ disabled }) }),
 };
 
 /** The trust center (GET/PUT /api/v1/compliance/trust-center). */

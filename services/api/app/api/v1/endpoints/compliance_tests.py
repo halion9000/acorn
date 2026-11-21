@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -18,6 +18,7 @@ from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.governance import ComplianceTestSchedule
 from app.models.signin import ClientM365Check
+from app.models.tenant import Tenant
 from app.services import compliance_audit as audit
 from app.services import compliance_tests as engine
 
@@ -36,6 +37,7 @@ class CheckSeen(BaseModel):
 
 
 class TestResult(BaseModel):
+    enabled: bool = True  # False when the client turned this test off in the library
     id: str
     title: str
     why: str
@@ -68,6 +70,11 @@ async def _checks(db: DBSession, tenant: object) -> dict[str, str]:
     return out
 
 
+async def _disabled(db: DBSession, tenant: object) -> frozenset[str]:
+    row = await db.get(Tenant, tenant)
+    return engine.disabled_of(row.settings if row else None)
+
+
 async def _enabled(db: DBSession, tenant: object) -> list[str]:
     return sorted(
         (await db.execute(select(ComplianceEnabledFramework.framework).where(ComplianceEnabledFramework.tenant_id == tenant))).scalars()
@@ -80,9 +87,11 @@ def _out(results: list[dict], enabled: list[str], held: int) -> TestsOut:
     shown = []
     for r in results:
         t: engine.ControlTest = r["test"]
-        counts[r["state"]] += 1
+        if r.get("enabled", True):
+            counts[r["state"]] += 1
         shown.append(
             TestResult(
+                enabled=bool(r.get("enabled", True)),
                 id=t.id,
                 title=t.title,
                 why=t.why,
@@ -101,7 +110,7 @@ async def list_tests(
     tenant: ScopeTenant, db: DBSession, _user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
 ) -> TestsOut:
     checks = await _checks(db, tenant)
-    return _out(engine.evaluate_all(checks), await _enabled(db, tenant), len(checks))
+    return _out(engine.evaluate_all(checks, await _disabled(db, tenant)), await _enabled(db, tenant), len(checks))
 
 
 @router.post("/record", response_model=RecordOut, summary="Write the results as evidence for the controls of the frameworks that are on")
@@ -110,7 +119,7 @@ async def record_tests(
 ) -> RecordOut:
     checks = await _checks(db, tenant)
     enabled = await _enabled(db, tenant)
-    results = engine.evaluate_all(checks)
+    results = engine.evaluate_all(checks, await _disabled(db, tenant))
     done = await engine.record(db, tenant, engine.evidence_rows(results, set(enabled)), datetime.now(UTC))
     await audit.note(
         db, tenant, user, "compliance_tests:recorded", "compliance_tests", tenant, written=done["written"], replaced=done["replaced"]
@@ -151,3 +160,28 @@ async def save_schedule(
     await audit.note(db, tenant, user, "compliance_tests:schedule", "compliance_tests", tenant, nightly=body.nightly)
     await db.commit()
     return ScheduleOut(nightly=row.nightly, last_run_at=row.last_run_at, last_result=row.last_result)
+
+
+class LibraryIn(BaseModel):
+    disabled: list[str]
+
+
+@router.put("/library", response_model=TestsOut, summary="Turn tests on or off for the client (the test library)")
+async def save_library(
+    body: LibraryIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> TestsOut:
+    """The tests named are turned off: they leave the counts and write no evidence. Names that are not tests are refused. An empty list turns every test back on."""
+    known = {t.id for t in engine.TESTS}
+    unknown = [i for i in body.disabled if i not in known]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Not tests: {', '.join(unknown[:5])}")
+    row = await db.get(Tenant, tenant)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    settings = dict(row.settings or {})
+    settings["compliance_tests"] = {**(settings.get("compliance_tests") or {}), "disabled": sorted(set(body.disabled))}
+    row.settings = settings
+    await audit.note(db, tenant, user, "compliance_tests:library", "compliance_tests", tenant, disabled=len(settings["compliance_tests"]["disabled"]))
+    await db.commit()
+    checks = await _checks(db, tenant)
+    return _out(engine.evaluate_all(checks, engine.disabled_of(settings)), await _enabled(db, tenant), len(checks))
