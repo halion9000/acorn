@@ -133,7 +133,119 @@ async def _org_mismatch(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str,
     return dr.org_mismatch_text(await org_mismatch_rows(db, tenant))
 
 
+def digest_text(d: Any) -> tuple[str, str] | None:
+    """The executive weekly digest as plain text (pure over the digest model): the headline, alerts and cases, the time to respond, the top tactics and sources, the recommendations. Always has something to say."""
+    p = d.period
+    lines = [d.headline, f"Period: {p.label}"]
+    a, c = d.alerts, d.cases
+    lines += [
+        "",
+        f"Alerts: {a.total} in the period, {a.new} new, {a.resolved} resolved, {a.open_at_period_end} open at the end (critical {a.severity.critical}, high {a.severity.high})",
+        f"Cases: {c.opened} opened, {c.closed} closed, {c.open_at_period_end} open at the end, {c.sla_breached} past their deadline",
+        *( [f"Time to respond (hours): detect {d.mtt.mttd_hours}, respond {d.mtt.mttr_hours}, close {d.mtt.mttc_hours}"] if d.mtt.mttr_hours is not None else []),
+    ]
+    if d.top_tactics:
+        lines += ["", "Top tactics:"] + [f"- {t.tactic} ({t.count})" for t in d.top_tactics[:5]]
+    if d.top_sources:
+        lines += ["", "Top sources:"] + [f"- {t.label or t.connector_type} ({t.count})" for t in d.top_sources[:5]]
+    if d.high_risk_alerts:
+        lines += ["", "Highest risk alerts:"] + [f"- {h.title}" for h in d.high_risk_alerts[:5]]
+    if d.recommendations:
+        lines += ["", "Recommendations:"] + [f"- {r.title}: {r.body}" for r in d.recommendations[:6]]
+    return d.headline[:150], "\n".join(x for x in lines if x is not None)
+
+
+async def _executive_digest(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from app.services.executive_digest import build_weekly_digest  # noqa: PLC0415
+
+    return digest_text(await build_weekly_digest(db, tenant))
+
+
+def licence_waste_text(rows: list[dict[str, Any]]) -> tuple[str, str] | None:
+    """The licenses bought but not assigned, by client, most first (pure). Quantities only, never prices. None when there are none."""
+    if not rows:
+        return None
+    total = sum(int(r["unassigned"]) for r in rows)
+    lines = [f"- {r['client_name']}: {r['item']} ({r['source']}): {r['unassigned']} of {r['bought']} unassigned ({r['percent']}%){' (count is old)' if r.get('stale') else ''}" for r in rows[:60]]
+    more = f"\n...and {len(rows) - 60} more lines" if len(rows) > 60 else ""
+    clients = len({r["client_name"] for r in rows})
+    return f"{total} unassigned licenses at {clients} clients", f"{total} licenses bought and not assigned to anyone, {len(rows)} lines at {clients} clients:\n" + "\n".join(lines) + more
+
+
+async def _licence_waste(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from app.api.v1.endpoints.billing import _all_count_rows, _scope  # noqa: PLC0415
+    from app.services.licence_waste import waste_rows  # noqa: PLC0415
+
+    ids, names = await _scope(db, tenant, None)
+    counts = await _all_count_rows(db, ids[1:])
+    return licence_waste_text([r.__dict__ for r in waste_rows(counts, names, now, 1)])
+
+
+def fleet_review_text(d: dict[str, Any]) -> tuple[str, str] | None:
+    """The client review: what got worse and better since yesterday, what is overdue, which accepted risks end soon and who is under target (pure over the fleet digest as a dict of lists of {client_name, text})."""
+    sections = [("Got worse", "worse"), ("Got better", "better"), ("Overdue", "overdue"), ("Accepted risks ending within a week", "expiring"), ("Clients under their target", "below_target")]
+    lines: list[str] = []
+    for title, key in sections:
+        items = d.get(key) or []
+        if items:
+            lines += ["", f"{title} ({d.get('counts', {}).get(key, len(items))}):"] + [f"- {i['client_name']}: {i['text']}" for i in items[:25]]
+    if not lines:
+        return None
+    return "Client review: what needs attention", "\n".join(lines).lstrip("\n")
+
+
+async def _client_review(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from app.api.v1.endpoints.client_posture import fleet_digest  # noqa: PLC0415
+
+    out = await fleet_digest(SimpleNamespace(tenant_id=tenant), db, days=7, limit=25)
+    return fleet_review_text(out.model_dump())
+
+
+def net_income_text(rows: list[dict[str, Any]], month: str) -> tuple[str, str] | None:
+    """Net income for a month, per client (pure over [{client_name, revenue, net_income}]): the totals, how many clients lost money, the five best and five worst. None with no rows."""
+    if not rows:
+        return None
+    revenue = sum(float(r["revenue"]) for r in rows)
+    net = sum(float(r["net_income"]) for r in rows)
+    losing = [r for r in rows if float(r["net_income"]) < 0]
+    ranked = sorted(rows, key=lambda r: float(r["net_income"]))
+    money = lambda v: f"{'-' if v < 0 else ''}${abs(v):,.0f}"  # noqa: E731
+    lines = [
+        f"Net income for {month}: {money(net)} on {money(revenue)} of revenue ({(100 * net / revenue):.1f}%), {len(rows)} clients, {len(losing)} lost money.",
+        "",
+        "Lowest five:",
+        *[f"- {r['client_name']}: {money(float(r['net_income']))}" for r in ranked[:5]],
+        "",
+        "Highest five:",
+        *[f"- {r['client_name']}: {money(float(r['net_income']))}" for r in reversed(ranked[-5:])],
+    ]
+    return f"Net income {month}: {money(net)}", "\n".join(lines)
+
+
+async def _net_income(db: Any, tenant: uuid.UUID, now: datetime) -> tuple[str, str] | None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from app.api.v1.endpoints.finance import profitability_summary  # noqa: PLC0415
+
+    out = await profitability_summary(SimpleNamespace(tenant_id=tenant), db, month=None)
+    through = out.get("through")
+    if not through:
+        return None
+    rows = []
+    for r in out.get("rows") or []:
+        m = (r.get("by_month") or {}).get(through)
+        if m:
+            rows.append({"client_name": r["client_name"], "revenue": m["revenue"], "net_income": m["net_income"]})
+    return net_income_text(rows, through)
+
+
 KINDS: dict[str, tuple[str, Renderer]] = {
+    "executive_digest": ("Executive digest for the week (alerts, cases, response times, what to do)", _executive_digest),
+    "client_review": ("Client review: what got worse, overdue, ending and under target", _client_review),
+    "net_income": ("Net income by client for the last complete month", _net_income),
+    "licence_waste": ("Licenses bought but not assigned (all clients)", _licence_waste),
     "org_mismatch": ("Machines filed under different clients in Huntress and NinjaOne", _org_mismatch),
     "new_vulnerabilities": ("New vulnerabilities in the last 7 days (all clients)", _new_vulnerabilities),
     "compliance_actions": ("Compliance action items (what needs doing now)", _compliance_actions),
