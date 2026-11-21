@@ -70,7 +70,7 @@
           "holidays": 0,
           "days_worked": 5,
           "closed": 0,
-          "created": 1,
+          "created": 0,
           "new_tickets": 1,
           "closed_tickets": 1,
           "opened_closed": 1,
@@ -80,7 +80,8 @@
           "total_calls": 12,
           "total_call_time": 40
         }
-      ]
+      ],
+      "hidden_engineers": []
     }
   }
 }

@@ -39,7 +39,8 @@
           "team": "Pod 1",
           "total_hours": 1.5
         }
-      ]
+      ],
+      "hidden_engineers": []
     }
   }
 }

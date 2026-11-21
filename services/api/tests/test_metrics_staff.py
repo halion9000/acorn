@@ -435,3 +435,14 @@ async def test_the_excluded_list_is_saved_on_the_organization_and_every_staff_pa
     assert got["engineers"] == ["Dan Kemp", "Vic Cio"], "the choices are everyone CORE sent, excluded or not"
     data, at = await mp._dataset(Db(), user, "staff-weekly")
     assert [r["engineer"] for r in data["rows"]] == ["Vic Cio"] and at == "t"
+
+
+def test_the_agents_core_names_as_hidden_are_left_out_of_every_staff_page_and_are_not_offered_in_settings():
+    staff = {
+        "rows": [{"week": W2, "engineer": "Dan Kemp", "team": "Pod 1"}, {"week": W2, "engineer": "Old Hand", "team": "Pod 2"}, {"week": W2, "engineer": "Rewst API", "team": ""}],
+        "hidden_engineers": ["Old Hand", "Rewst API"],
+    }
+    assert [r["engineer"] for r in ms.without_excluded("staff-weekly", staff, [])["rows"]] == ["Dan Kemp"]
+    assert [r["engineer"] for r in ms.without_excluded("dialpad-weekly", {**staff}, ["dan kemp"])["rows"]] == []
+    assert ms.engineers_of(staff) == ["Dan Kemp"], "settings offers only the people the pages show"
+    assert ms.without_excluded("staff-weekly", {"rows": staff["rows"]}, [])["rows"] == staff["rows"], "no hidden list, nothing hidden"

@@ -92,7 +92,8 @@
           "age_days": 74,
           "opened": "2026-09-01"
         }
-      ]
+      ],
+      "hidden_engineers": []
     }
   }
 }

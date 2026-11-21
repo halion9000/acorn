@@ -39,7 +39,8 @@
           "total_call_time": 40,
           "triage_inbound": 0
         }
-      ]
+      ],
+      "hidden_engineers": []
     }
   }
 }

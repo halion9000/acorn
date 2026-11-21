@@ -274,7 +274,9 @@ def _name_key(name: Any) -> str:
 
 def without_excluded(key: str, payload: dict[str, Any] | None, excluded: list[str]) -> dict[str, Any] | None:
     """The dataset with the people marked excluded left out of what is shown (pure). Only people-shaped rows go: the weekly staff, Dialpad and meeting rows by engineer, and the stale tickets by their tech. Tickets, client counts and totals worked out from client rows are untouched."""
-    skip = {_name_key(n) for n in excluded if _name_key(n)}
+    # CORE names the agents the Rewst dashboards do not show as people (disabled, service accounts, hidden teams, gone): they are left out like the ones marked in Settings.
+    hidden = (payload or {}).get("hidden_engineers") if isinstance((payload or {}).get("hidden_engineers"), list) else []
+    skip = {_name_key(n) for n in [*excluded, *hidden] if _name_key(n)}
     if not payload or not skip:
         return payload
     out = dict(payload)
@@ -287,7 +289,8 @@ def without_excluded(key: str, payload: dict[str, Any] | None, excluded: list[st
 
 def engineers_of(payload: dict[str, Any] | None) -> list[str]:
     """Every engineer name in the weekly staff data, sorted without regard to case (pure)."""
-    return sorted({str(r.get("engineer")) for r in (payload or {}).get("rows") or [] if r.get("engineer")}, key=str.lower)
+    hidden = {_name_key(n) for n in (payload or {}).get("hidden_engineers") or []}
+    return sorted({str(r.get("engineer")) for r in (payload or {}).get("rows") or [] if r.get("engineer") and _name_key(r.get("engineer")) not in hidden}, key=str.lower)
 
 
 def weekly_comparison(payload: dict[str, Any] | None, week: str | None = None) -> dict[str, Any]:
