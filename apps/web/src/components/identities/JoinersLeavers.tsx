@@ -50,10 +50,13 @@ function Table({ rows, label, testId }: { rows: Row[]; label: string; testId: st
 }
 
 export function JoinersLeavers() {
+  // Closed until asked: the section is long and the page above it is the one people come for. It loads only when opened.
+  const [open, setOpen] = useState(false);
   const [days, setDays] = useState(30);
   const [data, setData] = useState<JoinersLeaversData | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
+    if (!open) return;
     let live = true;
     void (async () => {
       try {
@@ -71,11 +74,17 @@ export function JoinersLeavers() {
     return () => {
       live = false;
     };
-  }, [days]);
+  }, [days, open]);
   return (
     <section className="space-y-3 px-6 pb-8" data-testid="joiners-leavers">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-white">Joiners and leavers</h2>
+        <h2 className="text-lg font-semibold text-white">
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 hover:text-gray-200">
+            <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+            Joiners and leavers
+          </button>
+        </h2>
+        {open ? (
         <label className="text-xs text-gray-400">
           Period{' '}
           <select className="rounded border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100" value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -84,9 +93,10 @@ export function JoinersLeavers() {
             ))}
           </select>
         </label>
+        ) : null}
       </div>
-      {problem ? <p className="text-sm text-amber-300">{problem}</p> : null}
-      {data ? (
+      {open && problem ? <p className="text-sm text-amber-300">{problem}</p> : null}
+      {open && data ? (
         <>
           <p className="text-xs text-gray-500">
             The join day is the day A.C.O.R.N first saw the account; accounts already there when a directory first reported are not shown as joiners. {data.recorded_since ? `Recorded since ${data.recorded_since.slice(0, 10)}.` : 'Nothing is recorded yet.'}

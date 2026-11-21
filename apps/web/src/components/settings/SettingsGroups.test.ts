@@ -43,6 +43,7 @@ describe('settings groups', () => {
     const labels = (caps?: string[]) => groupedSettings([...tabs] as never, caps).flatMap((g) => g.entries.map((e) => e.label));
     const gated = MORE_SETTINGS.filter((m) => m.requires);
     expect(gated.map((m) => [m.href, m.requires])).toEqual([
+      ['/settings/client-sign-ins', 'manage_users'],
       ['/settings/retention', 'settings_data'],
       ['/settings/finance', 'finance_view'],
       ['/settings/triage', 'settings_automation'],

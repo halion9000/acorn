@@ -210,6 +210,13 @@ def test_with_sso_on_only_administrators_may_use_a_password_unless_the_setting_s
     assert sso.password_login_allowed("viewer") is True
 
 
+def test_people_outside_the_organization_keep_their_password_sign_in_whatever_the_setting_is(world):
+    # An auditor or a client's own people have no Microsoft account of the organization (an auditor was told to "sign in with Microsoft").
+    for role in ("auditor", "client_viewer", "compliance_viewer"):
+        assert sso.password_login_allowed(role) is True, role
+    assert sso.password_login_allowed("viewer") is False
+
+
 # ─── Starting ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 

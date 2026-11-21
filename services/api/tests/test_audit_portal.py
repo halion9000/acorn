@@ -318,3 +318,26 @@ async def test_staff_can_create_an_auditor_sign_in_that_opens_only_the_audit_it_
     with pytest.raises(HTTPException) as bad:
         await run(w.msp, lambda db: ap.invite_auditor(w.audit_a, ap.InviteIn(account_name="no spaces allowed!"), w.msp, db, staff))
     assert bad.value.status_code == 422
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_taking_an_auditors_access_away_switches_the_account_off_and_the_name_can_be_invited_again(world):
+    w = world
+    staff = staff_of(w)
+    first = await run(w.msp, lambda db: ap.invite_auditor(w.audit_a, ap.InviteIn(account_name="reuse-me", name="Rae"), w.msp, db, staff))
+    async with w.engine.begin() as conn:
+        uid = (await conn.execute(text("select id from users where account_name = 'reuse-me'"))).scalar_one()
+    await run(w.msp, lambda db: ap.remove_auditor(w.audit_a, uid, w.msp, db, staff))
+    async with w.engine.begin() as conn:
+        assert (await conn.execute(text("select is_active from users where id = :i"), {"i": uid})).scalar_one() is False, "no audit left to open: switched off"
+    second = await run(w.msp, lambda db: ap.invite_auditor(w.audit_b, ap.InviteIn(account_name="reuse-me"), w.msp, db, staff))
+    assert second.temporary_password != first.temporary_password and len(second.auditors) == 1
+    async with w.engine.begin() as conn:
+        row = (await conn.execute(text("select count(*), bool_and(is_active) from users where account_name = 'reuse-me'"))).one()
+        link = (await conn.execute(text("select audit_id from audit_auditors where user_id = :i"), {"i": uid})).scalars().all()
+    assert tuple(row) == (1, True) and link == [w.audit_b], "the same account, active again, opening the new audit only"
+    # An account that still opens an audit is not reusable: that name is taken.
+    with pytest.raises(HTTPException) as dup:
+        await run(w.msp, lambda db: ap.invite_auditor(w.audit_a, ap.InviteIn(account_name="reuse-me"), w.msp, db, staff))
+    assert dup.value.status_code == 409

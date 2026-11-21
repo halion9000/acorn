@@ -59,6 +59,9 @@ STATE_TTL = 600
 CODE_TTL = 60
 KEYS_TTL = 3600
 ADMIN_ROLES = frozenset({"platform_admin", "admin", "tenant_admin"})
+# People OUTSIDE the organization (an auditor, a client's own people) have no Microsoft account of the organization to sign in with: they sign in with the account and password made for them (and an authenticator app),
+# whatever the Microsoft sign-in setting says. Found 2026-11-21: an auditor was told to "sign in with Microsoft".
+OUTSIDE_ROLES = frozenset({"auditor", "client_viewer", "compliance_viewer"})
 # Roles that a new person may never be created with, whatever the setting says.
 NEVER_AT_FIRST = ADMIN_ROLES | {"api_service"}
 
@@ -158,7 +161,7 @@ def password_login_allowed(role: str, env: dict[str, str] | None = None) -> bool
     cfg = load_config(env)
     if cfg is None or cfg.password_login == "all":
         return True
-    return role in ADMIN_ROLES
+    return role in ADMIN_ROLES or role in OUTSIDE_ROLES
 
 
 # ─── Redis (state and one-time codes) ──────────────────────────────────────────────────────────────────────────────────────

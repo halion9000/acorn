@@ -1,6 +1,9 @@
 /** Settings pages that are their own screens. They were reachable only by typing their address; this lists them. */
 /** `requires`: the capability (a View permission of its Settings area) a person needs to be shown the page; the server checks every action itself. A page with none is shown to everyone who reaches Settings. */
 export const MORE_SETTINGS: { href: string; label: string; description: string; requires?: string }[] = [
+  { href: '/settings/client-sign-ins', label: 'Client sign-ins', description: 'Sign-ins for people at your clients: the client dashboard and the read-only Compliance pages', requires: 'manage_users' },
+  { href: '/settings/metrics-people', label: 'Metrics people', description: 'HaloPSA engineers to leave out of what the metrics pages show' },
+  { href: '/settings/event-retention', label: 'Event retention', description: 'How long the stored events and saved data versions of each client are kept' },
   { href: '/settings/rbac', label: 'Roles & permissions', description: 'Who can do what, and which sidebar pages each role sees' },
   { href: '/settings/connectors', label: 'Connectors', description: 'The tools connected to A.C.O.R.N, and the ones CORE manages' },
   { href: '/settings/client-mapping', label: 'Client mapping', description: 'Link the clients of each tool to your client tenants' },

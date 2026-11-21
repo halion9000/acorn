@@ -240,8 +240,21 @@ async def invite_auditor(
         name = validate_account_name(body.account_name)
     except InvalidAccountName as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from None
-    if await account_name_taken(db, name):
+    # An auditor account that no audit opens any more (its access was taken away) is reused instead of refused: new password, linked to this audit.
+    leftover = await _unlinked_auditor(db, tenant, name)
+    if leftover is None and await account_name_taken(db, name):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="That account name is already taken. Choose another.")
+    if leftover is not None:
+        password = secrets.token_urlsafe(15)
+        leftover.hashed_password = get_password_hash(password)
+        leftover.is_active = True
+        if body.name and body.name.strip():
+            leftover.username = body.name.strip()[:100]
+        db.add(AuditAuditor(tenant_id=tenant, audit_id=a.id, user_id=leftover.id, created_by=getattr(user, "email", None)))
+        await db.flush()
+        await audit_trail.note(db, tenant, user, "audit:auditor_invited", "audit", a.id, auditor=str(leftover.id), reused=True)
+        await db.commit()
+        return InviteOut(auditors=await list_auditors(audit_id, tenant, db, user), temporary_password=password)
     email = normalize_email(body.email) if body.email else None
     if email is not None:
         taken = (await db.execute(select(User.id).where(func.lower(User.email) == email).limit(1))).scalar_one_or_none()
@@ -269,6 +282,17 @@ async def invite_auditor(
     return InviteOut(auditors=await list_auditors(audit_id, tenant, db, user), temporary_password=password)
 
 
+async def _unlinked_auditor(db: Any, tenant: uuid.UUID, name: str) -> Any:
+    """An auditor account of this workspace with this name that opens no audit (so it can be reused), else None (pure lookup)."""
+    person = (
+        await db.execute(select(User).where(func.lower(User.account_name) == name.lower(), User.tenant_id == tenant, User.role == client_portal.AUDITOR_ROLE))
+    ).scalar_one_or_none()
+    if person is None:
+        return None
+    links = (await db.execute(select(func.count()).select_from(AuditAuditor).where(AuditAuditor.user_id == person.id))).scalar_one()
+    return None if links else person
+
+
 @staff_router.delete("/{audit_id}/auditors/{user_id}", response_model=list[AuditorOut], summary="Take an auditor's access to this audit away")
 async def remove_auditor(
     audit_id: uuid.UUID,
@@ -280,6 +304,12 @@ async def remove_auditor(
     a = await audits_ep._audit(db, tenant, audit_id)
     await db.execute(delete(AuditAuditor).where(AuditAuditor.audit_id == a.id, AuditAuditor.user_id == user_id, AuditAuditor.tenant_id == tenant))
     await audit_trail.note(db, tenant, user, "audit:auditor_removed", "audit", a.id, auditor=str(user_id))
+    # An auditor account exists only to open audits: with no audit left to open, it is switched off, and its name stays free to use again (a new invite for the same name reuses it).
+    person = (await db.execute(select(User).where(User.id == user_id, User.tenant_id == tenant, User.role == client_portal.AUDITOR_ROLE))).scalar_one_or_none()
+    if person is not None:
+        still = (await db.execute(select(func.count()).select_from(AuditAuditor).where(AuditAuditor.user_id == user_id))).scalar_one()
+        if not still:
+            person.is_active = False
     await db.commit()
     return await list_auditors(audit_id, tenant, db, user)
 

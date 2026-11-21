@@ -319,3 +319,35 @@ describe('Select all', () => {
     expect(screen.getAllByRole('checkbox').filter((c) => (c as HTMLInputElement).checked)).toHaveLength(1);
   });
 });
+
+describe('the Linked and License ID columns', () => {
+  const linked = [
+    row({ client_id: 'a', client_name: 'Acme', link: 'not_linked', license_id: 30 }),
+    row({ client_id: 'b', client_name: 'Birch', link: 'linked', license_id: 20 }),
+    row({ client_id: 'c', client_name: 'Cedar', link: 'na', license_id: null }),
+    row({ client_id: 'd', client_name: 'Dune', link: 'unknown' }),
+  ];
+
+  it('filters by Linked, Not Linked or N/A and leaves a row with no license data out of all three', () => {
+    expect(filterRows(linked, '', '', 'linked').map((r) => r.client_name)).toEqual(['Birch']);
+    expect(filterRows(linked, '', '', 'not_linked').map((r) => r.client_name)).toEqual(['Acme']);
+    expect(filterRows(linked, '', '', 'na').map((r) => r.client_name)).toEqual(['Cedar']);
+    expect(filterRows(linked, '', '').map((r) => r.client_name)).toEqual(['Acme', 'Birch', 'Cedar', 'Dune']);
+  });
+
+  it('sorts by Linked (Linked, Not Linked, N/A, then unknown) and by License ID (none last)', () => {
+    expect(sortRows(linked, 'linked', 'asc').map((r) => r.client_name)).toEqual(['Birch', 'Acme', 'Cedar', 'Dune']);
+    expect(sortRows(linked, 'license_id', 'asc').map((r) => r.client_name)).toEqual(['Birch', 'Acme', 'Cedar', 'Dune']);
+    expect(nextSort({ key: null, dir: 'desc' }, 'linked')).toEqual({ key: 'linked', dir: 'asc' });
+  });
+
+  it('shows the Linked menu and the two sortable headers on the page', async () => {
+    authFetch.mockImplementation(() => answer({ generated_at: '2026-11-21T00:00:00Z', hidden: 0, rows: linked }));
+    render(<BillingSyncView />);
+    const table = await screen.findByTestId('sync-table');
+    expect(screen.getByRole('button', { name: 'Sort by Linked' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by License ID' })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Linked'), 'not_linked');
+    expect(within(table).getAllByTestId('link').map((c) => c.textContent)).toEqual(['Not Linked']);
+  });
+});

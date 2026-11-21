@@ -42,20 +42,22 @@ interface Result {
 
 export const rowKey = (r: { client_id: string; invoice_item: string }): string => `${r.client_id}|${r.invoice_item}`;
 export const signed = (n: number): string => (n > 0 ? `+${n}` : String(n));
-/** The rows matching the organization text and the line chosen ('' = all), in the order given (pure). */
-export function filterRows(rows: SyncRow[], text: string, item: string): SyncRow[] {
+export type LinkFilter = '' | 'linked' | 'not_linked' | 'na';
+/** The rows matching the organization text, the line chosen ('' = all) and the Linked choice ('' = all), in the order given (pure). A row CORE has not sent licenses for yet counts as none of the three. */
+export function filterRows(rows: SyncRow[], text: string, item: string, link: LinkFilter = ''): SyncRow[] {
   const q = text.trim().toLowerCase();
-  return rows.filter((r) => (q === '' || r.client_name.toLowerCase().includes(q)) && (item === '' || r.invoice_item === item));
+  return rows.filter((r) => (q === '' || r.client_name.toLowerCase().includes(q)) && (item === '' || r.invoice_item === item) && (link === '' || r.link === link));
 }
-export type SortKey = 'client_name' | 'invoice_item' | 'billed' | 'counted' | 'difference' | 'size' | 'status';
+export type SortKey = 'client_name' | 'invoice_item' | 'billed' | 'counted' | 'difference' | 'size' | 'status' | 'license_id' | 'linked';
 export type SortDir = 'asc' | 'desc';
+const linkRank = (r: SyncRow): number => (r.link === 'linked' ? 0 : r.link === 'not_linked' ? 1 : r.link === 'na' ? 2 : 3);
 const statusRank = (r: SyncRow): number => (!r.can_push ? 0 : r.push.status === 'failed' ? 1 : r.push.status === 'pending' || r.push.status === 'claimed' ? 2 : r.push.status === 'done' ? 3 : 4);
 /** The rows ordered by one column (pure; the same order for equal values is the order given). Text sorts without regard to letter case, 'size' is the size of the difference whichever way it goes. */
 export function sortRows(rows: SyncRow[], key: SortKey | null, dir: SortDir): SyncRow[] {
   if (key === null) return rows;
   const sign = dir === 'asc' ? 1 : -1;
   const value = (r: SyncRow): number | string =>
-    key === 'client_name' ? r.client_name.toLowerCase() : key === 'invoice_item' ? r.invoice_item.toLowerCase() : key === 'size' ? Math.abs(r.difference) : key === 'status' ? statusRank(r) : r[key];
+    key === 'client_name' ? r.client_name.toLowerCase() : key === 'invoice_item' ? r.invoice_item.toLowerCase() : key === 'size' ? Math.abs(r.difference) : key === 'status' ? statusRank(r) : key === 'linked' ? linkRank(r) : key === 'license_id' ? (r.license_id ?? Number.MAX_SAFE_INTEGER) : r[key];
   return rows
     .map((r, i) => ({ r, i }))
     .sort((a, b) => {
@@ -69,7 +71,7 @@ export function sortRows(rows: SyncRow[], key: SortKey | null, dir: SortDir): Sy
 /** What a click on a header does: a new column starts ascending (numbers: largest first), the same column flips (pure). */
 export function nextSort(current: { key: SortKey | null; dir: SortDir }, key: SortKey): { key: SortKey | null; dir: SortDir } {
   if (current.key === key) return { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
-  return { key, dir: key === 'client_name' || key === 'invoice_item' || key === 'status' ? 'asc' : 'desc' };
+  return { key, dir: key === 'client_name' || key === 'invoice_item' || key === 'status' || key === 'linked' || key === 'license_id' ? 'asc' : 'desc' };
 }
 /** The Linked column's words and color for a row (pure): Linked, Not Linked, N/A; nothing before CORE has sent licenses. */
 export function linkText(r: SyncRow): { label: string; tone: string } {
@@ -116,6 +118,7 @@ export function BillingSyncView() {
   const [showHidden, setShowHidden] = useState(false);
   const [text, setText] = useState('');
   const [item, setItem] = useState('');
+  const [linkChoice, setLinkChoice] = useState<LinkFilter>('');
   const [sort, setSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: 'desc' });
   const [open, setOpen] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -179,7 +182,7 @@ export function BillingSyncView() {
   }, [waiting, load, showHidden]);
 
   const items = useMemo(() => [...new Set((data?.rows ?? []).map((r) => r.invoice_item))].sort(), [data]);
-  const rows = useMemo(() => sortRows(filterRows(data?.rows ?? [], text, item), sort.key, sort.dir), [data, text, item, sort]);
+  const rows = useMemo(() => sortRows(filterRows(data?.rows ?? [], text, item, linkChoice), sort.key, sort.dir), [data, text, item, linkChoice, sort]);
   const chosen = rows.filter((r) => picked.has(rowKey(r)));
   const allPicked = rows.length > 0 && chosen.length === rows.length;
 
@@ -231,6 +234,12 @@ export function BillingSyncView() {
               {i}
             </option>
           ))}
+        </select>
+        <select aria-label="Linked" className={input} value={linkChoice} onChange={(e) => setLinkChoice(e.target.value as LinkFilter)}>
+          <option value="">Linked: all</option>
+          <option value="linked">Linked</option>
+          <option value="not_linked">Not Linked</option>
+          <option value="na">N/A</option>
         </select>
         <label className="flex items-center gap-1 text-sm text-gray-300">
           <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> Show hidden{data && data.hidden > 0 ? ` (${data.hidden})` : ''}
@@ -290,8 +299,19 @@ export function BillingSyncView() {
                     </button>
                   </th>
                 ))}
-                <th scope="col" className="px-3 py-2">License ID</th>
-                <th scope="col" className="px-3 py-2">Linked</th>
+                {(
+                  [
+                    ['license_id', 'License ID'],
+                    ['linked', 'Linked'],
+                  ] as [SortKey, string][]
+                ).map(([key, label]) => (
+                  <th key={key} scope="col" className="px-3 py-2" aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" className="uppercase hover:text-gray-300" onClick={() => setSort(nextSort(sort, key))} aria-label={`Sort by ${label}`}>
+                      {label}
+                      {sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
+                  </th>
+                ))}
                 <th scope="col" className="px-3 py-2" aria-sort={sort.key === 'status' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button type="button" className="uppercase hover:text-gray-300" onClick={() => setSort(nextSort(sort, 'status'))} aria-label="Sort by Status">
                     Status{sort.key === 'status' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
