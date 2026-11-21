@@ -15,7 +15,8 @@
  * MITRE call, presenting invented coverage as the tenant's own).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import cytoscape, {
   type Core,
@@ -35,6 +36,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ClientPicker } from '@/components/mssp/ClientPicker';
+import { nodeLink } from './graphLinks';
 
 // Register fcose once on the client.
 if (typeof window !== 'undefined') {
@@ -64,37 +66,82 @@ const KIND_SHAPES: Record<GraphNodeKind, string> = {
   ip: 'diamond',
   domain: 'diamond',
   hash: 'hexagon',
-  process: 'tag',
-  technique: 'star',
-  tactic: 'star',
-  alert: 'octagon',
+  process: 'round-tag',
+  technique: 'round-pentagon',
+  tactic: 'round-pentagon',
+  alert: 'round-octagon',
   asset: 'round-rectangle',
 };
+
+const KIND_LABELS: Record<GraphNodeKind, string> = {
+  host: 'Device',
+  user: 'Identity',
+  ip: 'IP address',
+  domain: 'Domain',
+  hash: 'File hash',
+  process: 'Process',
+  technique: 'ATT&CK technique',
+  tactic: 'ATT&CK tactic',
+  alert: 'Alert',
+  asset: 'Asset',
+};
+
+/** The ring around a node says how serious the worst alert on it is. */
+const SEVERITY_RING: Record<string, string> = {
+  critical: '#f43f5e',
+  high: '#fb923c',
+  medium: '#facc15',
+  low: '#38bdf8',
+  info: '#64748b',
+};
+
+/** With this many nodes or fewer every name is shown; with more, only the serious ones, the one under the pointer and the neighbors of the selection (the rest would be a wall of text). */
+const LABEL_ALL_UP_TO = 25;
 
 // ─── Cytoscape canvas ─────────────────────────────────────────────────────────
 
 interface GraphCanvasProps {
   graph: AttackGraph;
-  onSelect?: (node: GraphNode | null) => void;
+  selectedId: string | null;
+  hiddenKinds: ReadonlySet<GraphNodeKind>;
+  onSelect: (node: GraphNode | null) => void;
+  /** Hands the page the drawing so its buttons (fit, zoom, re-arrange) can act on it. */
+  onReady: (cy: Core | null) => void;
 }
 
-function GraphCanvas({ graph, onSelect }: GraphCanvasProps) {
+/** Fade everything except a node and what it touches (pure drawing change, no data). Pass null to show everything again. */
+function focusOn(cy: Core, id: string | null): void {
+  cy.elements().removeClass('faded').removeClass('near');
+  if (!id) return;
+  const node = cy.getElementById(id);
+  if (node.empty()) return;
+  const hood = node.closedNeighborhood();
+  cy.elements().not(hood).addClass('faded');
+  hood.addClass('near');
+}
+
+function GraphCanvas({ graph, selectedId, hiddenKinds, onSelect, onReady }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const showAll = graph.nodes.length <= LABEL_ALL_UP_TO;
     const elements: ElementDefinition[] = [
       ...graph.nodes.map((n) => ({
         data: {
           id: n.id,
-          label: n.label,
+          label: n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label,
           kind: n.kind,
           color: KIND_COLORS[n.kind] ?? '#94a3b8',
+          ring: SEVERITY_RING[n.severity ?? 'info'] ?? SEVERITY_RING.info,
           shape: KIND_SHAPES[n.kind] ?? 'ellipse',
-          size: 24 + Math.min(36, (n.riskScore ?? 30) / 2),
+          size: 26 + Math.min(34, (n.riskScore ?? 30) / 2.4),
         },
+        classes: showAll || (n.riskScore ?? 0) >= 70 ? 'named' : '',
       })),
       ...graph.edges.map((e) => ({
         data: {
@@ -102,6 +149,7 @@ function GraphCanvas({ graph, onSelect }: GraphCanvasProps) {
           source: e.source,
           target: e.target,
           label: e.label,
+          w: 1 + Math.min(3, Math.log2(1 + (e.weight ?? 1))),
         },
       })),
     ];
@@ -109,90 +157,152 @@ function GraphCanvas({ graph, onSelect }: GraphCanvasProps) {
     const cy = cytoscape({
       container: containerRef.current,
       elements,
-      wheelSensitivity: 0.25,
+      wheelSensitivity: 0.2,
+      minZoom: 0.2,
+      maxZoom: 3,
       style: [
         {
           selector: 'node',
           style: {
             'background-color': 'data(color)',
+            'background-opacity': 0.92,
             shape: 'data(shape)' as cytoscape.Css.NodeShape,
-            label: 'data(label)',
+            label: '',
             color: '#e2e8f0',
-            'font-size': 10,
-            'font-family':
-              'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto',
+            'font-size': 11,
+            'font-weight': 500,
+            'font-family': 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto',
             'text-valign': 'bottom',
-            'text-margin-y': 4,
-            'text-outline-color': '#0b1220',
-            'text-outline-width': 2,
+            'text-margin-y': 6,
+            'text-outline-color': '#070d1a',
+            'text-outline-width': 3,
+            'text-max-width': '120px',
+            'text-wrap': 'ellipsis',
             width: 'data(size)',
             height: 'data(size)',
-            'border-color': '#0f172a',
-            'border-width': 2,
-          },
-        },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-color': '#fbbf24',
+            'border-color': 'data(ring)',
             'border-width': 3,
-          },
+            'border-opacity': 0.95,
+            'underlay-color': 'data(color)',
+            'underlay-opacity': 0.14,
+            'underlay-padding': 7,
+            'underlay-shape': 'ellipse',
+            'transition-property': 'opacity, underlay-opacity, border-width',
+            'transition-duration': 150,
+          } as cytoscape.Css.Node,
         },
+        { selector: 'node.named, node.show, node.near', style: { label: 'data(label)' } },
+        { selector: 'node.show', style: { 'underlay-opacity': 0.3 } },
+        { selector: 'node:selected', style: { 'border-color': '#f8fafc', 'border-width': 4, 'underlay-opacity': 0.4, 'underlay-padding': 10 } },
+        { selector: 'node.faded', style: { opacity: 0.14, label: '' } },
         {
           selector: 'edge',
           style: {
-            width: 1.5,
-            'line-color': '#475569',
-            'target-arrow-color': '#475569',
+            width: 'data(w)',
+            'line-color': '#334155',
+            'line-opacity': 0.75,
+            'target-arrow-color': '#334155',
             'target-arrow-shape': 'triangle',
+            'arrow-scale': 0.8,
             'curve-style': 'bezier',
-            label: 'data(label)',
-            'font-size': 8,
+            label: '',
+            'font-size': 9,
             color: '#94a3b8',
             'text-rotation': 'autorotate',
-            'text-background-color': '#0b1220',
-            'text-background-opacity': 0.8,
+            'text-background-color': '#070d1a',
+            'text-background-opacity': 0.85,
             'text-background-padding': '2px',
-          },
+          } as cytoscape.Css.Edge,
         },
-        {
-          selector: 'edge:selected',
-          style: {
-            'line-color': '#fbbf24',
-            'target-arrow-color': '#fbbf24',
-            width: 2.5,
-          },
-        },
+        { selector: 'edge.near', style: { 'line-color': '#7dd3fc', 'target-arrow-color': '#7dd3fc', 'line-opacity': 1, label: 'data(label)' } },
+        { selector: 'edge.faded', style: { 'line-opacity': 0.05, 'target-arrow-shape': 'none' } },
       ],
       layout: {
         name: 'fcose',
         animate: true,
-        animationDuration: 600,
+        animationDuration: 500,
         randomize: true,
-        nodeRepulsion: 8000,
-        idealEdgeLength: 90,
-        gravity: 0.25,
+        quality: 'default',
+        nodeRepulsion: 14000,
+        idealEdgeLength: 110,
+        nodeSeparation: 90,
+        gravity: 0.3,
+        packComponents: true,
+        padding: 40,
       } as unknown as cytoscape.LayoutOptions,
     });
 
     cy.on('tap', 'node', (evt) => {
       const node = evt.target as NodeSingular;
-      const original = graph.nodes.find((n) => n.id === node.id());
-      onSelect?.(original ?? null);
+      selectRef.current(graph.nodes.find((n) => n.id === node.id()) ?? null);
     });
-
     cy.on('tap', (evt) => {
-      if (evt.target === cy) onSelect?.(null);
+      if (evt.target === cy) selectRef.current(null);
+    });
+    // Names appear for the node under the pointer and what it touches, so a busy graph stays readable.
+    cy.on('mouseover', 'node', (evt) => {
+      const node = evt.target as NodeSingular;
+      node.addClass('show');
+      node.neighborhood('node').addClass('show');
+      if (containerRef.current) containerRef.current.style.cursor = 'pointer';
+    });
+    cy.on('mouseout', 'node', () => {
+      cy.nodes().removeClass('show');
+      if (containerRef.current) containerRef.current.style.cursor = 'default';
     });
 
     cyRef.current = cy;
+    onReady(cy);
     return () => {
+      onReady(null);
       cy.destroy();
       cyRef.current = null;
     };
-  }, [graph, onSelect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  // The selection can also change from outside (a connection clicked in the side panel): show it here.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.elements().unselect();
+    focusOn(cy, selectedId);
+    if (selectedId) {
+      const node = cy.getElementById(selectedId);
+      if (!node.empty()) {
+        node.select();
+        cy.animate({ center: { eles: node }, duration: 250 });
+      }
+    }
+  }, [selectedId, graph]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes().forEach((n) => {
+      n.style('display', hiddenKinds.has(n.data('kind') as GraphNodeKind) ? 'none' : 'element');
+    });
+  }, [hiddenKinds, graph]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      style={{ backgroundImage: 'radial-gradient(rgba(148,163,184,0.12) 1px, transparent 1px)', backgroundSize: '22px 22px' }}
+    />
+  );
+}
+
+/** What a selected node touches: each connection's name and kind, so the side panel can jump to it (pure). */
+export function connectionsOf(graph: AttackGraph, id: string): GraphNode[] {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const out = new Map<string, GraphNode>();
+  for (const e of graph.edges) {
+    const other = e.source === id ? e.target : e.target === id ? e.source : null;
+    const node = other ? byId.get(other) : undefined;
+    if (node) out.set(node.id, node);
+  }
+  return [...out.values()].sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0) || a.label.localeCompare(b.label));
 }
 
 // ─── MITRE heatmap ────────────────────────────────────────────────────────────
@@ -261,10 +371,87 @@ function MitreHeatmap({ coverage }: { coverage: MitreCoverage }) {
   );
 }
 
+function SelectedPanel({ node, graph, client, onSelect }: { node: GraphNode; graph: AttackGraph | null; client: string; onSelect: (n: GraphNode | null) => void }) {
+  const link = nodeLink(node, client);
+  const connections = graph ? connectionsOf(graph, node.id) : [];
+  const risk = node.riskScore ?? null;
+  const ring = SEVERITY_RING[node.severity ?? 'info'] ?? SEVERITY_RING.info;
+  return (
+    <div className="space-y-4">
+      <div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: KIND_COLORS[node.kind] }} />
+          {KIND_LABELS[node.kind] ?? node.kind}
+        </span>
+        <div className="mt-2 break-words text-base font-medium text-white">{node.label}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-slate-800/60 px-2.5 py-2">
+          <div className="text-slate-500">Risk</div>
+          <div className="font-medium text-white">{risk ?? '—'}</div>
+          {risk !== null && (
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-700" aria-hidden="true">
+              <div className="h-full rounded-full" style={{ width: `${Math.min(100, risk)}%`, backgroundColor: ring }} />
+            </div>
+          )}
+        </div>
+        <div className="rounded-lg bg-slate-800/60 px-2.5 py-2">
+          <div className="text-slate-500">Worst severity</div>
+          <div className="flex items-center gap-1.5 font-medium capitalize text-white">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: ring }} />
+            {node.severity ?? '—'}
+          </div>
+        </div>
+      </div>
+      {typeof node.attributes?.alerts === 'number' && <p className="text-xs text-slate-400">{node.attributes.alerts} alert{node.attributes.alerts === 1 ? '' : 's'} name this.</p>}
+      {link && (
+        <Link href={link.href} className="block w-full rounded-lg bg-blue-500 px-3 py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-blue-400">
+          {link.label} →
+        </Link>
+      )}
+      {connections.length > 0 && (
+        <div>
+          <h3 className="mb-1.5 text-[11px] uppercase tracking-wider text-slate-500">Connected to ({connections.length})</h3>
+          <ul className="max-h-48 space-y-1 overflow-y-auto pr-1">
+            {connections.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(c)}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-slate-200 hover:bg-slate-800"
+                >
+                  <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: KIND_COLORS[c.kind] }} />
+                  <span className="truncate">{c.label}</span>
+                  <span className="ml-auto shrink-0 text-[10px] uppercase text-slate-500">{c.kind}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800" onClick={() => onSelect(null)}>
+        Clear selection
+      </button>
+    </div>
+  );
+}
+
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export function AttackGraphView() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<GraphNodeKind>>(new Set());
+  const cyRef = useRef<Core | null>(null);
+  const onReady = useCallback((cy: Core | null) => {
+    cyRef.current = cy;
+  }, []);
+  const toggleKind = (kind: GraphNodeKind) =>
+    setHiddenKinds((old) => {
+      const next = new Set(old);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
   // '' is the whole organization (every client together); an id is one client.
   const [client, setClient] = useState('');
 
@@ -342,7 +529,7 @@ export function AttackGraphView() {
                 />
               </div>
             ) : graph && graph.nodes.length > 0 ? (
-              <GraphCanvas graph={graph} onSelect={setSelected} />
+              <GraphCanvas graph={graph} selectedId={selected?.id ?? null} hiddenKinds={hiddenKinds} onSelect={setSelected} onReady={onReady} />
             ) : (
               <div className="p-6">
                 <EmptyState
@@ -352,80 +539,65 @@ export function AttackGraphView() {
               </div>
             )}
 
-            {/* Legend */}
-            <div className="absolute bottom-3 left-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-slate-300 bg-slate-900/80 backdrop-blur-sm rounded-lg p-2 border border-white/10">
-              {(
-                [
-                  'host',
-                  'user',
-                  'ip',
-                  'process',
-                  'technique',
-                  'alert',
-                ] as GraphNodeKind[]
-              ).map((kind) => (
-                <span
-                  key={kind}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: KIND_COLORS[kind] }}
-                  />
-                  {kind}
-                </span>
-              ))}
+            {/* Toolbar */}
+            {graph && graph.nodes.length > 0 && (
+              <div className="absolute right-3 top-3 flex flex-col gap-1.5">
+                {[
+                  { label: 'Zoom in', text: '+', run: (cy: Core) => cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) },
+                  { label: 'Zoom out', text: '−', run: (cy: Core) => cy.zoom({ level: cy.zoom() / 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) },
+                  { label: 'Fit the whole graph', text: '⤢', run: (cy: Core) => void cy.animate({ fit: { eles: cy.elements(':visible'), padding: 40 }, duration: 250 }) },
+                  { label: 'Arrange again', text: '↻', run: (cy: Core) => void cy.layout({ name: 'fcose', animate: true, animationDuration: 500, randomize: true, nodeRepulsion: 14000, idealEdgeLength: 110, nodeSeparation: 90, packComponents: true, padding: 40 } as unknown as cytoscape.LayoutOptions).run() },
+                ].map((b) => (
+                  <button
+                    key={b.label}
+                    type="button"
+                    aria-label={b.label}
+                    title={b.label}
+                    onClick={() => cyRef.current && b.run(cyRef.current)}
+                    className="h-8 w-8 rounded-lg border border-white/10 bg-slate-900/85 text-sm text-slate-200 backdrop-blur-sm transition-colors hover:bg-slate-800"
+                  >
+                    {b.text}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Legend: click a kind to hide or show it */}
+            <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 rounded-xl border border-white/10 bg-slate-900/85 p-2 backdrop-blur-sm" role="group" aria-label="Show or hide kinds">
+              {(['host', 'user', 'ip', 'process', 'technique', 'alert'] as GraphNodeKind[]).map((kind) => {
+                const off = hiddenKinds.has(kind);
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    aria-pressed={!off}
+                    onClick={() => toggleKind(kind)}
+                    title={off ? `Show ${KIND_LABELS[kind]}` : `Hide ${KIND_LABELS[kind]}`}
+                    className={clsx(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors',
+                      off ? 'border-white/5 text-slate-500 line-through' : 'border-white/10 text-slate-200 hover:bg-white/5',
+                    )}
+                  >
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: off ? '#475569' : KIND_COLORS[kind] }} />
+                    {kind}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Side panel */}
-          <aside className="border-l border-white/5 bg-slate-900/80 p-4 text-sm">
-            <h2 className="text-xs uppercase tracking-wider text-slate-400 mb-3">
-              {selected ? 'Selected entity' : 'How to read this'}
-            </h2>
+          <aside className="border-l border-white/5 bg-slate-900/80 p-4 text-sm" data-testid="graph-side-panel">
+            <h2 className="mb-3 text-xs uppercase tracking-wider text-slate-400">{selected ? 'Selected entity' : 'How to read this'}</h2>
             {selected ? (
-              <div className="space-y-3">
-                <div>
-                  <div className="text-xs text-slate-500">{selected.kind}</div>
-                  <div className="text-base font-medium text-white truncate">
-                    {selected.label}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded bg-slate-800/60 px-2 py-1.5">
-                    <div className="text-slate-500">Risk</div>
-                    <div className="text-white font-medium">
-                      {selected.riskScore ?? '—'}
-                    </div>
-                  </div>
-                  <div className="rounded bg-slate-800/60 px-2 py-1.5">
-                    <div className="text-slate-500">Severity</div>
-                    <div className="text-white font-medium">
-                      {selected.severity ?? '—'}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  className="w-full text-xs px-3 py-2 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30"
-                  onClick={() => setSelected(null)}
-                >
-                  Clear selection
-                </button>
-              </div>
+              <SelectedPanel node={selected} graph={graph ?? null} client={client} onSelect={setSelected} />
             ) : (
-              <ul className="space-y-2 text-xs text-slate-400 leading-relaxed">
+              <ul className="space-y-2 text-xs leading-relaxed text-slate-400">
                 <li>
-                  <span className="text-white font-medium">Click</span> any node
-                  to inspect its risk score and attributes.
+                  <span className="font-medium text-white">Click</span> a node to see its risk, what it connects to, and a button to open the device, identity or alert behind it.
                 </li>
-                <li>
-                  Edges show how identities, assets, processes and ATT&amp;CK
-                  techniques relate.
-                </li>
-                <li>
-                  The graph auto-refreshes every 30s as new events arrive
-                  through the ingest service.
-                </li>
+                <li>The ring around a node is the worst alert severity on it; bigger means higher risk. Point at a node to see its name and its neighbors.</li>
+                <li>Click a kind at the bottom left to hide or show it. The graph refreshes every 30 seconds.</li>
               </ul>
             )}
           </aside>
