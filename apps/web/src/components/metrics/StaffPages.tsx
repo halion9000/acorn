@@ -9,6 +9,7 @@ import { Fragment, useState } from 'react';
 import { AreaChart } from './AreaChart';
 import { PodsMatrix, type PodRow } from './PodsMatrix';
 import { UtilBars, UtilMatrix } from './UtilCharts';
+import { RefreshMetrics } from './RefreshMetrics';
 import { UpdatesMatrix, type UpdateDetail } from './UpdatesMatrix';
 import { MetricPicker } from './MetricPicker';
 
@@ -24,11 +25,12 @@ interface StaffMetricsData {
 export function StaffMetricsView() {
   const period = usePeriod(3);
   const [team, setTeam] = useState('');
-  const { data, denied, problem } = useMetric<StaffMetricsData>(`/api/v1/reports/metrics/staff-metrics?${period.query}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
+  const { data, denied, problem, reload } = useMetric<StaffMetricsData>(`/api/v1/reports/metrics/staff-metrics?${period.query}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
   return (
     <Page title="Weekly Team Metrics" subtitle="Utilization (hours logged over hours available) and tickets closed, by week and by team member." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <div className="flex flex-wrap items-center gap-3">
         <PeriodPicker period={period} options={[1, 3, 6]} />
+        <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Team
           <select aria-label="Team" className={selectClass} value={team} onChange={(e) => setTeam(e.target.value)}>
@@ -69,10 +71,11 @@ interface PodsData {
 
 export function PodsView() {
   const period = usePeriod(3);
-  const { data, denied, problem } = useMetric<PodsData>(`/api/v1/reports/metrics/pods?${period.query}`);
+  const { data, denied, problem, reload } = useMetric<PodsData>(`/api/v1/reports/metrics/pods?${period.query}`);
   return (
     <Page title="Metrics by Pods" subtitle="Each pod and its engineers, week by week and by month: tickets resolved and created, available and logged hours, and utilization." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <PeriodPicker period={period} options={[1, 3, 6, 12]} />
+      <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
       {data?.received_at && (
         <Panel title="Metrics by Pod" testId="pods-table">
           <PodsMatrix rows={data.rows ?? []} weeks={data.weeks} />
@@ -95,10 +98,11 @@ export function TicketUpdatesView() {
   // null: every member; a list: only those (an empty list shows none).
   const [picked, setPicked] = useState<string[] | null>(null);
   const query = (picked ?? []).map((m) => `&members=${encodeURIComponent(m)}`).join('');
-  const { data, denied, problem } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?${period.query}${query}`);
+  const { data, denied, problem, reload } = useMetric<UpdatesData>(`/api/v1/reports/metrics/ticket-updates?${period.query}${query}`);
   return (
     <Page title="Ticket Updates by Team Member" subtitle="How many different tickets each team member logged time on, week by week. HaloPSA cannot list every note or update in bulk, so an update with no logged time is not counted." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <PeriodPicker period={period} options={[1, 3, 6, 12]} />
+      <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
       {data?.received_at && (
         <>
           <MetricPicker
@@ -138,7 +142,7 @@ export function dialpadCells(by_week: DialpadData['people'][number]['by_week'], 
 export function DialpadView() {
   const period = usePeriod(3);
   const [engineer, setEngineer] = useState('');
-  const { data, denied, problem } = useMetric<DialpadData>(`/api/v1/reports/metrics/dialpad?${period.query}${engineer ? `&engineer=${encodeURIComponent(engineer)}` : ''}`);
+  const { data, denied, problem, reload } = useMetric<DialpadData>(`/api/v1/reports/metrics/dialpad?${period.query}${engineer ? `&engineer=${encodeURIComponent(engineer)}` : ''}`);
   const weeks = (data?.weeks ?? []).map((w) => w.week);
   const triage = (data?.weeks ?? []).some((w) => w.triage_inbound > 0);
   const who = engineer || 'All Teams';
@@ -147,6 +151,7 @@ export function DialpadView() {
     <Page title="DialPad Metrics" subtitle="Calls and time on the phone, from Dialpad." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the Dialpad call facts" />}>
       <div className="flex flex-wrap items-center gap-3">
         <PeriodPicker period={period} options={[1, 3, 6]} />
+        <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
         <label className="flex items-center gap-2 text-sm text-gray-300">
           Engineer
           <select aria-label="Engineer" className={selectClass} value={engineer} onChange={(e) => setEngineer(e.target.value)}>
@@ -225,10 +230,11 @@ interface HoursData {
 
 export function StaffHoursView() {
   const period = usePeriod(3);
-  const { data, denied, problem } = useMetric<HoursData>(`/api/v1/reports/metrics/staff-hours?${period.query}`);
+  const { data, denied, problem, reload } = useMetric<HoursData>(`/api/v1/reports/metrics/staff-hours?${period.query}`);
   return (
     <Page title="Staff hours distribution" subtitle="Where each person's hours went, by ticket type. Hours only." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the HaloPSA hours" />}>
       <PeriodPicker period={period} options={[1, 3, 6, 12]} />
+      <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
       {data?.received_at && (
         <>
           <Cards items={[['Hours worked', `${num(data.total_hours, 1)} h`], ['People', String(data.people.length)], ['Ticket types', String(data.types.length)]]} />
@@ -296,12 +302,13 @@ export function ScorecardView() {
   const period = usePeriod(2);
   const [member, setMember] = useState('');
   const [picked, setPicked] = useState<string[] | null>(null);
-  const { data, denied, problem } = useMetric<ScoreData>(`/api/v1/reports/metrics/scorecard?${period.query}${member ? `&member=${encodeURIComponent(member)}` : ''}`);
+  const { data, denied, problem, reload } = useMetric<ScoreData>(`/api/v1/reports/metrics/scorecard?${period.query}${member ? `&member=${encodeURIComponent(member)}` : ''}`);
   const d = data?.detail;
   return (
     <Page title="Service desk scorecard" subtitle="A score from 1 to 5 each week from tickets closed and updated, labor hours, calls, call time, customer satisfaction and utilization, weighted, with a grade." denied={denied} problem={problem} loading={data === null && !denied && !problem} empty={<NothingYet show={data?.received_at === null} what="the weekly staff facts" />}>
       <div className="flex flex-wrap items-center gap-3">
         <PeriodPicker period={period} options={[1, 2, 3, 6, 12]} />
+        <RefreshMetrics receivedAt={(data as { received_at?: string | null } | null)?.received_at} reload={reload} />
         <Link href="/settings/scorecard" className="text-sm text-blue-300 underline">
           Scorecard settings (weights and brackets)
         </Link>

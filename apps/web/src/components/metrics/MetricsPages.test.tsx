@@ -227,3 +227,13 @@ describe('the pages with data', () => {
     expect(within(screen.getByTestId('roles-table')).queryByText('Exchange Administrator')).toBeNull();
   });
 });
+
+describe('Refresh data on the staff pages', () => {
+  it('each staff page has the button that asks CORE for fresh facts', async () => {
+    for (const View of [StaffMetricsView, PodsView, TicketUpdatesView, DialpadView, ScorecardView]) {
+      render(<View />);
+      expect(await screen.findByRole('button', { name: 'Refresh data' })).toBeInTheDocument();
+      cleanup();
+    }
+  });
+});

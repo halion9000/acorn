@@ -4,7 +4,7 @@
  * The pieces every Metrics page shares (the Rewst metric dashboards, rebuilt): fetching one page's numbers, the period buttons, panels, a bar list, a column chart and a plain table. The numbers come from
  * A.C.O.R.N's own database, which CORE fills about once a day; a page shows "nothing has arrived yet" until then.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { authFetch } from '@/lib/auth-session';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
@@ -14,11 +14,15 @@ export interface MetricState<T> {
   data: T | null;
   denied: boolean;
   problem: string | null;
+  /** Asks the server for the numbers again now (Refresh data waits for CORE's new facts and calls this). */
+  reload: () => void;
 }
 
 /** Fetches one Metrics page's numbers again whenever the address changes (a new period or filter). A 403 means the person lacks the metrics permission. */
 export function useMetric<T>(path: string): MetricState<T> {
-  const [state, setState] = useState<MetricState<T>>({ data: null, denied: false, problem: null });
+  const [state, setState] = useState<Omit<MetricState<T>, 'reload'>>({ data: null, denied: false, problem: null });
+  const [tick, setTick] = useState(0);
+  const reload = useCallback(() => setTick((n) => n + 1), []);
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -35,8 +39,8 @@ export function useMetric<T>(path: string): MetricState<T> {
     return () => {
       live = false;
     };
-  }, [path]);
-  return state;
+  }, [path, tick]);
+  return { ...state, reload };
 }
 
 export const PERIODS = [1, 3, 6, 12] as const;
