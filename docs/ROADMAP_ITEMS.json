@@ -300,9 +300,9 @@
     "title": "Qdrant server upgrade (6A39)",
     "detail": "After the Sunday 2026-11-15 snapshot.",
     "area": "Platform",
-    "status": "in_progress",
+    "status": "completed",
     "needs": "hal",
-    "note": "Planned for Sunday 22 Nov evening after a fresh snapshot, as you said. Not started: it restarts the vector database, so I will do it when you are around that evening.",
+    "note": "Planned for Sunday 22 Nov evening after a fresh snapshot, as you said. Not started: it restarts the vector database, so I will do it when you are around that evening. 2026-11-21: Done: backed up the volume (/srv/acorn/backups/qdrant-pre-upgrade-20261121-1750.tgz, 5.8 MB), then stepped the storage 1.7.0 to 1.17.1 one minor version at a time (1.8.4, 1.9.7, 1.10.1, 1.11.5, 1.12.6, 1.13.6, 1.14.1, 1.15.5, 1.16.3, 1.17.1); after every step both collections were still there and threatintel_iocs held the same 1790 points. The compose file now names v1.17.1 (the client in the containers is 1.20.0).",
     "added": "2026-11-14"
   },
   {
@@ -1369,7 +1369,7 @@
     "status": "in_progress",
     "needs": "hal",
     "added": "2026-11-14",
-    "note": "Not built: I could not confirm where NinjaOne reports a machine's last patch scan. The StackJack NinjaOne connection is switched off (it says Auto-disabled after a validation error), so I could not read a sample, and I will not guess an endpoint and report numbers from it. To unblock: re-enable the NinjaOne connection on the StackJack Connectors page (or tell me to read it with CORE's own key on the VM). Then I read one device's patch fields and build the report."
+    "note": "Not built: I could not confirm where NinjaOne reports a machine's last patch scan. The StackJack NinjaOne connection is switched off (it says Auto-disabled after a validation error), so I could not read a sample, and I will not guess an endpoint and report numbers from it. To unblock: re-enable the NinjaOne connection on the StackJack Connectors page (or tell me to read it with CORE's own key on the VM). Then I read one device's patch fields and build the report. 2026-11-21: Tried to read a device patch field through the StackJack NinjaOne connection: still switched off (Auto-disabled after a validation error), so nothing was read. CORE already reports patching per machine from NinjaOne (patches pending 30 days or more, servers and software separately); NinjaOne has no field I can confirm for the time of the last patch scan. To get that: re-enable the StackJack NinjaOne connection and I read one device."
   },
   {
     "key": "r7-cf-08",
@@ -1847,7 +1847,7 @@
     "status": "in_progress",
     "needs": "claude",
     "added": "2026-11-14",
-    "note": "I will try: check Huntress SAT API for per-learner completion. If an endpoint exists I build it; otherwise I tell you here. (Nothing needed from you now.)"
+    "note": "I will try: check Huntress SAT API for per-learner completion. If an endpoint exists I build it; otherwise I tell you here. (Nothing needed from you now.) 2026-11-21: Per-account training completion already reaches the compliance checks from Huntress SAT (learners finished across the latest assignments). Per-person completion (marking each personnel training task done) needs the shape of one learner-activity row from the live Huntress SAT API, which I have not read yet; not built."
   },
   {
     "key": "r7-af-16",
@@ -2416,7 +2416,7 @@
     "area": "Finance",
     "status": "new",
     "needs": "hal",
-    "note": "What I saw: the finance workbook has a tab called Onboarding with 773 rows from April 2026: user, role, customer, project, phase, task, effort, tracked time, billable, category, notes, approved. It looks like an export of time entries on onboarding projects. Question: which system does it come from (HaloPSA projects, Rewst, or something else)? If HaloPSA, I read project time entries from Halo directly and show hours and cost per client and phase.",
+    "note": "What I saw: the finance workbook has a tab called Onboarding with 773 rows from April 2026: user, role, customer, project, phase, task, effort, tracked time, billable, category, notes, approved. It looks like an export of time entries on onboarding projects. Question: which system does it come from (HaloPSA projects, Rewst, or something else)? If HaloPSA, I read project time entries from Halo directly and show hours and cost per client and phase. 2026-11-21: Checked: there is no Rocketlane integration in CORE or A.C.O.R.N today. If the tab comes from Rocketlane I need a Rocketlane API key from you to read its projects and time entries.",
     "added": "2026-11-18"
   },
   {

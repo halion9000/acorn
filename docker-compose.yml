@@ -212,7 +212,7 @@ services:
 
 
   qdrant:
-    image: qdrant/qdrant:v1.7.0
+    image: qdrant/qdrant:v1.17.1
     container_name: aisoc-qdrant
     ports:
       - "127.0.0.1:6333:6333"
