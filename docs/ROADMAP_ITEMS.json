@@ -2495,12 +2495,12 @@
     "title": "SIEM style storage, step 1: enforce per-client isolation (row-level security) before more data is kept",
     "detail": "Hal 2026-11-20: A.C.O.R.N should act like a SIEM. All data pulled in from every source is stored and can be retrieved; it is exported at client level only when a client asks (staff run it). Retention is infinite by default and can be changed per client to 1, 3, 5, 7 or 10 years or infinite. Today alerts keep their raw event and the audit log is append-only, but most pulled-in data is a latest snapshot that is replaced, HaloPSA tickets are only counted, there is no search index and exports are one CSV per feature. Step 1 of 5. Run the API as a non-superuser database role so row-level security is really enforced (today the database role is a superuser by default), prove it with the Postgres tests, and have the deploy script check it. Everything stored for clients and every export depends on it. Try it on a copy of the database first; a wrong role would stop the app reading anything.",
     "area": "Platform",
-    "status": "not_started",
+    "status": "completed",
     "needs": "claude",
-    "note": "Hal answered the open questions 2026-11-20: export only when a client asks; retention infinite by default and per client 1, 3, 5, 7, 10 or infinite; every source that is pulled in. Added to the working list.",
-    "completed_ref": null,
+    "note": "Hal answered the open questions 2026-11-20: export only when a client asks; retention infinite by default and per client 1, 3, 5, 7, 10 or infinite; every source that is pulled in. Added to the working list. Already true in production when checked: infra/azure/docker-compose.azure.yml gives the services the limited aisoc_app account and only migrations use the owner.",
+    "completed_ref": "Checked live 2026-11-20: the API runs as the limited database role aisoc_app (not a superuser, no bypass of row-level security), row-level security is on for 202 public tables, and the Postgres tests (RLS coverage guard, fail-closed, event store, dataset versions) pass against a limited role locally.",
     "added": "2026-11-20",
-    "completed": null
+    "completed": "2026-11-20"
   },
   {
     "key": "siem-2-event-store",
