@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { PolicyAcceptLinks } from './PolicyAcceptLinks';
 import { PolicyAssign } from './PolicyAssign';
 
 interface Accepted {
@@ -113,6 +114,7 @@ export function PolicyAcceptance({ itemId, scoped }: { itemId: string; scoped: (
             Record {parseEmails(paste).length || ''} accepted
           </button>
           <PolicyAssign itemId={itemId} scoped={scoped} onChange={() => void load()} />
+          <PolicyAcceptLinks itemId={itemId} scoped={scoped} />
         </>
       )}
     </div>

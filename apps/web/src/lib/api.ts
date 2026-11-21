@@ -8443,7 +8443,28 @@ export const vendorApi = {
     request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/documents?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
   removeDocument: (clientId: string, id: string, docId: string) =>
     request<VendorDetail>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
+  questionnaires: (clientId: string, id: string) => request<VendorQuestionnaire[]>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/questionnaires?${riskQs(clientId)}`),
+  sendQuestionnaire: (clientId: string, id: string, body: { expires_days?: number; send?: boolean }) =>
+    request<VendorQuestionnaire>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/questionnaires?${riskQs(clientId)}`, { method: 'POST', body: JSON.stringify(body) }),
+  cancelQuestionnaire: (clientId: string, id: string, linkId: string) =>
+    request<void>(`/api/v1/compliance/vendors/${encodeURIComponent(id)}/questionnaires/${encodeURIComponent(linkId)}?${riskQs(clientId)}`, { method: 'DELETE' }),
 };
+
+/** A security questionnaire sent to a vendor on a one-time link, and the answers when it came back (GET/POST /api/v1/compliance/vendors/{id}/questionnaires). */
+export interface VendorQuestionnaire {
+  id: string;
+  created_at: string;
+  expires_on: string;
+  state: 'open' | 'answered' | 'expired' | string;
+  respondent_name: string | null;
+  respondent_email: string | null;
+  answered_at: string | null;
+  answers: { question: string; answer: string; details: string }[];
+  /** Only in the answer that made the link. */
+  path: string | null;
+  url: string | null;
+  emailed: boolean;
+}
 
 /** The Compliance dashboard and the frameworks turned on (GET /api/v1/compliance/dashboard, GET/PUT /api/v1/compliance/frameworks/enabled). `clientId` reads or writes one client. */
 export interface ComplianceHealth {

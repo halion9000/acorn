@@ -281,6 +281,22 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "An organization's public trust page, for prospects who have no account: off unless the organization switched its link on; one 404 for an unknown token, a switched-off link and junk; the token is long and random and a new one replaces the old; shows only what the trust center settings chose; escaped HTML with no script; rate limited",
     (
         "GET",
+        "/api/v1/public/policy/{token}",
+    ): "A one-time page to read a policy, for outside people who have no account: the token is long, random, stored only as a hash, made by staff for one person and one version; one 404 for an unknown token and junk; a used or expired link shows no policy text; escaped HTML with no script; rate limited",
+    (
+        "POST",
+        "/api/v1/public/policy/{token}",
+    ): "Accepting the policy on a one-time link: the link is claimed in one statement so it records one acceptance, needs a typed name and a ticked box, and is refused (410) once used or expired; an unknown token is a 404; rate limited",
+    (
+        "GET",
+        "/api/v1/public/vendor-questionnaire/{token}",
+    ): "A one-time security questionnaire for a vendor who has no account: the token is long, random and stored only as a hash, made by staff for one vendor; one 404 for an unknown token and junk; an answered or expired link shows no form; escaped HTML with no script; rate limited",
+    (
+        "POST",
+        "/api/v1/public/vendor-questionnaire/{token}",
+    ): "The vendor sends the questionnaire answers: the token is the credential, claimed in one statement so only one set of answers is saved; every question must be answered; an unknown token is a 404; rate limited",
+    (
+        "GET",
         "/api/v1/canary/{token_id}",
     ): "The honeytoken tripwire: a planted link must work for someone who has no AiSOC account, so it cannot require sign-in. It answers every id the same way (a one pixel image), forwards only a well-formed UUID, is rate limited per token and overall, and returns nothing about the token",
     (

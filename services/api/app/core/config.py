@@ -220,6 +220,9 @@ class Settings(BaseSettings):
     # lands back on /onboarding with the verify-data-flowing screen
     # already polling. Empty falls back to a relative path.
     CONSOLE_PUBLIC_BASE_URL: str = ""
+    # The address the internet reaches the public pages by (the Cloudflare tunnel host, for example https://trust.example.com): used to write whole links into
+    # e-mails for the policy acceptance page. Empty: links are only shown to staff as paths and e-mailing them is refused.
+    PUBLIC_PAGES_BASE_URL: str = ""
 
     # Workstream 5 (self-healing) — auto OAuth refresh worker. The
     # background loop runs inside the API process (``lifespan`` hook in

@@ -48,6 +48,16 @@ acorn-ext.goliveoak.com {
 	handle @trust {
 		reverse_proxy api:8000
 	}
+	# The one-time policy acceptance page (read and accept a policy without signing in): one fixed path shape.
+	@policy path_regexp policy ^/api/v1/public/policy/[A-Za-z0-9_-]{24,64}$
+	handle @policy {
+		reverse_proxy api:8000
+	}
+	# The one-time vendor security questionnaire: one fixed path shape.
+	@vendorq path_regexp vendorq ^/api/v1/public/vendor-questionnaire/[A-Za-z0-9_-]{24,64}$
+	handle @vendorq {
+		reverse_proxy api:8000
+	}
 	handle {
 		respond "Not found" 404
 	}

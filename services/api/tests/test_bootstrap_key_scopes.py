@@ -149,7 +149,7 @@ class TestAnExistingKey:
         assert (
             "'core-hud'" in message
             and "same secret" in message
-            and "['alerts:triage', 'cases:work', 'connectors:view', 'hunts:read', 'intel:read', 'metrics:view', 'proposals:log', 'rules:view']"
+            and "['alerts:triage', 'cases:work', 'compliance:read', 'connectors:view', 'hunts:read', 'intel:read', 'metrics:view', 'proposals:log', 'rules:view']"
             in message
             and "removed ['alerts:write', 'cases:write', 'connectors:read']" in message
         )

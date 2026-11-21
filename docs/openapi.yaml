@@ -4244,6 +4244,154 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/accept-links:
+    get:
+      tags:
+      - compliance
+      summary: List Accept Links
+      description: 'The one-time acceptance links made for a policy (never the links
+        themselves: only who, until when, and whether used).'
+      operationId: list_accept_links_api_v1_governance__item_id__accept_links_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AcceptLinkOut'
+                title: Response List Accept Links Api V1 Governance  Item Id  Accept
+                  Links Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - compliance
+      summary: Make Accept Links
+      description: 'Make a one-time link for each person: it shows the newest text
+        of the policy, needs no sign-in, works once and expires (14 days unless set).
+        The answer holds each link once; only a hash is kept.'
+      operationId: make_accept_links_api_v1_governance__item_id__accept_links_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptLinkIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AcceptLinkOut'
+                title: Response Make Accept Links Api V1 Governance  Item Id  Accept
+                  Links Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/governance/{item_id}/accept-links/{link_id}:
+    delete:
+      tags:
+      - compliance
+      summary: Revoke Accept Link
+      description: Stop a link from working (a used link stays on record as used).
+      operationId: revoke_accept_link_api_v1_governance__item_id__accept_links__link_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/governance/{item_id}/assignments/{email}:
     delete:
       tags:
@@ -16187,6 +16335,148 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/questionnaires:
+    get:
+      tags:
+      - vendors
+      summary: The questionnaires sent to a vendor and the answers that came back
+      operationId: list_questionnaires_api_v1_compliance_vendors__vendor_id__questionnaires_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QLinkOut'
+                title: Response List Questionnaires Api V1 Compliance Vendors  Vendor
+                  Id  Questionnaires Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - vendors
+      summary: Make a link to a security questionnaire for the vendor to answer (works
+        once, 30 days unless set, no sign-in)
+      operationId: send_questionnaire_api_v1_compliance_vendors__vendor_id__questionnaires_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QLinkIn'
+            example:
+              expires_days: 30
+              send: false
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QLinkOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/vendors/{vendor_id}/questionnaires/{link_id}:
+    delete:
+      tags:
+      - vendors
+      summary: Stop a questionnaire link from working
+      operationId: cancel_questionnaire_api_v1_compliance_vendors__vendor_id__questionnaires__link_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: vendor_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Vendor Id
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Link Id
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/vendors/{vendor_id}/reviews:
     post:
       tags:
@@ -18790,6 +19080,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PublicLinkIn'
+            example:
+              enabled: true
+              new_link: false
       responses:
         '200':
           description: Successful Response
@@ -19084,6 +19377,112 @@ paths:
       summary: An organization's public trust page (no sign-in; off unless the organization
         switched its link on)
       operationId: public_trust_page_api_v1_public_trust__token__get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/public/policy/{token}:
+    get:
+      tags:
+      - public
+      summary: A one-time page to read and accept a policy (no sign-in; the link is
+        made by staff, works once and expires)
+      operationId: public_policy_page_api_v1_public_policy__token__get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - public
+      summary: Accept the policy on a one-time link (records the acceptance; the link
+        cannot be used again)
+      operationId: public_policy_accept_api_v1_public_policy__token__post
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/public/vendor-questionnaire/{token}:
+    get:
+      tags:
+      - public
+      summary: A one-time security questionnaire for a vendor (no sign-in; the link
+        is made by staff, works once and expires)
+      operationId: public_vendor_questionnaire_api_v1_public_vendor_questionnaire__token__get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - public
+      summary: Send the answers on a one-time questionnaire link (saved once; the
+        link cannot be used again)
+      operationId: public_vendor_questionnaire_answer_api_v1_public_vendor_questionnaire__token__post
       parameters:
       - name: token
         in: path
@@ -36623,6 +37022,74 @@ components:
       required:
       - reason
       title: AcceptIn
+    AcceptLinkIn:
+      properties:
+        emails:
+          items:
+            type: string
+          type: array
+          maxItems: 100
+          title: Emails
+        name:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Name
+        expires_days:
+          anyOf:
+          - type: integer
+            maximum: 60.0
+            minimum: 1.0
+          - type: 'null'
+          title: Expires Days
+        send:
+          type: boolean
+          title: Send
+          default: false
+      type: object
+      title: AcceptLinkIn
+    AcceptLinkOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        email:
+          type: string
+          title: Email
+        version:
+          type: integer
+          title: Version
+        expires_on:
+          type: string
+          format: date
+          title: Expires On
+        state:
+          type: string
+          title: State
+        path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        emailed:
+          type: boolean
+          title: Emailed
+          default: false
+      type: object
+      required:
+      - id
+      - email
+      - version
+      - expires_on
+      - state
+      title: AcceptLinkOut
     AcceptanceIn:
       properties:
         emails:
@@ -58851,6 +59318,97 @@ components:
       - device_id
       - tool
       title: PushIn
+    QAnswer:
+      properties:
+        question:
+          type: string
+          title: Question
+        answer:
+          type: string
+          title: Answer
+        details:
+          type: string
+          title: Details
+      type: object
+      required:
+      - question
+      - answer
+      - details
+      title: QAnswer
+    QLinkIn:
+      properties:
+        expires_days:
+          anyOf:
+          - type: integer
+            maximum: 60.0
+            minimum: 1.0
+          - type: 'null'
+          title: Expires Days
+        send:
+          type: boolean
+          title: Send
+          default: false
+      type: object
+      title: QLinkIn
+    QLinkOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_on:
+          type: string
+          format: date
+          title: Expires On
+        state:
+          type: string
+          title: State
+        respondent_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Respondent Name
+        respondent_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Respondent Email
+        answered_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Answered At
+        answers:
+          items:
+            $ref: '#/components/schemas/QAnswer'
+          type: array
+          title: Answers
+        path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        emailed:
+          type: boolean
+          title: Emailed
+          default: false
+      type: object
+      required:
+      - id
+      - created_at
+      - expires_on
+      - state
+      title: QLinkOut
     QboCustomerIn:
       properties:
         name:

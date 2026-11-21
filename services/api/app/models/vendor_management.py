@@ -94,6 +94,24 @@ class VendorHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
 
+class VendorQuestionnaireLink(Base):
+    """A security questionnaire sent to a vendor as a link, with the answers when it comes back (migration 241). Only the hash of the token is kept."""
+
+    __tablename__ = "vendor_questionnaire_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), _fk("tenants"), nullable=False)
+    vendor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), _fk("vendors"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    respondent_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    respondent_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answers: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 class DetectedApplication(Base):
     """An application found in a client's Microsoft 365 tenant, waiting for a person to Add, Ignore or Link it (migration 186)."""
 

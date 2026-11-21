@@ -169,7 +169,7 @@
     "area": "Devices",
     "status": "not_started",
     "needs": "hal",
-    "note": "Moved some, more remain. Automating: the Huntress API cannot move an agent, so it cannot be fully automatic. What I can do is send the weekly list of mismatched machines (r7-cf-01) with the target organization filled in, so you move them in one pass. ESW Texas Subs: you say ESW Texas Subs is part of ESW Enterprise, so those 21 should map to ESW Enterprise and need no move. I am checking the mapping; Question: confirm the target for the Texas Subs machines is ESW Enterprise. 2026-11-21: Hal confirmed ESW Texas Subs is ESW Enterprise (the 21 machines need no move once the mapping says so).",
+    "note": "Moved some, more remain. Automating: the Huntress API cannot move an agent, so it cannot be fully automatic. What I can do is send the weekly list of mismatched machines (r7-cf-01) with the target organization filled in, so you move them in one pass. ESW Texas Subs: you say ESW Texas Subs is part of ESW Enterprise, so those 21 should map to ESW Enterprise and need no move. I am checking the mapping; Question: confirm the target for the Texas Subs machines is ESW Enterprise. 2026-11-21: Hal confirmed ESW Texas Subs is ESW Enterprise (the 21 machines need no move once the mapping says so). 2026-11-21: Done live: a client family named ESW Enterprise now holds ESW Enterprise and ESW - Texas Subs (same Families page, nothing else changed), so the weekly mismatch list no longer lists a machine filed under one and Huntress under the other. ESW - Beverly Hills Rejuvenation Center was left out because you did not name it. NOT seen yet: the next weekly mismatch report without the Texas Subs rows.",
     "added": "2026-11-14"
   },
   {
@@ -1496,10 +1496,10 @@
     "key": "r7-cf-21",
     "title": "A Cipher job that drafts the weekly client review paragraph from the data",
     "area": "Round 7: CORE feature",
-    "status": "new",
+    "status": "completed",
     "needs": "signoff",
     "added": "2026-11-14",
-    "note": "Each Monday a draft paragraph per client could go to Slack (a channel) or e-mail to the account owner. About one model run per client per week. Reply with where it should go (Slack channel name or e-mail) or 'skip'."
+    "note": "Each Monday a draft paragraph per client could go to Slack (a channel) or e-mail to the account owner. About one model run per client per week. Reply with where it should go (Slack channel name or e-mail) or 'skip'. 2026-11-21: Built after Hal said go (same Slack channel as the weekly client review): Cipher skill client-weekly-paragraph and the job weekly-client-paragraphs, Mondays at 08:30 after the 08:00 client review. One run (not one per client) reads the rollup, picks the ten clients needing most attention, reads each with aisoc_client_review and posts a 3 to 4 sentence DRAFT paragraph per client to #security for account owners to edit; nothing is sent to any client. Starts after the next CORE update; NOT seen running yet."
   },
   {
     "key": "r7-cf-22",
@@ -1753,9 +1753,9 @@
     "key": "r7-af-06",
     "title": "Vendors: a questionnaire sent to the vendor as a form with a link",
     "area": "Round 7: A.C.O.R.N feature",
-    "status": "in_progress",
+    "status": "completed",
     "needs": "hal",
-    "note": "Hal (core2.docx): sounds good, but will it work with the VPN / specific IP setup? Answer: no, not as it is. A vendor outside the allowed addresses cannot open a form link. Same fix as trust-center: one public path that serves only the vendor form (answers are saved, the link expires after 30 days). Reply with the answer given on trust-center and I build both together; otherwise the questionnaire can be e-mailed as a file instead.",
+    "note": "Hal (core2.docx): sounds good, but will it work with the VPN / specific IP setup? Answer: no, not as it is. A vendor outside the allowed addresses cannot open a form link. Same fix as trust-center: one public path that serves only the vendor form (answers are saved, the link expires after 30 days). Reply with the answer given on trust-center and I build both together; otherwise the questionnaire can be e-mailed as a file instead. 2026-11-21: Built as public (Hal: build as public): on a vendor, Questionnaires makes a one-time link (30 days unless set, no sign-in, only a hash stored) to a form of 14 standard security questions with Yes, No or Not applicable and optional details; the vendor types a name and e-mail and sends it once; staff see the answers on the vendor and in its history, can cancel an open link, and can e-mail it to the account manager (needs the mail credentials and PUBLIC_PAGES_BASE_URL). Tested end to end against Postgres; NOT seen live in a browser yet. The questions are fixed in services/vendor_questionnaire.py; tell me if you want a different list.",
     "added": "2026-11-14"
   },
   {
@@ -1828,7 +1828,7 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "new",
     "needs": "signoff",
-    "note": "Both can be done: one-time e-mail links, or sign-in with Microsoft (SSO) so the click records who accepted. Recommend SSO for Live Oak staff and one-time links for outside people. Reply 'go' to build that.",
+    "note": "Both can be done: one-time e-mail links, or sign-in with Microsoft (SSO) so the click records who accepted. Recommend SSO for Live Oak staff and one-time links for outside people. Reply 'go' to build that. 2026-11-21: Built after Hal said go: on Policies, Acceptance, Links for people without an account makes one one-time link per outside person (works once, expires in 14 days unless set, no sign-in, name typed and box ticked, only a hash stored, can be cancelled, optional e-mail needs PUBLIC_PAGES_BASE_URL). Live Oak staff keep accepting in the console with Microsoft sign-in. Public route /api/v1/public/policy/{token} has its own Caddy rule. Tested end to end against Postgres; NOT seen live in a browser yet.",
     "added": "2026-11-14"
   },
   {

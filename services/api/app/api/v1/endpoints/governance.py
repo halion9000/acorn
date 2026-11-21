@@ -17,12 +17,13 @@ from sqlalchemy import func, select
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
 from app.models.governance import GovernanceItem, GovernanceVersion
-from app.models.policy_acceptance import PolicyAcceptance, PolicyApproval, PolicyAssignment
+from app.models.policy_acceptance import PolicyAcceptance, PolicyAcceptLink, PolicyApproval, PolicyAssignment
 from app.models.tenant import Tenant
 from app.services import governance as gov
 from app.services import policy_acceptance as pa
 from app.services import policy_approval as pap
 from app.services import policy_assignment as pas
+from app.services import policy_links as pl
 from app.services import policy_templates as pt
 from app.services.audit import emit_audit
 from app.services.identity_people import is_active
@@ -677,6 +678,128 @@ async def assign_policy(
         )
     await db.commit()
     return await _assignment_rows(db, tenant, item_id)
+
+
+class AcceptLinkIn(BaseModel):
+    emails: list[str] = Field(default_factory=list, max_length=100)
+    name: str | None = Field(default=None, max_length=120)  # shown on the page only as the person's own record; they type their name when accepting
+    expires_days: int | None = Field(default=None, ge=1, le=pl.MAX_DAYS)
+    send: bool = False  # e-mail the link to the person (needs the mail credentials and PUBLIC_PAGES_BASE_URL)
+
+
+class AcceptLinkOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    version: int
+    expires_on: date
+    state: str  # open / used / expired
+    path: str | None = None  # only in the answer that made the link: the token is never stored and cannot be shown again
+    url: str | None = None
+    emailed: bool = False
+
+
+def _public_url(path: str) -> str | None:
+    from app.core.config import settings as _s  # noqa: PLC0415
+
+    base = (_s.PUBLIC_PAGES_BASE_URL or "").strip().rstrip("/")
+    return f"{base}{path}" if base.lower().startswith(("http://", "https://")) else None
+
+
+@router.get("/{item_id}/accept-links", response_model=list[AcceptLinkOut], dependencies=[Depends(require_permission("reports:read"))])
+async def list_accept_links(tenant: ScopeTenant, item_id: uuid.UUID, user: AuthUser, db: DBSession) -> list[AcceptLinkOut]:
+    """The one-time acceptance links made for a policy (never the links themselves: only who, until when, and whether used)."""
+    await _item(db, tenant, item_id)
+    now = datetime.now(UTC)
+    rows = (
+        (await db.execute(select(PolicyAcceptLink).where(PolicyAcceptLink.item_id == item_id, PolicyAcceptLink.tenant_id == tenant).order_by(PolicyAcceptLink.created_at.desc()).limit(500)))
+        .scalars()
+        .all()
+    )
+    return [AcceptLinkOut(id=r.id, email=r.email, version=r.version, expires_on=r.expires_at.date(), state=pl.state_of(r.expires_at, r.used_at, now)) for r in rows]
+
+
+@router.post("/{item_id}/accept-links", response_model=list[AcceptLinkOut], status_code=status.HTTP_201_CREATED)
+async def make_accept_links(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    body: AcceptLinkIn,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> list[AcceptLinkOut]:
+    """Make a one-time link for each person: it shows the newest text of the policy, needs no sign-in, works once and expires (14 days unless set). The answer holds each link once; only a hash is kept."""
+    row = await _item(db, tenant, item_id)
+    if row.kind != "policy":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only a policy is accepted.")
+    latest = (await db.execute(select(func.max(GovernanceVersion.version)).where(GovernanceVersion.item_id == item_id))).scalar_one()
+    if latest is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Save the text of the policy first; there is nothing to read yet.")
+    emails = sorted({pa.norm(e) for e in body.emails if "@" in e})
+    if not emails:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Give at least one e-mail address.")
+    if body.send and _public_url("/x") is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="E-mailing links needs PUBLIC_PAGES_BASE_URL (the address the internet reaches the public pages by). Copy the links instead.")
+    mailer = None
+    if body.send:
+        from app.services.alert_email.graph import GraphMailer  # noqa: PLC0415
+
+        mailer = GraphMailer.from_settings()
+        if not mailer.configured:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The mail credentials are not set, so nothing can be e-mailed. Copy the links instead.")
+    now = datetime.now(UTC)
+    out: list[AcceptLinkOut] = []
+    for e in emails:
+        token = pl.new_token()
+        expires = pl.expiry(now, body.expires_days)
+        rec = PolicyAcceptLink(
+            id=uuid.uuid4(), tenant_id=tenant, item_id=item_id, version=latest, email=e, display_name=body.name,
+            token_hash=pl.hash_token(token), expires_at=expires, created_by=getattr(user, "email", None),
+        )
+        db.add(rec)
+        path = pl.link_path(token)
+        url = _public_url(path)
+        emailed = False
+        if mailer is not None and url:
+            try:
+                note = chr(10).join([f"You are asked to read and accept the policy {row.title}.", "", f"Open this link (it works once and expires on {expires.date().isoformat()}):", url, ""])
+                await mailer.send([e], f"Please read and accept: {row.title}", note)
+                emailed = True
+            except Exception:  # noqa: BLE001 - the link is still made and shown to staff
+                emailed = False
+        out.append(AcceptLinkOut(id=rec.id, email=e, version=latest, expires_on=expires.date(), state="open", path=path, url=url, emailed=emailed))
+    await db.flush()
+    await emit_audit(
+        db=db,
+        tenant_id=tenant,
+        actor_id=user.user_id,
+        action="policy_accept_link:made",
+        resource="governance_item",
+        resource_id=str(item_id),
+        changes={"people": len(emails), "version": latest, "emailed": sum(1 for o in out if o.emailed)},
+        request=request,
+    )
+    await db.commit()
+    return out
+
+
+@router.delete("/{item_id}/accept-links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_accept_link(
+    tenant: ScopeTenant,
+    item_id: uuid.UUID,
+    link_id: uuid.UUID,
+    request: Request,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+    db: DBSession,
+) -> None:
+    """Stop a link from working (a used link stays on record as used)."""
+    await _item(db, tenant, item_id)
+    found = (await db.execute(select(PolicyAcceptLink).where(PolicyAcceptLink.id == link_id, PolicyAcceptLink.item_id == item_id, PolicyAcceptLink.tenant_id == tenant))).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such link.")
+    if found.used_at is None:
+        found.expires_at = datetime.now(UTC)
+    await emit_audit(db=db, tenant_id=tenant, actor_id=user.user_id, action="policy_accept_link:revoked", resource="governance_item", resource_id=str(item_id), changes={}, request=request)
+    await db.commit()
 
 
 @router.delete("/{item_id}/assignments/{email}", status_code=status.HTTP_204_NO_CONTENT)

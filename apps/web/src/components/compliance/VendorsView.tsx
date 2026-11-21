@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { dollars } from '@/lib/money';
 import { ClientPicker, clientFromAddress } from '@/components/mssp/ClientPicker';
 import { saveText } from '@/lib/saveFile';
+import { VendorQuestionnaires } from './VendorQuestionnaires';
 import { myVendors } from '@/lib/vendorOwner';
 import { apiErrorDetail, authApi, detectedAppsApi, downloadCsv, vendorApi, type VendorDetail, type VendorInput, type VendorList, type VendorRow } from '@/lib/api';
 
@@ -332,6 +333,7 @@ function Detail({ clientId, vendor, data, onChange, onClose }: { clientId: strin
           </ul>
         </div>
       )}
+      <VendorQuestionnaires clientId={clientId} vendorId={vendor.id} archived={archived} contactEmail={vendor.account_manager_email ?? null} />
       <div data-testid="vendor-documents">
         <h4 className="mb-1 text-xs font-semibold uppercase text-gray-400">Documents</h4>
         <ul className="space-y-1 text-sm text-gray-300">

@@ -37,6 +37,8 @@ EXAMPLES: dict[tuple[str, str], dict[str, Any]] = {
     ("PATCH", "/api/v1/compliance/vendors/{vendor_id}"): {"risk_level": "high", "notes": "Breach notice received 2026-10-20; review brought forward."},
     ("POST", "/api/v1/compliance/vendors/{vendor_id}/reviews"): {"title": "2026 annual review", "kind": "one_time", "due_date": "2026-12-15", "reviewer": "Dana Reyes"},
     ("POST", "/api/v1/compliance/vendors/{vendor_id}/reviews/{review_id}/complete"): {"outcome": "no_concerns", "findings": "SOC 2 Type II report reviewed; no exceptions."},
+    ("POST", "/api/v1/compliance/vendors/{vendor_id}/questionnaires"): {"expires_days": 30, "send": False},
+    ("PUT", "/api/v1/compliance/trust-center/public"): {"enabled": True, "new_link": False},
     ("POST", "/api/v1/compliance/vendors/{vendor_id}/documents"): {"name": "SOC 2 Type II report 2026", "doc_type": "SOC 2", "url": "https://trust.backup.example.com/soc2.pdf"},
     ("POST", "/api/v1/compliance/detected-applications/{app_id}/link"): {"vendor_id": "6f9619ff-8b86-d011-b42d-00cf4fc964ff"},
     ("POST", "/api/v1/compliance/access-reviews"): {

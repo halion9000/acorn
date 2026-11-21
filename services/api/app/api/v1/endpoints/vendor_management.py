@@ -19,8 +19,10 @@ from sqlalchemy import select
 
 from app.api.v1.deps import AuthUser, DBSession, require_permission
 from app.api.v1.endpoints.compliance import ScopeTenant
-from app.models.vendor_management import DetectedApplication, Vendor, VendorDocument, VendorHistory, VendorReview
+from app.models.vendor_management import DetectedApplication, Vendor, VendorDocument, VendorHistory, VendorQuestionnaireLink, VendorReview
 from app.services import csv_export
+from app.services import policy_links as pl
+from app.services import vendor_questionnaire as vq
 from app.services.audit import emit_audit
 from app.services.vendor_management import CATEGORIES, DOC_TYPES, RISK_LEVELS, describe_changes, review_state, spend_by_category, spend_total
 
@@ -539,6 +541,133 @@ async def restore_vendor(
         await _audit(db, tenant, user, request, "restored", v)
         await db.commit()
     return await _detail(db, tenant, vendor_id)
+
+
+class QLinkIn(BaseModel):
+    expires_days: int | None = Field(default=None, ge=1, le=pl.MAX_DAYS)
+    send: bool = False  # e-mail the link to the vendor account manager (needs the mail credentials and PUBLIC_PAGES_BASE_URL)
+
+
+class QAnswer(BaseModel):
+    question: str
+    answer: str
+    details: str
+
+
+class QLinkOut(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+    expires_on: date
+    state: str  # open / answered / expired
+    respondent_name: str | None = None
+    respondent_email: str | None = None
+    answered_at: datetime | None = None
+    answers: list[QAnswer] = Field(default_factory=list)
+    path: str | None = None  # only in the answer that made the link; the token cannot be shown again
+    url: str | None = None
+    emailed: bool = False
+
+
+def _qstate(r: VendorQuestionnaireLink, now: datetime) -> str:
+    s = pl.state_of(r.expires_at, r.submitted_at, now)
+    return "answered" if s == "used" else s
+
+
+def _qout(r: VendorQuestionnaireLink, now: datetime) -> QLinkOut:
+    return QLinkOut(
+        id=r.id,
+        created_at=r.created_at,
+        expires_on=r.expires_at.date(),
+        state=_qstate(r, now),
+        respondent_name=r.respondent_name,
+        respondent_email=r.respondent_email,
+        answered_at=r.submitted_at,
+        answers=[QAnswer(question=a.get("question", ""), answer=a.get("answer", ""), details=a.get("details", "")) for a in (r.answers or [])],
+    )
+
+
+@router.get("/{vendor_id}/questionnaires", response_model=list[QLinkOut], summary="The questionnaires sent to a vendor and the answers that came back")
+async def list_questionnaires(
+    vendor_id: uuid.UUID, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:read"))]
+) -> list[QLinkOut]:
+    await _get(db, tenant, vendor_id)
+    now = datetime.now(UTC)
+    rows = (
+        (await db.execute(select(VendorQuestionnaireLink).where(VendorQuestionnaireLink.vendor_id == vendor_id, VendorQuestionnaireLink.tenant_id == tenant).order_by(VendorQuestionnaireLink.created_at.desc()).limit(50)))
+        .scalars()
+        .all()
+    )
+    return [_qout(r, now) for r in rows]
+
+
+@router.post("/{vendor_id}/questionnaires", response_model=QLinkOut, status_code=status.HTTP_201_CREATED, summary="Make a link to a security questionnaire for the vendor to answer (works once, 30 days unless set, no sign-in)")
+async def send_questionnaire(
+    vendor_id: uuid.UUID,
+    body: QLinkIn,
+    request: Request,
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+) -> QLinkOut:
+    from app.api.v1.endpoints.governance import _public_url  # noqa: PLC0415
+
+    vendor = await _get(db, tenant, vendor_id)
+    if vendor.status == "archived":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An archived vendor cannot be sent a questionnaire. Restore it first.")
+    if body.send:
+        if not vendor.account_manager_email or "@" not in vendor.account_manager_email:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Add the account manager e-mail address to the vendor first, or copy the link instead.")
+        if _public_url("/x") is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="E-mailing links needs PUBLIC_PAGES_BASE_URL (the address the internet reaches the public pages by). Copy the link instead.")
+    mailer = None
+    if body.send:
+        from app.services.alert_email.graph import GraphMailer  # noqa: PLC0415
+
+        mailer = GraphMailer.from_settings()
+        if not mailer.configured:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The mail credentials are not set, so nothing can be e-mailed. Copy the link instead.")
+    now = datetime.now(UTC)
+    token = pl.new_token()
+    expires = pl.expiry(now, body.expires_days or vq.DEFAULT_DAYS)
+    rec = VendorQuestionnaireLink(id=uuid.uuid4(), tenant_id=tenant, vendor_id=vendor_id, token_hash=pl.hash_token(token), expires_at=expires, created_by=_actor(user))
+    db.add(rec)
+    path = f"{vq.PUBLIC_PATH}{token}"
+    url = _public_url(path)
+    emailed = False
+    if mailer is not None and url:
+        note = chr(10).join([f"{vendor.name}: please answer a short security questionnaire.", "", f"Open this link (it works once and expires on {expires.date().isoformat()}):", url, ""])
+        try:
+            await mailer.send([vendor.account_manager_email], "Security questionnaire", note)
+            emailed = True
+        except Exception:  # noqa: BLE001 - the link is still made and shown to staff
+            emailed = False
+    await _note(db, tenant, vendor_id, user, "questionnaire_sent", f"link valid until {expires.date().isoformat()}" + (", e-mailed" if emailed else ""))
+    await db.flush()
+    await _audit(db, tenant, user, request, "questionnaire_link", vendor, {"emailed": emailed})
+    await db.commit()
+    out = _qout(rec, now)
+    out.path, out.url, out.emailed = path, url, emailed
+    return out
+
+
+@router.delete("/{vendor_id}/questionnaires/{link_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Stop a questionnaire link from working")
+async def cancel_questionnaire(
+    vendor_id: uuid.UUID,
+    link_id: uuid.UUID,
+    request: Request,
+    tenant: ScopeTenant,
+    db: DBSession,
+    user: Annotated[AuthUser, Depends(require_permission("reports:write"))],
+) -> None:
+    vendor = await _get(db, tenant, vendor_id)
+    row = (await db.execute(select(VendorQuestionnaireLink).where(VendorQuestionnaireLink.id == link_id, VendorQuestionnaireLink.vendor_id == vendor_id, VendorQuestionnaireLink.tenant_id == tenant))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such link.")
+    if row.submitted_at is None:
+        row.expires_at = datetime.now(UTC)
+    await _note(db, tenant, vendor_id, user, "questionnaire_cancelled", "")
+    await _audit(db, tenant, user, request, "questionnaire_cancelled", vendor)
+    await db.commit()
 
 
 @router.post(
