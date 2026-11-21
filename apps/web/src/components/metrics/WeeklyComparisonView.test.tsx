@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const authFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth-session', () => ({ authFetch }));
 
-import { WeeklyComparisonView, netText, sortRows, totalOf } from './WeeklyComparisonView';
+import { WeeklyComparisonView, netText, podSummary, sortRows, totalOf } from './WeeklyComparisonView';
 
 const line = (over = {}) => ({ days_worked: 5, new: 22, opened_closed: 10, older_closed: 13, closed: 23, net: 1, new_per_day: 4.4, closed_per_day: 4.6, calls_excluded: 3, ...over });
 const REPORT = (over = {}) => ({
@@ -68,6 +68,13 @@ describe('sorting and the pod filter', () => {
     expect(sortRows(rows, 'new_per_day', -1).map((r) => r.engineer)).toEqual(['C', 'B', 'A']);
     expect(sortRows(rows, 'engineer', -1).map((r) => r.engineer)).toEqual(['C', 'B', 'A']);
     expect(sortRows(rows, null, 1)).toBe(rows);
+  });
+
+  it('says on the filter button what is chosen', () => {
+    expect(podSummary(new Set(), 5)).toBe('Pods: all');
+    expect(podSummary(new Set(['Pod 1']), 5)).toBe('Pods: Pod 1');
+    expect(podSummary(new Set(['Pod 1', 'Pod 2']), 5)).toBe('Pods: 2 of 5');
+    expect(podSummary(new Set(['A', 'B']), 2)).toBe('Pods: all');
   });
 
   it('works the totals of the rows shown, with the per-day rates from them', () => {

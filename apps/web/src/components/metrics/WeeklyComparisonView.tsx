@@ -60,6 +60,11 @@ export function totalOf(rows: Row[]): Line {
   return { days_worked: days, new: created, opened_closed: sum('opened_closed'), older_closed: sum('older_closed'), closed, net: closed - created, new_per_day: days > 0 ? Math.round((created / days) * 10) / 10 : null, closed_per_day: days > 0 ? Math.round((closed / days) * 10) / 10 : null, calls_excluded: sum('calls_excluded') };
 }
 
+/** What the pod filter button says (pure): all pods, the one chosen, or how many. */
+export function podSummary(chosen: ReadonlySet<string>, total: number): string {
+  if (chosen.size === 0 || chosen.size >= total) return 'Pods: all';
+  return chosen.size === 1 ? `Pods: ${[...chosen][0]}` : `Pods: ${chosen.size} of ${total}`;
+}
 const rate = (n: number | null): string => (n === null ? '–' : n.toFixed(1));
 const COLS: [string, (l: Line) => string, boolean][] = [
   ['Days worked', (l) => String(l.days_worked), true],
@@ -116,20 +121,22 @@ export function WeeklyComparisonView() {
           </label>
           <RefreshMetrics receivedAt={data.received_at} reload={reload} />
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300" role="group" aria-label="Pods">
-            <span>Pods</span>
-            {allPods.map((pod) => (
-              <label key={pod} className="flex items-center gap-1">
-                <input type="checkbox" checked={pods.has(pod)} onChange={() => toggle(pod)} />
-                {pod}
-              </label>
-            ))}
-            {filtering && (
-              <button type="button" className="text-xs text-blue-300 underline" onClick={() => setPods(new Set())}>
-                Show all pods
-              </button>
-            )}
-          </div>
+          <details className="relative inline-block text-sm text-gray-300" data-testid="pod-filter">
+            <summary className="cursor-pointer select-none rounded border border-gray-700 bg-gray-900 px-3 py-1.5 text-gray-100 hover:bg-gray-800">{podSummary(pods, allPods.length)}</summary>
+            <div role="group" aria-label="Pods" className="absolute left-0 z-20 mt-1 max-h-72 w-60 overflow-y-auto rounded-lg border border-gray-700 bg-gray-950 p-2 shadow-xl">
+              {allPods.map((pod) => (
+                <label key={pod} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-gray-800">
+                  <input type="checkbox" checked={pods.has(pod)} onChange={() => toggle(pod)} />
+                  {pod}
+                </label>
+              ))}
+              {filtering && (
+                <button type="button" className="mt-1 w-full rounded px-2 py-1 text-left text-xs text-blue-300 hover:bg-gray-800" onClick={() => setPods(new Set())}>
+                  Show all pods
+                </button>
+              )}
+            </div>
+          </details>
           {!data.has_detail && (
             <p className="text-sm text-amber-300" role="status">
               CORE has not sent the weekly ticket counts for this week yet; they arrive with its next daily round.
