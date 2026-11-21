@@ -130,6 +130,10 @@ export function EventSearchView() {
         <a href="/settings/event-retention" className="text-xs text-blue-300 hover:underline">
           Data retention
         </a>
+        <span className="px-1 text-xs text-gray-600">·</span>
+        <a href="/events/history" className="text-xs text-blue-300 hover:underline">
+          Data history
+        </a>
         <p className="mt-1 text-sm text-gray-400">Everything the sources reported, kept as events and never changed. Search by client, source, kind, dates and text; open an event to see it whole.</p>
       </div>
       <form

@@ -100,7 +100,7 @@ export function EventRetentionView() {
     }
   };
 
-  const nameOf = (id: string): string => (id === 'none' ? 'Events about no client' : (clients.find((c) => c.id === id)?.name ?? id));
+  const nameOf = (id: string): string => (id === 'none' ? 'Events about no client' : id === 'dataset versions' ? 'Saved copies of the data sets (the organization default applies)' : (clients.find((c) => c.id === id)?.name ?? id));
   const select = (value: Choice, onChange: (c: Choice) => void, label: string) => (
     <select aria-label={label} className={field} value={value} onChange={(e) => onChange(e.target.value as Choice)}>
       {OPTIONS.map(([v, text]) => (

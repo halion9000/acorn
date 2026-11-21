@@ -105,6 +105,11 @@ async def purge_expired(db: Any, tenant_id: uuid.UUID, settings: dict[str, Any] 
             text("DELETE FROM stored_events WHERE tenant_id = :t AND client_id IS NOT DISTINCT FROM :c AND event_time < :limit"), {"t": tenant_id, "c": client, "limit": limit}
         )
         deleted += res.rowcount or 0
+    # The versions of the datasets (step 3) are the organization's own, not one client's, so the organization's default retention covers them.
+    versions_limit = cutoff(retention_years(settings, None), when)
+    if versions_limit is not None:
+        res = await db.execute(text("DELETE FROM dataset_versions WHERE tenant_id = :t AND received_at < :limit"), {"t": tenant_id, "limit": versions_limit})
+        deleted += res.rowcount or 0
     return deleted
 
 
@@ -122,4 +127,9 @@ async def expired_counts(db: Any, tenant_id: uuid.UUID, settings: dict[str, Any]
         ).scalar_one()
         if n:
             out[str(client) if client else "none"] = int(n)
+    versions_limit = cutoff(retention_years(settings, None), when)
+    if versions_limit is not None:
+        n = (await db.execute(text("SELECT count(*) FROM dataset_versions WHERE tenant_id = :t AND received_at < :limit"), {"t": tenant_id, "limit": versions_limit})).scalar_one()
+        if n:
+            out["dataset versions"] = int(n)
     return out

@@ -91,3 +91,22 @@ async def test_with_every_client_infinite_the_preview_is_empty_and_a_purge_of_ze
     assert (await with_db(world.a, lambda db: ep.purge(ep.PurgeIn(confirm=0), None, world.user, db))) == {"deleted": 0}
     left = (await with_db(world.a, lambda db: db.execute(text("select count(*) from stored_events")))).scalar_one()
     assert left == 1
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_saved_copies_of_the_datasets_follow_the_organizations_default_retention(world):
+    old, new = NOW - __import__("datetime").timedelta(days=366 * 3), NOW
+
+    async def add(db):
+        for i, at in enumerate((old, new)):
+            await db.execute(text("insert into dataset_versions (tenant_id, key, received_at, sha256, payload) values (:t, 'k', :at, :h, '{}'::jsonb)"), {"t": world.a, "at": at, "h": f"h{i}"})
+
+    await with_db(world.a, add)
+    count = lambda: with_db(world.a, lambda db: db.execute(text("select count(*) from dataset_versions where tenant_id = :t"), {"t": world.a}))  # noqa: E731
+    await with_db(world.a, lambda db: ep.put_retention(ep.RetentionIn(default=1), None, world.user, db))
+    p = await with_db(world.a, lambda db: ep.preview(world.user, db))
+    assert p["by_client"] == {"dataset versions": 1} and p["total"] == 1
+    assert (await count()).scalar_one() == 2, "the preview deleted nothing"
+    done = await with_db(world.a, lambda db: ep.purge(ep.PurgeIn(confirm=1), None, world.user, db))
+    assert done == {"deleted": 1} and (await count()).scalar_one() == 1

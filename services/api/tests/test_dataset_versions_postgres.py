@@ -109,3 +109,28 @@ async def test_the_ticket_statistics_the_csat_summary_and_the_profitability_summ
         assert kept == ["csat", "profitability", "ticket-stats"]
     finally:
         feed._verify_core_feed_token = original
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_old_versions_can_be_listed_and_read_whole_with_a_check_that_they_are_unchanged(world):
+    from app.api.v1.endpoints import dataset_history as dh
+    from fastapi import HTTPException
+
+    user = SimpleNamespace(tenant_id=world.a)
+    one = {"weeks": [{"week": "2026-11-09", "hours": 12.5, "name": "Dan"}], "n": 2, "ratio": 0.1, "ok": True, "note": None}
+    two = {**one, "n": 3}
+    await with_db(world.a, lambda db: dv.keep_version(db, world.a, "staff-weekly", one, T0))
+    await with_db(world.a, lambda db: dv.keep_version(db, world.a, "staff-weekly", two, T0 + timedelta(hours=7)))
+    await with_db(world.a, lambda db: dv.keep_version(db, world.a, "csat", {"x": 1}, T0))
+
+    listed = await with_db(world.a, lambda db: dh.list_datasets(user, db))
+    assert [(d.key, d.versions) for d in listed] == [("csat", 1), ("staff-weekly", 2)]
+    versions = await with_db(world.a, lambda db: dh.list_versions("staff-weekly", user, db))
+    assert [v.received_at for v in versions] == [T0 + timedelta(hours=7), T0]  # newest first
+    old = await with_db(world.a, lambda db: dh.get_version(versions[1].id, user, db))
+    assert old.payload == one and old.verified and old.key == "staff-weekly"
+    assert (await with_db(world.a, lambda db: dh.list_versions("nothing", user, db))) == []
+    with pytest.raises(HTTPException) as e:
+        await with_db(world.a, lambda db: dh.get_version(10**12, user, db))
+    assert e.value.status_code == 404

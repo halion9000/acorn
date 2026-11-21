@@ -18945,6 +18945,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dataset-history:
+    get:
+      tags:
+      - events
+      summary: The datasets that have saved versions
+      operationId: list_datasets_api_v1_dataset_history_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DatasetSummary'
+                type: array
+                title: Response List Datasets Api V1 Dataset History Get
+      security:
+      - HTTPBearer: []
+  /api/v1/dataset-history/{key}:
+    get:
+      tags:
+      - events
+      summary: The saved versions of one dataset, newest first
+      operationId: list_versions_api_v1_dataset_history__key__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          title: Before
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VersionRow'
+                title: Response List Versions Api V1 Dataset History  Key  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dataset-history/version/{version_id}:
+    get:
+      tags:
+      - events
+      summary: One saved version whole, with a check that it is unchanged
+      operationId: get_version_api_v1_dataset_history_version__version_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Version Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionFull'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/events/export:
     get:
       tags:
@@ -46193,6 +46279,29 @@ components:
       - baseline_tool
       - rows
       title: DataQualityOut
+    DatasetSummary:
+      properties:
+        key:
+          type: string
+          title: Key
+        versions:
+          type: integer
+          title: Versions
+        first:
+          type: string
+          format: date-time
+          title: First
+        latest:
+          type: string
+          format: date-time
+          title: Latest
+      type: object
+      required:
+      - key
+      - versions
+      - first
+      - latest
+      title: DatasetSummary
     DayPoint:
       properties:
         day:
@@ -70602,6 +70711,41 @@ components:
       - client_id
       - alerts_raised
       title: VerdictOut
+    VersionFull:
+      properties:
+        id:
+          type: integer
+          title: Id
+        received_at:
+          type: string
+          format: date-time
+          title: Received At
+        sha256:
+          type: string
+          title: Sha256
+        bytes:
+          type: integer
+          title: Bytes
+        key:
+          type: string
+          title: Key
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        verified:
+          type: boolean
+          title: Verified
+      type: object
+      required:
+      - id
+      - received_at
+      - sha256
+      - bytes
+      - key
+      - payload
+      - verified
+      title: VersionFull
     VersionIn:
       properties:
         body:
@@ -70644,6 +70788,28 @@ components:
       - change_note
       - created_at
       title: VersionOut
+    VersionRow:
+      properties:
+        id:
+          type: integer
+          title: Id
+        received_at:
+          type: string
+          format: date-time
+          title: Received At
+        sha256:
+          type: string
+          title: Sha256
+        bytes:
+          type: integer
+          title: Bytes
+      type: object
+      required:
+      - id
+      - received_at
+      - sha256
+      - bytes
+      title: VersionRow
     ViewableTenant:
       properties:
         id:
