@@ -23,6 +23,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.client_alias import ClientAlias
 from app.models.signin import BillingDifferenceNote, BillingItemMap, ClientLicenseCount, ClientLicenseHistory
 from app.models.tenant import Tenant
+from app.services.dataset_versions import keep_version
 from app.services.license_counts import (
     BASELINE_TOOL,
     changes,
@@ -197,6 +198,8 @@ async def report_core_feed_license_counts(tenant_token: str, body: LicenseCounts
     owner = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, owner)
     result = await apply_license_counts(db, owner, body)
+    # The counts are replaced by the next report: keep the version (changed content, at most every six hours; SIEM style storage step 3).
+    await keep_version(db, owner, f"license-counts:{body.vendor}:{body.vendor_client_id}", body.model_dump(mode="json"))
     await db.commit()
     return result
 

@@ -28,6 +28,7 @@ from app.db.rls_sessions import adopt_tenant
 from app.models.identity_history import IdentityHistory
 from app.models.signin import DirectoryAuditEvent, IdentityMfaUser, IdentitySecureScore
 from app.models.tenant import Tenant
+from app.services.dataset_versions import keep_version
 from app.services import identity_history
 from app.services.directory_scoring import directory_features, sensitivity_of
 from app.services.identity_detections import run_audit_detections, run_mfa_detections
@@ -721,6 +722,8 @@ async def report_core_feed_secure_score(tenant_token: str, body: SecureScoreRepo
     owner = await _verify_core_feed_token(db, tenant_token)
     await adopt_tenant(db, owner)
     result = await apply_secure_score(db, owner, body)
+    # The score and its improvements are replaced by the next report: keep the version (changed content, at most every six hours; SIEM style storage step 3).
+    await keep_version(db, owner, f"secure-score:{body.vendor_client_id}", body.model_dump(mode="json"))
     await db.commit()
     return result
 

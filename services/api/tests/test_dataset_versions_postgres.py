@@ -134,3 +134,25 @@ async def test_old_versions_can_be_listed_and_read_whole_with_a_check_that_they_
     with pytest.raises(HTTPException) as e:
         await with_db(world.a, lambda db: dh.get_version(10**12, user, db))
     assert e.value.status_code == 404
+
+
+@needs_pg
+@pytest.mark.asyncio
+async def test_the_secure_score_and_the_license_counts_keep_a_version_of_each_report(world):
+    from app.api.v1.endpoints import billing, identity
+
+    async def verified(db, token):
+        return world.a
+
+    originals = (identity._verify_core_feed_token, billing._verify_core_feed_token)
+    identity._verify_core_feed_token = billing._verify_core_feed_token = verified
+    try:
+        score = identity.SecureScoreReport(vendor="cipp", vendor_client_id="tenant-1", taken_at=T0, current=41.5, max=100)
+        await with_db(world.a, lambda db: identity.report_core_feed_secure_score("t", score, db))
+        counts = billing.LicenseCountsReport(vendor="cipp", vendor_client_id="tenant-1", counts=[billing.LicenseCountIn(item="Business Premium", count=12, available=1)])
+        await with_db(world.a, lambda db: billing.report_core_feed_license_counts("t", counts, db))
+        kept = (await with_db(world.a, lambda db: db.execute(text("select key, payload from dataset_versions order by key")))).all()
+        assert [k for k, _ in kept] == ["license-counts:cipp:tenant-1", "secure-score:tenant-1"]
+        assert kept[0][1]["counts"][0]["count"] == 12 and kept[1][1]["current"] == 41.5
+    finally:
+        identity._verify_core_feed_token, billing._verify_core_feed_token = originals
