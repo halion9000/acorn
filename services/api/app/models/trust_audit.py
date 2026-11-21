@@ -27,6 +27,9 @@ class TrustCenterSettings(Base):
     frameworks: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     policy_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     documents: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # The public share link (migration 238): off by default; the token is the unguessable part of the link.
+    public_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='false')
+    public_token: Mapped[str | None] = mapped_column(String(80), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 

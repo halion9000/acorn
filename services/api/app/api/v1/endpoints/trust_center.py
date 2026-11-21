@@ -22,7 +22,7 @@ from app.models.compliance_enabled_framework import ComplianceEnabledFramework
 from app.models.governance import GovernanceItem
 from app.models.trust_audit import TrustCenterSettings
 from app.services import compliance_audit as audit
-from app.services import compliance_health
+from app.services import compliance_health, public_trust
 
 router = APIRouter(prefix="/compliance/trust-center", tags=["compliance"])
 
@@ -77,6 +77,9 @@ class TrustCenterOut(BaseModel):
     available_policies: list[PolicyChoice]
     chosen_frameworks: list[str]
     chosen_policy_ids: list[uuid.UUID]
+    # The public share link: whether it is on, and its path (add the public address of A.C.O.R.N in front). None until it was switched on once.
+    public_enabled: bool = False
+    public_path: str | None = None
 
 
 def clean_documents(docs: list[DocumentIn]) -> list[dict[str, str]]:
@@ -141,6 +144,8 @@ async def _build(db: DBSession, tenant: uuid.UUID) -> TrustCenterOut:
         available_policies=[PolicyChoice(id=p.id, title=p.title) for p in policies],
         chosen_frameworks=chosen_fw,
         chosen_policy_ids=sorted(chosen_ids, key=str),
+        public_enabled=bool(row and row.public_enabled and row.public_token),
+        public_path=public_trust.link_path(row.public_token if row else None),
     )
 
 
@@ -196,5 +201,30 @@ async def put_trust_center(
         policies=len(row.policy_ids),
         documents=len(row.documents),
     )
+    await db.commit()
+    return await _build(db, tenant)
+
+
+class PublicLinkIn(BaseModel):
+    enabled: bool
+    # True makes a new link: the old one stops working at once (use it when a link was shared too widely).
+    new_link: bool = False
+
+
+@router.put("/public", response_model=TrustCenterOut, summary="Switch the public share link of the trust center on or off, or make a new link")
+async def put_public_link(
+    body: PublicLinkIn, tenant: ScopeTenant, db: DBSession, user: Annotated[AuthUser, Depends(require_permission("reports:write"))]
+) -> TrustCenterOut:
+    """Off by default. Switching on makes the link the first time; switching off keeps the link but it answers 404 until it is on again; ``new_link`` replaces it. Written to the audit log."""
+    row = (await db.execute(select(TrustCenterSettings).where(TrustCenterSettings.tenant_id == tenant))).scalar_one_or_none()
+    if row is None:
+        row = TrustCenterSettings(tenant_id=tenant)
+        db.add(row)
+    if body.enabled and (row.public_token is None or body.new_link):
+        row.public_token = public_trust.new_token()
+    row.public_enabled = body.enabled and row.public_token is not None
+    row.updated_by = getattr(user, "email", None)
+    row.updated_at = datetime.now(UTC)
+    await audit.note(db, tenant, user, "trust_center:public_link", "trust_center", tenant, enabled=row.public_enabled, new_link=body.new_link)
     await db.commit()
     return await _build(db, tenant)

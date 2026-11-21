@@ -85,7 +85,7 @@
     "area": "Compliance",
     "status": "in_progress",
     "needs": "hal",
-    "note": "Hal (core2.docx, 2026-11-18): yes to a public link: one per client, off by default, an off switch, a list of the documents shown. One catch before I build it: A.C.O.R.N only answers from allowed IP addresses, so a prospect outside could not open a public link. Question: may I open one public path that serves only the trust page (nothing else, nothing signed-in), through the same load balancer, with its own rule? If yes I build the page, the per-client token and the off switch, and give you the one infrastructure change to approve. If no, the link works only from allowed addresses.",
+    "note": "Hal (core2.docx, 2026-11-18): yes to a public link: one per client, off by default, an off switch, a list of the documents shown. One catch before I build it: A.C.O.R.N only answers from allowed IP addresses, so a prospect outside could not open a public link. Question: may I open one public path that serves only the trust page (nothing else, nothing signed-in), through the same load balancer, with its own rule? If yes I build the page, the per-client token and the off switch, and give you the one infrastructure change to approve. If no, the link works only from allowed addresses. 2026-11-21: Built as Hal asked (public, off by default): migration 238, Compliance > Trust center > Public link (switch on or off, make a new link), the page at /api/v1/public/trust/<token> (escaped HTML, no script, 404 for anything that is not a switched-on link) and a Caddy rule on the public :8088 listener that lets only that path shape through from the Cloudflare tunnel. NOT seen live: the public address is the one the honeytoken links use; open the link from a phone off the Wi-Fi once it is switched on for a client.",
     "added": "2026-11-14"
   },
   {
@@ -290,10 +290,10 @@
     "key": "threat-hunting",
     "title": "12.14: threat hunting",
     "area": "Security",
-    "status": "not_started",
+    "status": "completed",
     "needs": "signoff",
     "added": "2026-11-14",
-    "note": "Threat hunting would let you save a search over client alert data (for example 'every sign-in from a new country this week') and run it on a schedule. Reply 'go' for a first version (saved searches plus a daily run), or 'skip'."
+    "note": "Threat hunting would let you save a search over client alert data (for example 'every sign-in from a new country this week') and run it on a schedule. Reply 'go' for a first version (saved searches plus a daily run), or 'skip'. 2026-11-21: Hal: go. Found it already built as saved hunts (Hunt page: save a question, schedule it with cron, the scheduled run shows its last hit count) plus saved searches and the alert search. Nothing new needed; tell me what a first threat-hunt should look like if it should differ."
   },
   {
     "key": "qdrant-upgrade",
@@ -1248,7 +1248,7 @@
     "area": "Round 7: A.C.O.R.N improvement",
     "status": "new",
     "needs": "signoff",
-    "note": "What it is for: it would force a client's users to sign in with their Microsoft account only (no A.C.O.R.N passwords) for the client sign-in. Only matters once clients log in (customer dashboard, client compliance). Recommend: defer until the client sign-in is live. Reply 'defer' or 'go'.",
+    "note": "What it is for: it would force a client's users to sign in with their Microsoft account only (no A.C.O.R.N passwords) for the client sign-in. Only matters once clients log in (customer dashboard, client compliance). Recommend: defer until the client sign-in is live. Reply 'defer' or 'go'. 2026-11-21: Hal asked: what needs setting up, and Google clients? Answered in chat (2026-11-21).",
     "added": "2026-11-14"
   },
   {
@@ -1873,7 +1873,7 @@
     "area": "Round 7: A.C.O.R.N feature",
     "status": "in_progress",
     "needs": "claude",
-    "note": "Same as trust-center: waiting on the answer there (public path or not).",
+    "note": "Same as trust-center: waiting on the answer there (public path or not). 2026-11-21: Built with trust-center (the public link with an off switch).",
     "added": "2026-11-14"
   },
   {
@@ -1916,7 +1916,7 @@
     "status": "new",
     "needs": "signoff",
     "added": "2026-11-14",
-    "note": "No purchase date, so age comes from first seen plus warranty when available. I will build the lifecycle view that way and label it first seen. Reply 'go' to approve."
+    "note": "No purchase date, so age comes from first seen plus warranty when available. I will build the lifecycle view that way and label it first seen. Reply 'go' to approve. 2026-11-21: Built: Devices > Device lifecycle (age from the day first seen, labeled so; operating system support ended or not). NOT seen live."
   },
   {
     "key": "r7-af-23",
@@ -2021,7 +2021,7 @@
     "status": "in_progress",
     "needs": "hal",
     "added": "2026-11-14",
-    "note": "Built: Reports > Executive digest > Scheduled reports: pick a report, who gets it, daily, weekly or monthly and the hour; e-mailed as plain text. Two reports can be scheduled so far (Compliance action items, Open audit requests); more are one small piece of code each. Question: which reports do you want on the list next (Executive digest, Client review, the Net income tabs, License waste)? Client names go out only if the report is about that client; tell me if you want a switch for that. NOT seen live."
+    "note": "Built: Reports > Executive digest > Scheduled reports: pick a report, who gets it, daily, weekly or monthly and the hour; e-mailed as plain text. Two reports can be scheduled so far (Compliance action items, Open audit requests); more are one small piece of code each. Question: which reports do you want on the list next (Executive digest, Client review, the Net income tabs, License waste)? Client names go out only if the report is about that client; tell me if you want a switch for that. NOT seen live. 2026-11-21: Hal: all. The executive digest, client review, net income and license waste can now be scheduled too (6 kinds in all)."
   },
   {
     "key": "r7-af-33",

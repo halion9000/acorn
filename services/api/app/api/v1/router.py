@@ -56,6 +56,7 @@ from app.api.v1.endpoints import (
     compliance,
     compliance_controls,
     dataset_history,
+    public_pages,
     event_export,
     event_retention,
     event_search,
@@ -330,6 +331,7 @@ api_router.include_router(toolbox.router)
 api_router.include_router(trust_center.router)
 api_router.include_router(compliance_controls.router)
 api_router.include_router(dataset_history.router)
+api_router.include_router(public_pages.router)
 api_router.include_router(event_export.router)
 api_router.include_router(event_retention.router)
 api_router.include_router(event_search.router)

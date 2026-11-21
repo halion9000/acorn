@@ -18758,6 +18758,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/compliance/trust-center/public:
+    put:
+      tags:
+      - compliance
+      summary: Switch the public share link of the trust center on or off, or make
+        a new link
+      description: Off by default. Switching on makes the link the first time; switching
+        off keeps the link but it answers 404 until it is on again; ``new_link`` replaces
+        it. Written to the audit log.
+      operationId: put_public_link_api_v1_compliance_trust_center_public_put
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: One of your clients, to read or record its compliance instead
+            of your own. Omit for your own.
+          title: Client Id
+        description: One of your clients, to read or record its compliance instead
+          of your own. Omit for your own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicLinkIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustCenterOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/compliance/controls:
     get:
       tags:
@@ -19026,6 +19071,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionFull'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/public/trust/{token}:
+    get:
+      tags:
+      - public
+      summary: An organization's public trust page (no sign-in; off unless the organization
+        switched its link on)
+      operationId: public_trust_page_api_v1_public_trust__token__get
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
         '422':
           description: Validation Error
           content:
@@ -58614,6 +58686,19 @@ components:
       - mapped
       - proposals
       title: ProposalsOut
+    PublicLinkIn:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        new_link:
+          type: boolean
+          title: New Link
+          default: false
+      type: object
+      required:
+      - enabled
+      title: PublicLinkIn
     PublicReplay:
       properties:
         slug:
@@ -68543,6 +68628,15 @@ components:
             format: uuid
           type: array
           title: Chosen Policy Ids
+        public_enabled:
+          type: boolean
+          title: Public Enabled
+          default: false
+        public_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Public Path
       type: object
       required:
       - enabled

@@ -43,6 +43,11 @@ acorn-ext.goliveoak.com {
 			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
 		}
 	}
+	# The public trust page of an organization that switched its link on (404 otherwise): one fixed path shape, nothing else of the API.
+	@trust path_regexp trust ^/api/v1/public/trust/[A-Za-z0-9_-]{24,64}$
+	handle @trust {
+		reverse_proxy api:8000
+	}
 	handle {
 		respond "Not found" 404
 	}

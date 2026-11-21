@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
+const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), setPublic: vi.fn() }));
 vi.mock('@/lib/api', () => ({ apiErrorDetail: (e: unknown) => (e instanceof Error ? e.message : null), trustCenterApi: api, msspApi: { listChildren: async () => [] } }));
 
 import { TrustCenterView } from './TrustCenterView';
@@ -16,6 +16,7 @@ const center = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   api.get.mockReset();
   api.put.mockReset();
+  api.setPublic.mockReset();
   api.get.mockResolvedValue(center());
   window.history.replaceState(null, '', '/compliance/trust-center');
 });
@@ -83,5 +84,26 @@ describe('printing the trust center', () => {
     expect(await screen.findByTestId('trust-editor')).toHaveClass('print:hidden');
     expect(screen.getByRole('heading', { name: 'Trust center' }).parentElement).toHaveClass('print:hidden');
     expect(screen.getByTestId('trust-preview')).not.toHaveClass('print:hidden');
+  });
+});
+
+describe('the public link', () => {
+  it('is off until switched on, then shows the path and can make a new link or be switched off again', async () => {
+    api.get.mockResolvedValue(center({ public_enabled: false, public_path: null }));
+    render(<TrustCenterView />);
+    const panel = await screen.findByTestId('public-link');
+    expect(panel).toHaveTextContent('Public link (off)');
+    expect(within(panel).queryByTestId('public-path')).toBeNull();
+    api.setPublic.mockResolvedValue(center({ public_enabled: true, public_path: '/api/v1/public/trust/abc123' }));
+    await userEvent.click(within(panel).getByRole('button', { name: 'Switch the public link on' }));
+    expect(api.setPublic).toHaveBeenLastCalledWith('', { enabled: true });
+    expect(await screen.findByTestId('public-path')).toHaveTextContent('/api/v1/public/trust/abc123');
+    api.setPublic.mockResolvedValue(center({ public_enabled: true, public_path: '/api/v1/public/trust/new456' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Make a new link' }));
+    expect(api.setPublic).toHaveBeenLastCalledWith('', { enabled: true, new_link: true });
+    expect(await screen.findByText('/api/v1/public/trust/new456')).toBeInTheDocument();
+    api.setPublic.mockResolvedValue(center({ public_enabled: false, public_path: '/api/v1/public/trust/new456' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Switch the public link off' }));
+    expect(api.setPublic).toHaveBeenLastCalledWith('', { enabled: false });
   });
 });

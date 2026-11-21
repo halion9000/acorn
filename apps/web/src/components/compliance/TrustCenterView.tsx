@@ -36,6 +36,14 @@ export function TrustCenterView() {
     void load();
   }, [load]);
 
+  const setPublic = async (body: { enabled: boolean; new_link?: boolean }) => {
+    try {
+      setData(await trustCenterApi.setPublic(clientId, body));
+      setProblem('');
+    } catch (e) {
+      setProblem(apiErrorDetail(e) ?? (e instanceof Error ? e.message : 'Could not change the public link.'));
+    }
+  };
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const save = async () => {
     try {
@@ -54,7 +62,7 @@ export function TrustCenterView() {
     <div className="space-y-4 p-6">
       <div className="print:hidden">
         <h1 className="text-2xl font-bold text-white">Trust center</h1>
-        <p className="mt-1 text-sm text-gray-400">What you show your customers about your security. It is read by people who sign in; a public link is not built yet. Control health is worked out when the page is read, never typed in.</p>
+        <p className="mt-1 text-sm text-gray-400">What you show your customers about your security. It is read by people who sign in, and it can also have a public link (off until you switch it on, below). Control health is worked out when the page is read, never typed in.</p>
         <div className="mt-3">
           <ClientPicker value={clientId} onChange={setClientId} label="Whose trust center" />
         </div>
@@ -118,6 +126,29 @@ export function TrustCenterView() {
             {data.contact_email && <p className="text-sm text-gray-300">Questions: {data.contact_email}</p>}
           </section>
           <section className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-4 print:hidden" data-testid="trust-editor">
+            <div className="space-y-2 rounded border border-gray-800 bg-gray-950/60 p-3" data-testid="public-link">
+              <p className="text-sm font-medium text-gray-200">Public link {data.public_enabled ? '(on)' : '(off)'}</p>
+              <p className="text-xs text-gray-400">
+                Anyone with the link can read this page without signing in: the headline, about text, the chosen frameworks as measured now, the chosen policies by name, the documents and the contact address. Nothing else. It is off until you switch it on, switching it off makes the link answer
+                &quot;not found&quot;, and a new link replaces the old one at once.
+              </p>
+              {data.public_path && (
+                <p className="break-all rounded bg-gray-900 px-2 py-1 font-mono text-xs text-gray-200" data-testid="public-path">
+                  {data.public_path}
+                </p>
+              )}
+              {data.public_path && <p className="text-xs text-gray-500">Put the public address of A.C.O.R.N in front of this path (the same address your honeytoken links use).</p>}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => void setPublic({ enabled: !data.public_enabled })} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-100 hover:bg-gray-800">
+                  {data.public_enabled ? 'Switch the public link off' : 'Switch the public link on'}
+                </button>
+                {data.public_path && (
+                  <button type="button" onClick={() => void setPublic({ enabled: true, new_link: true })} className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-100 hover:bg-gray-800">
+                    Make a new link
+                  </button>
+                )}
+              </div>
+            </div>
             <label className="flex items-center gap-2 text-sm text-gray-200">
               <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
               Switch the trust center on

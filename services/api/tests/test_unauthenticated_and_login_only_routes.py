@@ -277,6 +277,10 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
     ): "CORE's people (Datto SaaS Protection, Dropsuite, Huntress SAT, HaloPSA): authenticated by the core-feed token in the path, checked in the handler (401 without it); can only add people under that feed's own mapped client tenants",
     (
         "GET",
+        "/api/v1/public/trust/{token}",
+    ): "An organization's public trust page, for prospects who have no account: off unless the organization switched its link on; one 404 for an unknown token, a switched-off link and junk; the token is long and random and a new one replaces the old; shows only what the trust center settings chose; escaped HTML with no script; rate limited",
+    (
+        "GET",
         "/api/v1/canary/{token_id}",
     ): "The honeytoken tripwire: a planted link must work for someone who has no AiSOC account, so it cannot require sign-in. It answers every id the same way (a one pixel image), forwards only a well-formed UUID, is rate limited per token and overall, and returns nothing about the token",
     (

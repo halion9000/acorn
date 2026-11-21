@@ -8069,11 +8069,17 @@ export interface TrustCenter {
   available_policies: { id: string; title: string }[];
   chosen_frameworks: string[];
   chosen_policy_ids: string[];
+  /** The public share link: on or off, and its path on the public address. Absent from an older API. */
+  public_enabled?: boolean;
+  public_path?: string | null;
 }
 export const trustCenterApi = {
   get: (clientId: string) => request<TrustCenter>(`/api/v1/compliance/trust-center?${riskQs(clientId)}`),
   put: (clientId: string, body: { enabled: boolean; headline: string; about: string; contact_email: string | null; frameworks: string[]; policy_ids: string[]; documents: { name: string; url: string }[] }) =>
     request<TrustCenter>(`/api/v1/compliance/trust-center?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  /** Switch the public link on or off, or make a new one (the old link stops working). */
+  setPublic: (clientId: string, body: { enabled: boolean; new_link?: boolean }) =>
+    request<TrustCenter>(`/api/v1/compliance/trust-center/public?${riskQs(clientId)}`, { method: 'PUT', body: JSON.stringify(body) }),
 };
 
 /** Audits and their evidence requests (/api/v1/compliance/audits). */
