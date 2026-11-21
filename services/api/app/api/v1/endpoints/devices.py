@@ -1179,6 +1179,25 @@ async def unmapped_devices(
     return group_unmapped(hints, aliases, mapped)
 
 
+@router.get("/lifecycle", summary="How old each computer is (from the day it was first seen) and whether its operating system is still supported")
+async def device_lifecycle(
+    current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],
+    db: DBSession,
+    client_id: uuid.UUID | None = Query(default=None),
+) -> dict[str, Any]:
+    """Computers only (phones, network devices and cameras are left out), worst first: an operating system its maker no longer patches, then the oldest. There is no purchase date in any tool: age counts from the day
+    A.C.O.R.N first saw the machine, so it is a floor. At most 2000 rows come back; the counts are over all of them."""
+    from app.services import device_lifecycle as lc  # noqa: PLC0415
+
+    owner = current_user.tenant_id
+    scope, clients = await _scope(db, owner, client_id)
+    master = _master_of(await db.get(Tenant, owner))
+    loaded = await _load_cached(db, owner, scope, clients, master)
+    now = datetime.now(UTC)
+    rows = [lc.lifecycle_row(d, now) for d in loaded if d.hidden_since is None and d.kind == "computer" and not long_offline(d)]
+    return {"basis": "first_seen", "summary": lc.summarize(rows), "rows": lc.order(rows)[:2000]}
+
+
 @router.get("/duplicates", response_model=DuplicatesOut)
 async def list_duplicates(
     current_user: Annotated[AuthUser, Depends(require_permission("alerts:read"))],

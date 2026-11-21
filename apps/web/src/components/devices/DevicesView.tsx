@@ -663,6 +663,10 @@ export default function DevicesView() {
 
       <UnmappedDevices />
 
+      <Link href="/devices/lifecycle" className="inline-block text-sm text-blue-400 hover:text-blue-300">
+        Device lifecycle: age and operating system support
+      </Link>
+
       {clientId && (
         <Link href={`/devices/environment?client=${encodeURIComponent(clientId)}`} className="inline-block text-sm text-blue-400 hover:text-blue-300">
           See this client&apos;s environment and network wiring
