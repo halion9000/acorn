@@ -6,6 +6,7 @@ file name says whose data it is. The manifest records the filters and the time, 
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import io
 import json
@@ -42,6 +43,16 @@ def ndjson(rows: list[dict[str, Any]]) -> bytes:
     return ("\n".join(json.dumps(r, sort_keys=True, default=str, ensure_ascii=False) for r in rows) + ("\n" if rows else "")).encode("utf-8")
 
 
+def csv_of(rows: list[dict[str, Any]]) -> bytes:
+    """The events as CSV (pure): id, source, kind, event time, pulled time, external id and the whole event as JSON in the last column."""
+    out = io.StringIO()
+    w = csv.writer(out, lineterminator=chr(10))
+    w.writerow(["id", "source", "kind", "event_time", "pulled_at", "external_id", "payload"])
+    for r in rows:
+        w.writerow([r["id"], r["source"], r["kind"], r["event_time"], r["pulled_at"], r["external_id"], json.dumps(r["payload"], sort_keys=True, default=str, ensure_ascii=False)])
+    return out.getvalue().encode("utf-8")
+
+
 @router.get("/export", dependencies=[Depends(require_permission("mssp:manage"))], summary="Export one client's stored events as a zip (staff, when the client asks)")
 async def export_client(
     request: Request,
@@ -51,6 +62,7 @@ async def export_client(
     source: Annotated[str | None, Query(max_length=64)] = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    format: Annotated[str, Query(pattern="^(ndjson|csv)$")] = "ndjson",
 ) -> Response:
     where, values = build_query(client_id, source, None, since, until, "", None)
     total = (await db.execute(text(f"SELECT count(*) FROM stored_events WHERE tenant_id = :tenant AND {where}"), {**values, "tenant": user.tenant_id})).scalar_one()
@@ -64,8 +76,8 @@ async def export_client(
     ).all()
     records = [{"id": r.id, "source": r.source, "kind": r.kind, "event_time": r.event_time.isoformat(), "pulled_at": r.pulled_at.isoformat(), "external_id": r.external_id, "payload": r.payload} for r in rows]
     when = datetime.now(UTC)
-    files = [("events.ndjson", ndjson(records), len(records))]
-    filters = {"source": source, "since": since.isoformat() if since else None, "until": until.isoformat() if until else None}
+    files = [("events.csv", csv_of(records), len(records))] if format == "csv" else [("events.ndjson", ndjson(records), len(records))]
+    filters = {"format": format, "source": source, "since": since.isoformat() if since else None, "until": until.isoformat() if until else None}
     manifest = json.dumps(manifest_for(files, client_id, filters, when), indent=2).encode("utf-8")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:

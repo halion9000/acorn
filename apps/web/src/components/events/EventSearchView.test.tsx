@@ -57,6 +57,7 @@ describe('event search', () => {
 
   it('builds the export address with the client and only the filters that are set', () => {
     expect(Object.fromEntries(new URLSearchParams(exportQuery({ client: 'c1', source: '', since: '', until: '' })))).toEqual({ client_id: 'c1' });
+    expect(Object.fromEntries(new URLSearchParams(exportQuery({ client: 'c1', source: '', since: '', until: '', format: 'csv' })))).toEqual({ client_id: 'c1', format: 'csv' });
     expect(Object.fromEntries(new URLSearchParams(exportQuery({ client: 'c1', source: 'halopsa', since: '2026-11-01', until: '2026-11-30' })))).toEqual({ client_id: 'c1', source: 'halopsa', since: '2026-11-01T00:00:00Z', until: '2026-12-01T00:00:00Z' });
   });
 

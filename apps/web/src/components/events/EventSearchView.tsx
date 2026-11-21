@@ -42,9 +42,10 @@ export function searchQuery(f: { client: string; source: string; kind: string; q
 }
 
 /** The address of the export for one client: the client and, when set, the source and the dates (pure; a client is required). */
-export function exportQuery(f: { client: string; source: string; since: string; until: string }): string {
+export function exportQuery(f: { client: string; source: string; since: string; until: string; format?: string }): string {
   const p = new URLSearchParams(searchQuery({ client: '', source: f.source, kind: '', q: '', since: f.since, until: f.until }));
   p.set('client_id', f.client);
+  if (f.format === 'csv') p.set('format', 'csv');
   return p.toString();
 }
 
@@ -57,6 +58,7 @@ export function EventSearchView() {
   const [q, setQ] = useState('');
   const [since, setSince] = useState('');
   const [until, setUntil] = useState('');
+  const [format, setFormat] = useState('ndjson');
   const [rows, setRows] = useState<EventRow[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const [sources, setSources] = useState<string[]>([]);
@@ -94,7 +96,7 @@ export function EventSearchView() {
   const exportZip = async (): Promise<void> => {
     setProblem('');
     try {
-      const res = await authFetch(`/api/v1/events/export?${exportQuery({ client, source, since, until })}`);
+      const res = await authFetch(`/api/v1/events/export?${exportQuery({ client, source, since, until, format })}`);
       if (res.status === 403) throw new Error('Exporting needs the manage permission.');
       if (res.status === 413) throw new Error(((await res.json().catch(() => ({}))) as { detail?: string }).detail ?? 'That is too many events; choose a shorter date range.');
       if (!res.ok) throw new Error(`The API answered ${res.status}`);
@@ -168,6 +170,13 @@ export function EventSearchView() {
         <button type="submit" disabled={busy} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-100 hover:bg-gray-800 disabled:opacity-50">
           {busy ? 'Searching…' : 'Search'}
         </button>
+        <label className="flex flex-col text-xs text-gray-400">
+          Export as
+          <select aria-label="Export format" className={field} value={format} onChange={(e) => setFormat(e.target.value)}>
+            <option value="ndjson">NDJSON</option>
+            <option value="csv">CSV</option>
+          </select>
+        </label>
         <button type="button" disabled={!client} title={client ? 'A zip of the events of this client with a manifest, for when the client asks' : 'Choose a client first'} onClick={() => void exportZip()} className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-100 hover:bg-gray-800 disabled:opacity-50">
           Export this client
         </button>

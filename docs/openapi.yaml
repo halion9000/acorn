@@ -18865,6 +18865,14 @@ paths:
             format: date-time
           - type: 'null'
           title: Until
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(ndjson|csv)$
+          default: ndjson
+          title: Format
       responses:
         '200':
           description: Successful Response
