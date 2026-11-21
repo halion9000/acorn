@@ -446,3 +446,24 @@ def test_the_agents_core_names_as_hidden_are_left_out_of_every_staff_page_and_ar
     assert [r["engineer"] for r in ms.without_excluded("dialpad-weekly", {**staff}, ["dan kemp"])["rows"]] == []
     assert ms.engineers_of(staff) == ["Dan Kemp"], "settings offers only the people the pages show"
     assert ms.without_excluded("staff-weekly", {"rows": staff["rows"]}, [])["rows"] == staff["rows"], "no hidden list, nothing hidden"
+
+
+def test_a_week_the_new_send_covers_is_replaced_whole_so_a_stale_row_for_it_is_dropped_but_other_weeks_stay():
+    from app.models.metric_dataset import merge_dataset
+
+    held = {
+        "weeks": ["a", "b", "c"],
+        "rows": [
+            {"week": "a", "agent_id": "1", "labor_hours": 5},  # older than the send covers: kept
+            {"week": "b", "agent_id": "1", "labor_hours": 60},  # stale: counted differently before
+            {"week": "b", "agent_id": "2", "labor_hours": 7},
+            {"week": "c", "agent_id": "1", "labor_hours": 9},
+        ],
+    }
+    new = {"weeks": ["b", "c"], "rows": [{"week": "b", "agent_id": "2", "labor_hours": 8}, {"week": "c", "agent_id": "1", "labor_hours": 10}]}
+    out = merge_dataset("staff-weekly", held, new)
+    assert sorted((r["week"], r["agent_id"], r["labor_hours"]) for r in out["rows"]) == [("a", "1", 5), ("b", "2", 8), ("c", "1", 10)], "the stale 60 hours of week b is gone"
+    assert out["weeks"] == ["a", "b", "c"]
+    # a send that names no weeks drops nothing, as before
+    again = merge_dataset("staff-weekly", held, {"rows": [{"week": "b", "agent_id": "2", "labor_hours": 8}]})
+    assert len(again["rows"]) == 4

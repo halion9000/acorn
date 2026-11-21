@@ -31,7 +31,14 @@ def merge_dataset(key: str, held: dict[str, Any] | None, new: dict[str, Any]) ->
         return new
     field, ident, cap = rule
     mine = {tuple(str(r.get(f) or "") for f in ident): r for r in new.get(field) or [] if isinstance(r, dict)}
-    kept = [r for r in held.get(field) or [] if isinstance(r, dict) and tuple(str(r.get(f) or "") for f in ident) not in mine]
+    # A week the new send covers (its ``weeks``) is replaced as a whole: a held row for that week that the send does not carry again is dropped (CORE leaves out people with nothing that week, and an older send counted
+    # things differently, so a row kept from before would show figures nobody can reproduce). Weeks the send does not cover keep their rows, so the history builds up.
+    covered = {str(w) for w in new.get("weeks") or []}
+    kept = [
+        r
+        for r in held.get(field) or []
+        if isinstance(r, dict) and tuple(str(r.get(f) or "") for f in ident) not in mine and str(r.get(ident[0]) or "") not in covered
+    ]
     older = {tuple(str(r.get(f) or "") for f in ident): r for r in held.get(field) or [] if isinstance(r, dict)}
     # a row sent again replaces the one held, but a field the new row leaves out (ticket updates for a week CORE did not read this time) keeps what was held
     fresh = [{**older.get(k, {}), **r} for k, r in mine.items()]
