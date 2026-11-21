@@ -38,6 +38,7 @@ const routeLabels: Record<string, { title: string; description: string }> = {
   '/vcio-risk-scoring': { title: 'Client Risk Score', description: 'A client’s Business Review scored by risk, with a NIST CSF 2.0 reading' },
   '/settings/secure-score': { title: 'Secure Score', description: 'Microsoft Secure Score per client, and what would raise it' },
   '/settings/scorecard': { title: 'Scorecard settings', description: 'The weighted template the staff scorecard is worked out with' },
+  '/settings/event-retention': { title: 'Data retention', description: 'How long the stored events of each client are kept' },
   '/events': { title: 'Event search', description: 'Everything the sources reported, kept and searchable' },
   '/settings/metrics-people': { title: 'Metrics people', description: 'Engineers left out of what the metrics pages show' },
   '/settings/signin-scores': { title: 'Sign-in Scores', description: 'The most unusual sign-ins, across clients' },

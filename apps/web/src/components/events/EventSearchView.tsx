@@ -125,6 +125,9 @@ export function EventSearchView() {
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Event search</h1>
+        <a href="/settings/event-retention" className="text-xs text-blue-300 hover:underline">
+          Data retention
+        </a>
         <p className="mt-1 text-sm text-gray-400">Everything the sources reported, kept as events and never changed. Search by client, source, kind, dates and text; open an event to see it whole.</p>
       </div>
       <form

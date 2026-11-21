@@ -18877,6 +18877,98 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/events/retention:
+    get:
+      tags:
+      - events
+      summary: The retention of the stored events
+      operationId: get_retention_api_v1_events_retention_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Get Retention Api V1 Events Retention Get
+      security:
+      - HTTPBearer: []
+    put:
+      tags:
+      - events
+      summary: Set how long events are kept (deletes nothing)
+      operationId: put_retention_api_v1_events_retention_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Put Retention Api V1 Events Retention Put
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/events/retention/preview:
+    get:
+      tags:
+      - events
+      summary: How many events each client's retention has passed (deletes nothing)
+      operationId: preview_api_v1_events_retention_preview_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Preview Api V1 Events Retention Preview Get
+      security:
+      - HTTPBearer: []
+  /api/v1/events/retention/purge:
+    post:
+      tags:
+      - events
+      summary: Delete the events past each client's retention, only when the confirmed
+        number matches
+      operationId: purge_api_v1_events_retention_purge_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurgeIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Purge Api V1 Events Retention Purge Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
   /api/v1/events/search:
     get:
       tags:
@@ -58274,6 +58366,18 @@ components:
       - view_count
       - created_at
       title: PublishedSummary
+    PurgeIn:
+      properties:
+        confirm:
+          type: integer
+          minimum: 0.0
+          title: Confirm
+          description: The total the preview gave; the purge runs only when it is
+            still the number of events past retention
+      type: object
+      required:
+      - confirm
+      title: PurgeIn
     PushIn:
       properties:
         device_id:
@@ -59975,6 +60079,26 @@ components:
       title: ResolutionIn
       description: 'The Ticket Resolution page''s data as the Rewst dashboard counts
         it: by the month a ticket was opened (see CORE''s acorn-ticket-stats-sql.ts).'
+    RetentionIn:
+      properties:
+        default:
+          anyOf:
+          - type: integer
+          - type: string
+          title: Default
+          default: infinite
+        clients:
+          additionalProperties:
+            anyOf:
+            - type: integer
+            - type: string
+          type: object
+          maxProperties: 2000
+          title: Clients
+      type: object
+      title: RetentionIn
+      description: '``default`` and each client''s value: 1, 3, 5, 7 or 10 (years),
+        or "infinite".'
     RetentionLine:
       properties:
         what:

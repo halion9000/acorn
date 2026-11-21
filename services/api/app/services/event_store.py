@@ -106,3 +106,20 @@ async def purge_expired(db: Any, tenant_id: uuid.UUID, settings: dict[str, Any] 
         )
         deleted += res.rowcount or 0
     return deleted
+
+
+async def expired_counts(db: Any, tenant_id: uuid.UUID, settings: dict[str, Any] | None, now: datetime | None = None) -> dict[str, int]:
+    """How many events each client's retention has passed right now, {client id or "none": count}, without deleting anything (what a purge would remove)."""
+    when = now or datetime.now(UTC)
+    out: dict[str, int] = {}
+    clients = (await db.execute(text("SELECT DISTINCT client_id FROM stored_events WHERE tenant_id = :t"), {"t": tenant_id})).scalars().all()
+    for client in clients:
+        limit = cutoff(retention_years(settings, str(client) if client else None), when)
+        if limit is None:
+            continue
+        n = (
+            await db.execute(text("SELECT count(*) FROM stored_events WHERE tenant_id = :t AND client_id IS NOT DISTINCT FROM :c AND event_time < :limit"), {"t": tenant_id, "c": client, "limit": limit})
+        ).scalar_one()
+        if n:
+            out[str(client) if client else "none"] = int(n)
+    return out
