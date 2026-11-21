@@ -33,6 +33,55 @@ export const AUTH_ACTIVITY_KEY = 'aisoc.responder.lastActive';
  * It is set only after a request WITHOUT any token has been answered as signed in, so a sign-in whose cookies did not stick (a proxy stripping them) falls back to keeping the tokens, as before.
  */
 export const AUTH_COOKIE_SESSION_KEY = 'aisoc.responder.cookieSession';
+/** While an administrator is signed in AS another person (Settings > Members > Impersonate): that person's one-hour token and who is behind it. Kept for this browser tab only. */
+export const AUTH_IMPERSONATION_KEY = 'aisoc.responder.impersonation';
+/** The administrator's own saved user, put back when the impersonation ends. */
+export const AUTH_USER_BEFORE_IMPERSONATION_KEY = 'aisoc.responder.userBeforeImpersonation';
+export interface Impersonation {
+  token: string;
+  /** Who the administrator is signed in as. */
+  label: string;
+  /** The administrator's own label. */
+  by: string;
+}
+function tabStore(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+export function getImpersonation(): Impersonation | null {
+  try {
+    const raw = tabStore()?.getItem(AUTH_IMPERSONATION_KEY);
+    const v = raw ? (JSON.parse(raw) as Impersonation) : null;
+    return v && typeof v.token === 'string' && v.token ? v : null;
+  } catch {
+    return null;
+  }
+}
+export function setImpersonation(value: Impersonation): void {
+  try {
+    tabStore()?.setItem(AUTH_IMPERSONATION_KEY, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+/** Forget the impersonation and put the administrator's own saved user back. */
+export function clearImpersonation(): void {
+  try {
+    tabStore()?.removeItem(AUTH_IMPERSONATION_KEY);
+    const s = window.localStorage;
+    const mine = s.getItem(AUTH_USER_BEFORE_IMPERSONATION_KEY);
+    if (mine) s.setItem(AUTH_USER_KEY, mine);
+    s.removeItem(AUTH_USER_BEFORE_IMPERSONATION_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+/** The token requests carry: the impersonation's while one is on, else the sign-in's own. */
+const requestToken = (): string | null => getImpersonation()?.token ?? getItem(AUTH_TOKEN_KEY);
+
 /** Every console request carries this; a request that changes data and is authenticated by the cookie alone is refused by the server without it. */
 const CONSOLE_HEADER = 'X-Requested-With';
 const CONSOLE_VALUE = 'aisoc-console';
@@ -119,6 +168,8 @@ export function clearSession(): void {
     s?.removeItem(AUTH_USER_KEY);
     s?.removeItem(AUTH_ACTIVITY_KEY);
     s?.removeItem(AUTH_COOKIE_SESSION_KEY);
+    s?.removeItem(AUTH_USER_BEFORE_IMPERSONATION_KEY);
+    tabStore()?.removeItem(AUTH_IMPERSONATION_KEY);
   } catch {
     /* storage unavailable */
   }
@@ -312,8 +363,14 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
   const callerSetAuth = new Headers(init?.headers).has('Authorization');
   const replay = input instanceof Request ? input.clone() : input;
   const replayable = !(init?.body instanceof ReadableStream);
-  const res = await fetch(input, withConsole(withViewAs(withBearer(init, getItem(AUTH_TOKEN_KEY)), path)));
+  const res = await fetch(input, withConsole(withViewAs(withBearer(init, requestToken()), path)));
   dropRefusedView(res);
+  if (res.status === 401 && !callerSetAuth && getImpersonation() !== null) {
+    // The one-hour impersonation ran out (or was ended elsewhere): there is no refresh for it. Back to the administrator's own sign-in.
+    clearImpersonation();
+    sessionHooks.reload();
+    return res;
+  }
   if (res.status !== 401 || callerSetAuth || NO_RETRY_PATHS.includes(path) || !replayable) return res;
 
   const state = await sharedSessionCheck();

@@ -4,15 +4,15 @@ import json
 import logging
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, Response, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, update
 
-from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, custom_role_grants, get_current_user
+from app.api.v1.deps import AuthUser, DBSession, SessionUser, bearer_scheme, custom_role_grants, get_current_user, require_permission
 from app.api.v1.endpoints.sso_microsoft import password_login_allowed
 from app.auth import session_cookies
 
@@ -20,6 +20,8 @@ __all__ = ["router", "get_current_user"]
 from app.core.config import settings
 from app.core.password_policy import password_problem
 from app.core.security import (
+    PLATFORM_PERMISSIONS,
+    ROLE_PERMISSIONS,
     capabilities_for_permissions,
     capabilities_for_role,
     create_access_token,
@@ -42,6 +44,7 @@ from app.core.token_revocation import (
 from app.core.trusted_proxy import resolve_client_ip
 from app.models.audit import AuditLog
 from app.models.tenant import User
+from app.services.audit import emit_audit
 from app.services import login_throttle, signin_history, totp_store
 from app.services.user_lookup import find_user_by_login
 
@@ -107,6 +110,8 @@ class UserMeResponse(BaseModel):
     capabilities: list[str] = []
     # Sections and pages the person's roles hide in the console (see app.services.role_nav). Empty when nothing is hidden.
     hidden_nav: list[str] = []
+    # Set while an administrator is signed in as this person (Settings > People > Impersonate): who they really are. The console shows a banner with a button to end it.
+    impersonated_by: dict[str, str | None] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -230,6 +235,111 @@ async def login(
         access_token=access_token,
         refresh_token=refresh_token,
     )
+
+
+IMPERSONATION_MINUTES = 60
+
+
+class ImpersonationResponse(BaseModel):
+    access_token: str
+    expires_in_minutes: int
+    user_id: str
+    label: str
+    role: str
+
+
+@router.post("/impersonate/{user_id}", response_model=ImpersonationResponse)
+async def impersonate(
+    user_id: uuid.UUID,
+    current_user: Annotated[AuthUser, Depends(require_permission("users:impersonate"))],
+    db: DBSession,
+    http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+) -> ImpersonationResponse:
+    """Sign in as another person of the organization to see the console exactly as they see it, with their permissions.
+
+    Returns a one-hour access token (no refresh token) that names the real administrator; the console keeps it beside the administrator's own sign-in and drops it when the administrator ends the impersonation.
+    Refused for: yourself, someone in another organization or an inactive account, an API key, a session that is already impersonating, and anyone who holds the wildcard or a platform permission you do not
+    hold yourself (nobody gains power this way). Written to the audit log when it starts, and every change made while impersonating carries ``impersonated_by`` in its audit row.
+    """
+    if current_user.scopes is not None or current_user.impersonator_id is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation needs a signed-in person who is not already impersonating.")
+    if current_user.home_tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is not available while working in another tenant.")
+    if user_id == current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot impersonate yourself.")
+    target = (
+        await db.execute(select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id, User.is_active.is_(True)))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active person with that id in your organization.")
+    grants = await custom_role_grants(db, target)
+    target_perms = grants if grants is not None else list(ROLE_PERMISSIONS.get(target.role, []))
+    if not may_impersonate_perms(current_user, target_perms):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot impersonate someone with more power than you hold.")
+    label = target.email or target.account_name
+    token = create_access_token(
+        {
+            "sub": str(target.id),
+            "tenant_id": str(target.tenant_id),
+            "role": target.role,
+            "email": label,
+            "account_name": target.account_name,
+            "imp": {"id": str(current_user.user_id), "email": current_user.email},
+        },
+        expires_delta=timedelta(minutes=IMPERSONATION_MINUTES),
+    )
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.user_id,
+        action="auth:impersonation_started",
+        resource="user",
+        resource_id=str(target.id),
+        changes={"as": label, "role": target.role, "minutes": IMPERSONATION_MINUTES},
+        request=http_request,
+    )
+    await db.commit()
+    return ImpersonationResponse(access_token=token, expires_in_minutes=IMPERSONATION_MINUTES, user_id=str(target.id), label=label, role=target.role)
+
+
+def may_impersonate_perms(caller: Any, target_perms: list[str]) -> bool:
+    """May `caller` impersonate someone whose permissions are `target_perms` (pure given the caller): not when they hold the wildcard or a platform permission the caller does not."""
+    needs_wildcard = "*" in target_perms
+    platform = [p for p in target_perms if p in PLATFORM_PERMISSIONS]
+    if needs_wildcard and not caller.holds_wildcard():
+        return False
+    return all(caller.holds(p) for p in platform)
+
+
+@router.post("/impersonate/end/now", response_model=LogoutResponse)
+async def end_impersonation(
+    current_user: AuthUser,
+    db: DBSession,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
+    http_request: Request = None,  # type: ignore[assignment]  # injected by FastAPI; None for a direct call
+) -> LogoutResponse:
+    """End an impersonation: the impersonation token stops working at once and the end is written to the audit log. Called by the console's banner button."""
+    if current_user.impersonator_id is None or credentials is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This session is not impersonating anyone.")
+    payload = decode_token(credentials.credentials)
+    try:
+        if payload.get("jti"):
+            await revoke(payload["jti"], payload["exp"])
+    except RevocationUnavailable:
+        pass  # the token still expires on its own within the hour; the end is logged either way
+    await emit_audit(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        actor_id=current_user.impersonator_id,
+        actor_email=current_user.impersonator_email,
+        action="auth:impersonation_ended",
+        resource="user",
+        resource_id=str(current_user.user_id),
+        changes={"as": current_user.email},
+        request=http_request,
+    )
+    await db.commit()
+    return LogoutResponse(revoked=True, detail="Impersonation ended.")
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -443,6 +553,8 @@ async def get_me(current_user: AuthUser, db: DBSession) -> UserMeResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     me = _me(user, await custom_role_grants(db, user))
     me.hidden_nav = await _hidden_nav(db, user)
+    if current_user.impersonator_id is not None:
+        me.impersonated_by = {"id": str(current_user.impersonator_id), "email": current_user.impersonator_email}
     return me
 
 

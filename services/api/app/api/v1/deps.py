@@ -90,6 +90,8 @@ class CurrentUser:
         home_tenant_id: uuid.UUID | None = None,
         acting_access: str | None = None,
         role_permissions: list[str] | None = None,
+        impersonator_id: uuid.UUID | None = None,
+        impersonator_email: str | None = None,
     ) -> None:
         self.user_id = user_id
         self.tenant_id = tenant_id
@@ -102,6 +104,9 @@ class CurrentUser:
         self.scopes = scopes  # None → role-based; list → API-key scoped
         # For a person whose one role is a custom role: the permissions that role grants. None for everyone else (their built-in role decides).
         self.role_permissions = role_permissions
+        # Set while an administrator is signed in AS this person (see POST /auth/impersonate): who they really are.
+        self.impersonator_id = impersonator_id
+        self.impersonator_email = impersonator_email
 
     def _role_grants(self, permission: str) -> bool:
         """Does this person's ONE role grant `permission`? A custom role grants exactly its own permissions; a built-in role grants what the table says."""
@@ -142,6 +147,9 @@ class CurrentUser:
         else:
             # JWT / role path — static ROLE_PERMISSIONS fallback
             # Working in another tenant with FULL access: identity, credential, platform and MSSP administration is refused whatever the role holds (the wildcard included).
+            # An impersonated session cannot start another impersonation (nobody hops from person to person).
+            if self.impersonator_id is not None and permission == "users:impersonate":
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not available while signed in as another person: users:impersonate")
             if self.acting_access == "full" and permission in ACTING_DENIED_PERMISSIONS:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail=f"Not available while working in another tenant: {permission}"
@@ -313,6 +321,8 @@ async def get_current_user(
     """
     credentials = _credentials_or_cookie(credentials, request)
     user = await _authenticate(credentials, db)
+    if request is not None and user.impersonator_id is not None:
+        request.state.impersonated_by = {"id": str(user.impersonator_id), "email": user.impersonator_email}  # for the audit middleware
     # A customer's sign-in (client_viewer) reaches only the client dashboard, whatever a route checks for itself (app/services/client_portal.py).
     client_portal.enforce_reach(user.role, request)
     requested = None if request is None or credentials is None else request.headers.get(VIEW_AS_HEADER)
@@ -370,6 +380,8 @@ async def get_current_user(
         home_tenant_id=user.tenant_id,
         acting_access=target.access,
         role_permissions=user.role_permissions,
+        impersonator_id=user.impersonator_id,
+        impersonator_email=user.impersonator_email,
     )
 
 
@@ -459,12 +471,21 @@ async def _authenticate(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
+    imp = payload.get("imp") if isinstance(payload.get("imp"), dict) else None
+    impersonator_id: uuid.UUID | None = None
+    if imp is not None:
+        try:
+            impersonator_id = uuid.UUID(str(imp.get("id")))
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from e
     return CurrentUser(
         user_id=user.id,
         tenant_id=user.tenant_id,
         role=user.role,
         email=user.email or user.account_name,  # the label for 'who' (audit etc.): the email if there is one, else the account name
         role_permissions=await custom_role_grants(db, user),
+        impersonator_id=impersonator_id,
+        impersonator_email=str(imp.get("email")) if imp is not None and imp.get("email") else None,
     )
 
 
@@ -481,6 +502,11 @@ async def require_signed_in_session(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This action is only available to a signed-in user, not an API key.",
+        )
+    if current_user.impersonator_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not available while signed in as another person: passwords, passkeys and notifications belong to the person themselves.",
         )
     return current_user
 

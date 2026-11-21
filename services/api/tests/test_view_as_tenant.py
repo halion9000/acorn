@@ -1223,6 +1223,7 @@ class TestCapabilities:
         assert UI_CAPABILITIES == {
             "platform_admin": "platform:cross_tenant_query",
             "manage_users": "users:write",
+            "impersonate": "users:impersonate",
             "respond_identities": "identities:respond",
             "run_bec": "identities:bec",
             "finance_view": "finance:view",
@@ -1238,6 +1239,7 @@ class TestCapabilities:
         }
         assert capabilities_for_role("platform_admin") == [
             "finance_view",
+            "impersonate",
             "manage_users",
             "platform_admin",
             "respond_identities",
@@ -1260,6 +1262,7 @@ class TestCapabilities:
                 "platform",
                 [
                     "finance_view",
+                    "impersonate",
                     "manage_users",
                     "platform_admin",
                     "respond_identities",
@@ -1278,6 +1281,7 @@ class TestCapabilities:
                 "p_admin",
                 [
                     "finance_view",
+                    "impersonate",
                     "manage_users",
                     "respond_identities",
                     "run_bec",
@@ -1295,6 +1299,7 @@ class TestCapabilities:
                 "c1_admin",
                 [
                     "finance_view",
+                    "impersonate",
                     "manage_users",
                     "respond_identities",
                     "run_bec",
@@ -1326,6 +1331,7 @@ class TestCapabilities:
             "custom": [],  # a custom-role person's capabilities come from that role (capabilities_for_permissions)
             "platform_admin": [
                 "finance_view",
+                "impersonate",
                 "manage_users",
                 "platform_admin",
                 "respond_identities",
@@ -1341,6 +1347,7 @@ class TestCapabilities:
             ],
             "admin": [
                 "finance_view",
+                "impersonate",
                 "manage_users",
                 "respond_identities",
                 "run_bec",
@@ -1355,6 +1362,7 @@ class TestCapabilities:
             ],
             "tenant_admin": [
                 "finance_view",
+                "impersonate",
                 "manage_users",
                 "settings_automation",
                 "settings_clients",
@@ -1388,6 +1396,7 @@ class TestCapabilities:
         r = world.client.patch("/api/v1/auth/me/preferences", headers=world.auth("p_admin"), json={"preferences": {"theme": "dark"}})
         assert r.status_code == 200 and r.json()["capabilities"] == [
             "finance_view",
+            "impersonate",
             "manage_users",
             "respond_identities",
             "run_bec",

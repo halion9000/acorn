@@ -5,10 +5,11 @@
  * remove their passkeys (reset MFA), disable or enable, delete. Every change goes through the server, which has the last word (nobody changes their own role, disables or deletes themselves, or
  * leaves the workspace without an administrator) and says why when it refuses; that message is shown as it is.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
-import { apiErrorDetail, tenantsApi, type CustomRole, type TenantUser } from '@/lib/api';
+import { apiErrorDetail, authApi, tenantsApi, type CustomRole, type TenantUser } from '@/lib/api';
+import { startImpersonation } from '@/lib/impersonation';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CUSTOM_PREFIX, MEMBER_ROLES, MIN_PASSWORD_LENGTH, generatePassword } from './AddMemberForm';
 import { Field, inputClass } from './panel-parts';
@@ -45,6 +46,31 @@ export function MemberEditor({
   const [pending, setPending] = useState<Pending>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordShown, setPasswordShown] = useState<string | null>(null);
+
+  // Only people who hold the impersonation permission see the button (the server checks it again and decides who may be impersonated).
+  const [canImpersonate, setCanImpersonate] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void Promise.resolve()
+      .then(() => authApi.freshCapabilities())
+      .then((caps) => live && setCanImpersonate(caps.includes('impersonate')))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  const impersonate = async () => {
+    setBusy(true);
+    setError(null);
+    const me = authApi.currentUser();
+    const problem = await startImpersonation(member.id, me?.email || me?.account_name || 'you');
+    if (problem) {
+      setBusy(false);
+      setError(problem);
+      return;
+    }
+    window.location.assign('/dashboard');
+  };
 
   const knownRole = MEMBER_ROLES.some((r) => r.value === member.role);
   const dirty = displayName.trim() !== (member.username ?? '') || choice !== initialChoice;
@@ -178,6 +204,11 @@ export function MemberEditor({
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
+              {canImpersonate && member.is_active ? (
+                <button type="button" disabled={busy} onClick={() => void impersonate()} title="See the console exactly as this person sees it, with their permissions. A banner at the top ends it." className={BUTTON}>
+                  Impersonate
+                </button>
+              ) : null}
               <button type="button" disabled={busy} onClick={() => setPending('signout')} className={BUTTON}>
                 Sign out everywhere
               </button>

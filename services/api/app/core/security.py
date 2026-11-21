@@ -56,6 +56,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "connectors:delete",
         "users:read",
         "users:write",
+        "users:impersonate",  # sign in as another person of the organization to see what they see (Settings > People); switchable per role
         "rules:read",
         "rules:write",
         "reports:read",
@@ -492,6 +493,7 @@ def has_permission(role: str, permission: str) -> bool:
 UI_CAPABILITIES: dict[str, str] = {
     "platform_admin": "platform:cross_tenant_query",
     "manage_users": "users:write",
+    "impersonate": "users:impersonate",
     "respond_identities": "identities:respond",
     "run_bec": "identities:bec",
     "settings_workspace": "settings_workspace:view",

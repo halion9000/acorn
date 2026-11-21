@@ -21,6 +21,7 @@ import { redirectIfSignedOut } from '@/lib/auth-session';
 import { authApi } from '@/lib/api';
 import { CLIENT_PORTAL_PATH, landingFor } from '@/lib/landing';
 import { IdleLogout } from './IdleLogout';
+import { ImpersonationBanner, useImpersonation } from './ImpersonationBanner';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -30,7 +31,9 @@ export function AppShell({ children }: AppShellProps) {
   // In demo mode the banner adds 36px (h-9) to the top, so push the main
   // content down to keep the TopBar from sliding underneath it.
   const demo = isDemoMode();
-  const topPadClass = demo ? 'pt-[100px]' : 'pt-16';
+  // While an administrator is signed in as another person, the amber banner takes the top 36px, exactly as the demo banner would.
+  const impersonating = useImpersonation() !== null;
+  const topPadClass = demo || impersonating ? 'pt-[100px]' : 'pt-16';
 
   // In a production build nothing of the console is drawn until this browser is known to hold a saved sign-in. With none, the person goes to the login page straight away
   // and never sees the page frame (the server refuses every data request without a login anyway, but the frame should not flash up first). Demo mode signs visitors in by
@@ -88,10 +91,11 @@ export function AppShell({ children }: AppShellProps) {
         */}
         <ClientOnly>
           <DemoBanner />
+          <ImpersonationBanner />
         </ClientOnly>
         <Sidebar />
         <div className="md:ml-60">
-          <TopBar demoOffset={demo} />
+          <TopBar demoOffset={demo || impersonating} />
           <main className={`${topPadClass} min-h-screen`}>
             <div className="p-6 pb-24">
               <AnnouncementBanner />

@@ -319,6 +319,7 @@ OPEN_ROUTES: dict[tuple[str, str], str] = {
 
 LOGIN_ONLY_NO_CHECK: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/logout"): OWN,
+    ("POST", "/api/v1/auth/impersonate/end/now"): OWN + " (ends only the impersonation the caller is in: refused with 400 unless the token names an impersonator, and revokes only that token)",
     ("POST", "/api/v1/auth/password"): OWN
     + " (changes only the caller's own password, and only with the current password; sign-in throttling applies to wrong guesses; needs a real session, not an API key)",
     ("GET", "/api/v1/auth/me"): OWN,

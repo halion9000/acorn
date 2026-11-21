@@ -159,6 +159,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 meta["status_code"] = response.status_code
                 if acting is not None:
                     meta.update(acting[1])
+                impersonated_by = getattr(getattr(request, "state", None), "impersonated_by", None)
+                if impersonated_by:
+                    meta["impersonated_by"] = impersonated_by  # the administrator who was signed in as this person
 
                 created_at = datetime.now(UTC)
                 event = AuditLog(
