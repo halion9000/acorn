@@ -57,6 +57,10 @@ Other new rules the data supports:
 
 13,278 of 15,676 alerts (85 percent) have no technique, so the heatmap shows only the identity detections. Cheap mappings that need only a title match: user-reported phish T1566; unfamiliar sign-in, new country and atypical travel T1078; suspicious user agents T1078; potentially unsecured credentials in files T1552.001; Microsoft Defender service stopped and Huntress agent missing T1562.001; BitLocker disabled and old operating systems have no honest technique (leave unmapped rather than guess).
 
-## What this change did
+## What was built
 
-Two rule fixes in `identity_detections.py` with tests: the guessed-password title and key, and the partner-service role addition. Nothing was deleted; existing alerts keep their titles. Everything else above is a proposal and has not been changed.
+First change: two rule fixes in `identity_detections.py` (the guessed-password title and key, and the partner-service role addition).
+
+Second change, from the same review: the **Likely account takeover** rule (`detect_takeover_chain`, one critical alert per person and day, joins the saved identity alerts after each new one), ATT&CK techniques for vendor alerts by title, and resolving by-design alerts as benign (`services/alert_triage.py`, run every minute by the suppression sweeper; each resolved alert carries an `auto_triage` note and can be reopened). Nothing was deleted.
+
+Still proposals, not built: rolling the Huntress "does not exist" alerts into one per client and device, the consent rule by permissions and publisher, once-a-week legacy-protocol alerts, linking Blumira and CIPP sign-in alerts, gating old CVEs by exploitability, and the library-versus-active split of the 199,307 rules.

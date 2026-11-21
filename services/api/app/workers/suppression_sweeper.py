@@ -15,6 +15,7 @@ from app.services import worker_heartbeat
 from app.services.alert_script_rules import sweep_script_rules
 from app.services.alert_stale import exempt_severities, exempt_tenant_ids, sweep_stale
 from app.services.alert_suppression import sweep
+from app.services.alert_triage import sweep_attack_mapping, sweep_by_design
 from app.services.alert_ticket_rules import sweep_ticket_rules
 from app.services.quarantine_release import queue_auto_checks
 from app.services.tool_deploy_rules import sweep_deploy_rules
@@ -44,6 +45,8 @@ async def run_suppression_sweeper(
                 scripted = await sweep_script_rules(session)
                 scripted += await sweep_deploy_rules(session)
                 checks = await queue_auto_checks(session)
+                mapped = await sweep_attack_mapping(session)
+                by_design = await sweep_by_design(session)
                 await session.commit()
                 if queued:
                     logger.info("alert_ticket_rules.queued", queued=queued)
@@ -51,6 +54,8 @@ async def run_suppression_sweeper(
                     logger.info("alert_script_rules.queued", queued=scripted)
                 if checks:
                     logger.info("quarantine_checks.queued", queued=checks)
+                if mapped or by_design:
+                    logger.info("alert_triage.swept", mapped=mapped, resolved_by_design=by_design)
             if since_stale >= STALE_EVERY_SECONDS:
                 since_stale = 0
                 async with session_factory() as session:
