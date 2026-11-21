@@ -291,17 +291,29 @@ def test_stale_tickets_carry_their_type_opened_day_and_idle_days():
     assert second["idle_days"] is None and second["last_activity"] == ""
 
 
-def test_licensing_apps_are_the_items_each_client_is_billed_for_in_a_month_with_the_common_ones_marked():
+def test_licensing_apps_are_the_curated_apps_each_client_is_billed_for_in_a_month_matched_by_exact_item_name():
     def row(month, client, item, qty=1, amount=10):
         return {"month": month, "client_name": client, "item": item, "quantity": qty, "amount": amount, "category": "x"}
 
-    rows = [row("2026-10", "Acme", "Huntress EDR"), row("2026-10", "Birch", "Huntress EDR"), row("2026-10", "Cedar", "Huntress EDR"), row("2026-10", "Acme", "NinjaOne RMM"), row("2026-10", "Acme", "Credit", qty=1, amount=-5), row("2026-10", "Birch", "Free item", qty=0, amount=0), row("2026-09", "Acme", "Old app")]
+    rows = [
+        row("2026-10", "Acme", "Huntress EDR"),
+        row("2026-10", "Birch", "huntress edr"),
+        row("2026-10", "Cedar", "Huntress EDR"),
+        row("2026-10", "Acme", "NinjaOne RMM"),
+        row("2026-10", "Acme", "Bit Defender"),
+        row("2026-10", "Acme", "Huntress SAT", qty=0, amount=0),
+        row("2026-10", "Cedar", "Datto SaaS Protection"),
+        row("2026-09", "Acme", "Old app"),
+    ]
     out = mt.licensing_apps({"rows": rows}, None)
     assert out["month"] == "2026-10" and out["months"] == ["2026-10", "2026-09"], "the newest month by default, newest first"
-    assert out["apps"] == [{"app": "Huntress EDR", "clients": 3, "common": True}, {"app": "NinjaOne RMM", "clients": 1, "common": False}], "credits and zero quantities are not apps"
+    assert [a["app"] for a in out["apps"]] == list(mt.CURATED_APPS) and all(a["common"] for a in out["apps"]), "every curated app is a column, in the curated order"
+    assert {a["app"]: a["clients"] for a in out["apps"] if a["clients"]} == {"Huntress EDR": 3, "NinjaOne RMM": 1}, "exact names only, letter case aside: Bit Defender is not curated and a zero quantity is not billed"
     assert out["clients"][0] == {"client": "Acme", "apps": ["Huntress EDR", "NinjaOne RMM"]}
+    assert {c["client"]: c["apps"] for c in out["clients"]}["Cedar"] == ["Huntress EDR"], "Datto SaaS Protection is not the curated Datto SAAS"
     older = mt.licensing_apps({"rows": rows}, "2026-09")
-    assert older["month"] == "2026-09" and [a["app"] for a in older["apps"]] == ["Old app"]
+    assert older["month"] == "2026-09" and sum(a["clients"] for a in older["apps"]) == 0
     assert mt.licensing_apps({"rows": rows}, "2030-01")["month"] == "2026-10", "a month that is not held falls back to the newest"
-    assert [a["app"] for a in mt.licensing_apps({"rows": rows}, "2026-10", ["huntress edr"])["apps"]] == ["NinjaOne RMM"]
+    assert "Huntress EDR" not in [a["app"] for a in mt.licensing_apps({"rows": rows}, "2026-10", ["huntress edr"])["apps"]]
     assert mt.licensing_apps(None, None) == {"months": [], "month": None, "apps": [], "clients": []}
+    assert len(mt.CURATED_APPS) == 22

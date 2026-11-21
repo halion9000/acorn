@@ -184,34 +184,62 @@ def open_breakdown(detail: dict[str, Any] | None, client_id: str | None = None) 
     }
 
 
-COMMON_APP_CLIENTS = 3
+# The apps the Rewst Monthly Licensing page shows (read from that page 2026-11-21: its categories list with Exclude set to No, which it matches to the invoice line item names exactly, whatever the letter case).
+CURATED_APPS = (
+    "Auto Elevate",
+    "Auvik Networking",
+    "CyberCNS",
+    "Datto BCDR",
+    "Datto SAAS",
+    "DNS Filter",
+    "Google Licensed Users",
+    "Huntress EDR",
+    "Huntress MDR",
+    "Huntress SAT",
+    "Huntress SIEM",
+    "Inky- Base",
+    "Inky-Encrypt",
+    "Inky-Graymail",
+    "Last Pass",
+    "Licensed Microsoft Accounts",
+    "Liongard",
+    "NinjaOne RMM",
+    "NordLayer VPN",
+    "NordLayer VPN - Dedicated Server",
+    "Petra MDR",
+    "ThreatMate",
+)
 
 
 def licensing_apps(payload: dict[str, Any] | None, month: str | None, hide: list[str] | None = None) -> dict[str, Any]:
-    """The Monthly Licensing page the Rewst way: which apps each client is billed for in one month, from the invoice lines. An app is an invoice item with a positive quantity and amount on that client's invoices in the month.
-    ``months`` are the last twelve months up to the newest invoice month; ``apps`` are the items billed that month with how many clients have each (``common`` for items billed to at least three clients, the ones a
-    picture of the software stack is made of); ``rows`` give each client's items for the month. ``hide`` leaves items out (Rewst's exclude list)."""
+    """The Monthly Licensing page the Rewst way: which of the curated apps (``CURATED_APPS``) each client is billed for in one month, from the invoice lines. A client has an app when an invoice item with a positive quantity and
+    amount in that month is named exactly like it (letter case aside), as Rewst matches it. ``months`` are the last twelve months up to the newest invoice month; ``apps`` are all the curated apps with how many clients have each
+    (``common`` is true for each, so the page starts with every column); ``rows`` give each client's curated apps for the month. ``hide`` leaves apps out (Rewst's exclude list)."""
     rows = [r for r in (payload or {}).get("rows") or [] if _num(r.get("quantity")) > 0 and _num(r.get("amount")) > 0]
     all_months = sorted({str(r.get("month")) for r in rows if r.get("month")})
     months = all_months[-12:][::-1]
     chosen = month if month in all_months else (months[0] if months else None)
     skip = {h.strip().lower() for h in hide or []}
+    by_name = {a.lower(): a for a in CURATED_APPS if a.lower() not in skip}
     per_client: dict[str, set[str]] = {}
     for r in rows:
         if str(r.get("month")) != chosen:
             continue
-        item = str(r.get("item") or "").strip()
-        if not item or item.lower() in skip:
-            continue
-        per_client.setdefault(str(r.get("client_name") or ""), set()).add(item)
-    counts: dict[str, int] = {}
-    for items in per_client.values():
-        for i in items:
-            counts[i] = counts.get(i, 0) + 1
+        app = by_name.get(str(r.get("item") or "").strip().lower())
+        client = str(r.get("client_name") or "")
+        per_client.setdefault(client, set())
+        if app:
+            per_client[client].add(app)
+    counts = {a: 0 for a in by_name.values()}
+    for apps in per_client.values():
+        for a in apps:
+            counts[a] += 1
+    if chosen is None:
+        return {"months": [], "month": None, "apps": [], "clients": []}
     return {
         "months": months,
         "month": chosen,
-        "apps": [{"app": a, "clients": n, "common": n >= COMMON_APP_CLIENTS} for a, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))],
+        "apps": [{"app": a, "clients": counts[a], "common": True} for a in CURATED_APPS if a in counts],
         "clients": [{"client": c, "apps": sorted(i, key=str.lower)} for c, i in sorted(per_client.items(), key=lambda kv: kv[0].lower())],
     }
 
