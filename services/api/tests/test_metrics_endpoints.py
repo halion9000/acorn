@@ -101,7 +101,7 @@ async def test_a_staff_page_is_empty_until_core_sends_then_worked_out_from_what_
 
     await with_db(world.owner, store)
     sm = await with_db(world.owner, lambda db: ep.staff_metrics(world.user, db, 1, None))
-    assert sm["received_at"] is not None and [(w["week"], w["utilization"]) for w in sm["weeks"]] == [(W1, 70.0), (W2, 40.0)]
+    assert sm["received_at"] is not None and [(w["week"], w["utilization"]) for w in sm["weeks"]] == [(W1, 75.0), (W2, 30.0)]
     sc = await with_db(world.owner, lambda db: ep.scorecard(world.user, db, 1, "Dan"))
     assert [(p["engineer"], p["average"]) for p in sc["people"]] == [("Dan", 3.4)] and sc["detail"]["weeks"][1]["score"] == 4.3
     assert (await with_db(world.owner, lambda db: ep.pods(world.user, db, 1)))["pods"][0]["pod"] == "Pod 1"

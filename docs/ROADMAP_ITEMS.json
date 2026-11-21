@@ -2519,9 +2519,9 @@
     "title": "SIEM style storage, step 3: keep versions of the snapshots that are replaced today",
     "detail": "Hal 2026-11-20: A.C.O.R.N should act like a SIEM. All data pulled in from every source is stored and can be retrieved; it is exported at client level only when a client asks (staff run it). Retention is infinite by default and can be changed per client to 1, 3, 5, 7 or 10 years or infinite. Today alerts keep their raw event and the audit log is append-only, but most pulled-in data is a latest snapshot that is replaced, HaloPSA tickets are only counted, there is no search index and exports are one CSV per feature. Step 3 of 5. Microsoft 365 users and Multi-Factor, roles, licenses, posture and secure score, ticket statistics and detail, invoice lines and similar latest-only data: keep each version (or each change) with the time it was read, so what a client looked like in any past month can be retrieved. Follows the same per client retention.",
     "area": "Platform",
-    "status": "not_started",
+    "status": "in_progress",
     "needs": "claude",
-    "note": "Hal answered the open questions 2026-11-20: export only when a client asks; retention infinite by default and per client 1, 3, 5, 7, 10 or infinite; every source that is pulled in. Added to the working list.",
+    "note": "2026-11-20: Metrics datasets (weekly staff, ticket detail, invoice lines, Dialpad, meetings, user roles, licenses, Microsoft 365 roles) now keep versions: migration 235 (dataset_versions, append-only, once per content by SHA-256, at most one every six hours per dataset, row-level security), written whenever CORE sends a dataset. Still to do: the other latest-only data (Microsoft 365 users and MFA, roles, license counts, posture, secure score, ticket statistics), a way to read an old version, and the retention purge covering versions.",
     "completed_ref": null,
     "added": "2026-11-20",
     "completed": null

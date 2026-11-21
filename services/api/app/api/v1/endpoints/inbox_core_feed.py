@@ -35,6 +35,7 @@ from app.models.finance_halo_snapshot import FinanceHaloSnapshot
 from app.models.finance_profit import FinanceCostEntry, FinanceCostTransactions, FinancePnlMonth, FinanceProfitSnapshot, FinanceProfitTickets, FinanceQboSales, FinanceVendorCost
 from app.models.metric_dataset import DATASET_KEYS, MetricDataset, merge_dataset
 from app.models.client_alias import ClientAlias
+from app.services.dataset_versions import keep_version
 from app.services.event_store import append_events
 from app.models.tenant import Tenant
 from app.models.ticket_stats import CsatSnapshot, TicketStatsSnapshot
@@ -1870,6 +1871,8 @@ async def _keep_metric_dataset(db: Any, tenant_id: Any, key: str, body: MetricDa
         db.add(MetricDataset(tenant_id=tenant_id, key=key, payload=body.data, received_at=now))
     else:
         row.payload, row.received_at = merge_dataset(key, row.payload, body.data), now
+    # The replaced snapshot is not lost: this state is kept as a version when it changed (append-only, at most one every six hours).
+    await keep_version(db, tenant_id, key, row.payload if row is not None else body.data, now)
     await db.commit()
     return MetricDatasetOut(key=key, rows=rows)
 
