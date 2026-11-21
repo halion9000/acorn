@@ -30,7 +30,7 @@ describe('CreateCaseModal', () => {
     await user.type(screen.getByLabelText('Title'), 'Odd logins');
     await user.selectOptions(screen.getByLabelText('Severity'), 'high');
     await user.click(screen.getByRole('button', { name: 'Create case' }));
-    expect(api.create).toHaveBeenCalledWith({ title: 'Odd logins', severity: 'high' });
+    expect(api.create).toHaveBeenCalledWith({ title: 'Odd logins', severity: 'high' }, { createTicket: true }); // a case is tied to a ticket: a new one is asked for unless a number is typed
     expect(onCreated).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });

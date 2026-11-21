@@ -125,6 +125,9 @@ class CreateCaseRequest(BaseModel):
     # enabled, and declare ``Capability.PUSH_CASE`` (e.g. Jira,
     # ServiceNow). Empty list = case stays AiSOC-only.
     push_to_connector_ids: list[uuid.UUID] = Field(default_factory=list)
+    # A case should always be linked to a HaloPSA ticket. The tickets of its alerts are linked automatically; a person may also link a ticket by number, or ask for a new one to be opened.
+    ticket_id: str | None = Field(default=None, max_length=20)
+    create_ticket: bool = False
 
 
 class UpdateCaseRequest(BaseModel):
@@ -199,6 +202,8 @@ class CaseResponse(BaseModel):
     # was attempted on this call" and is distinct from ``[]`` ("fan-out
     # was attempted but no connectors were selected").
     fanout_results: list[FanoutResult] | None = None
+    # The HaloPSA tickets this case is linked to (see app.services.case_tickets). A case should always have one: the console says so when it has none and offers to link or open one.
+    ticket_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class CommentResponse(BaseModel):
@@ -347,6 +352,7 @@ def _row_to_case(row: Any) -> CaseResponse:
         sla_due_at=row.sla_due_at,
         tenant_id=_only(getattr(row, "tenant_id", None), uuid.UUID),
         client_name=_only(getattr(row, "client_name", None), str),
+        ticket_refs=[r for r in (getattr(row, "ticket_refs", None) or []) if isinstance(r, dict)],
     )
 
 
@@ -706,6 +712,22 @@ async def create_case(
         logger.exception("Database error in cases endpoint")
         raise HTTPException(status_code=503, detail="Database error") from exc
 
+    # Tickets: the ones the alerts already have, the number the person typed, and (when asked) a new one opened by CORE. A failure here never undoes the case.
+    try:
+        from app.services import case_tickets  # noqa: PLC0415
+
+        who = getattr(user, "email", None) or "a person"
+        typed = case_tickets.clean_ticket_number(body.ticket_id) if body.ticket_id else None
+        changed = await case_tickets.tie_new_case(db, user.tenant_id, case_id, body.alert_ids, holders, typed, who, now)
+        if body.create_ticket and not changed and not body.alert_ids:
+            changed = int(await case_tickets.queue_ticket_for_case(db, user.tenant_id, row, who, getattr(user, "user_id", None), now))
+        if changed:
+            await db.commit()
+            row = (await db.execute(text("SELECT * FROM aisoc_cases WHERE id = :id AND tenant_id = :t").bindparams(id=case_id, t=user.tenant_id))).fetchone() or row
+    except Exception:
+        await db.rollback()
+        logger.exception("Could not link the tickets of a new case")
+
     response = _row_to_case(row)
 
     # A case and a HaloPSA ticket go together: ask CORE for a ticket for each alert that has none. A failure here never undoes the case.
@@ -959,6 +981,53 @@ async def add_alerts(
         await db.rollback()
         logger.exception("Database error in cases endpoint")
         raise HTTPException(status_code=503, detail="Database error") from exc
+
+
+class LinkTicketRequest(BaseModel):
+    ticket_id: str = Field(..., max_length=20, description="The HaloPSA ticket number (digits).")
+
+
+async def _case_row(db: Any, cid: uuid.UUID, tenant_id: uuid.UUID) -> Any:
+    row = (await db.execute(text("SELECT * FROM aisoc_cases WHERE id = :id AND tenant_id = :t").bindparams(id=cid, t=tenant_id))).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    return row
+
+
+@router.post("/{case_id}/tickets", response_model=CaseResponse, summary="Link a HaloPSA ticket to a case")
+async def link_ticket(
+    case_id: str, body: LinkTicketRequest, db: DBSession, user: Annotated[AuthUser, Depends(case_scoped("cases:write"))]
+) -> CaseResponse:
+    from app.services import case_tickets  # noqa: PLC0415
+
+    number = case_tickets.clean_ticket_number(body.ticket_id)
+    if number is None:
+        raise HTTPException(status_code=422, detail="A HaloPSA ticket number is digits only, for example 12345.")
+    cid = await _resolve_case_id(case_id, db, user.tenant_id)
+    await _case_row(db, cid, user.tenant_id)
+    await case_tickets.link_ticket_to_case(db, user.tenant_id, cid, number, getattr(user, "email", None) or "a person", datetime.now(UTC))
+    await db.commit()
+    return _row_to_case(await _case_row(db, cid, user.tenant_id))
+
+
+class CreateTicketResponse(BaseModel):
+    queued: bool
+    detail: str
+
+
+@router.post("/{case_id}/tickets/create", response_model=CreateTicketResponse, summary="Ask CORE to open a HaloPSA ticket for a case")
+async def create_ticket_for_case(
+    case_id: str, db: DBSession, user: Annotated[AuthUser, Depends(case_scoped("cases:write"))]
+) -> CreateTicketResponse:
+    from app.services import case_tickets  # noqa: PLC0415
+
+    cid = await _resolve_case_id(case_id, db, user.tenant_id)
+    row = await _case_row(db, cid, user.tenant_id)
+    queued = await case_tickets.queue_ticket_for_case(db, user.tenant_id, row, getattr(user, "email", None) or "a person", getattr(user, "user_id", None))
+    await db.commit()
+    if not queued:
+        return CreateTicketResponse(queued=False, detail="A ticket for this case is already being opened.")
+    return CreateTicketResponse(queued=True, detail="CORE will open the ticket within a few minutes; its number appears on the case.")
 
 
 @router.post("/{case_id}/observables", response_model=CaseResponse, summary="Update observable graph")

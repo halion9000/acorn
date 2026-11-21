@@ -45,6 +45,7 @@ from app.services import vcio_risk_tickets as vcio_tickets
 from app.services.ticket_stats_merge import merge_ticket_stats
 from app.services.alert_settle import case_has_no_other_open_alert, closed_in_tool, has_open_ticket, tickets_all_closed
 from app.services.alert_status import FINISHED_ALERT_STATUSES
+from app.services import case_tickets
 from app.services.alert_ticket_rules import link_created_ticket
 from app.services.client_mapping import IncomingClient, upsert_clients
 from app.services.connector_run_log import record_if_changed
@@ -760,11 +761,13 @@ async def report_core_feed_action_result(
                     await note_quarantine_released(db, tid, row.alert_id, now, by=by)
                 if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is not None:
                     await link_created_ticket(db, tid, row.alert_id, body.ticket_id, now)
+                    await case_tickets.link_ticket_to_cases_of_alert(db, tid, row.alert_id, body.ticket_id, "ticket rule", now)
                 if body.status == "done" and row.action == "create_ticket" and body.ticket_id and row.alert_id is None:
                     # A ticket opened for a BEC search (it has no alert): note its number on the search and its case.
                     from app.services.bec_followup import on_ticket_created  # noqa: PLC0415
 
                     await on_ticket_created(db, tid, row.incident_uid, body.ticket_id, now)
+                    await case_tickets.on_ticket_created(db, tid, row.incident_uid, body.ticket_id, now)  # or for a case a person asked a ticket for
                     # Or for a Client Risk Score question: record its number on the question's line and queue its private note.
                     await vcio_tickets.on_created(db, tid, row.incident_uid, body.ticket_id, now)
                 if body.status == "failed" and row.action == "create_ticket" and row.alert_id is None:

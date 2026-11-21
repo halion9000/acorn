@@ -22,6 +22,9 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [templateId, setTemplateId] = useState('');
+  // A case should be tied to a HaloPSA ticket: link one by number, or have a new one opened (the default).
+  const [ticketId, setTicketId] = useState('');
+  const [newTicket, setNewTicket] = useState(true);
 
   if (!open) return null;
 
@@ -42,11 +45,19 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
     }
     setBusy(true);
     try {
-      await casesApi.create(buildNewCase({ title, severity, description }));
+      const typed = ticketId.trim().replace(/^#/, '');
+      if (typed && !/^[0-9]{1,12}$/.test(typed)) {
+        toast.error('A HaloPSA ticket number is digits only, for example 12345.');
+        setBusy(false);
+        return;
+      }
+      await casesApi.create(buildNewCase({ title, severity, description }), typed ? { ticketId: typed } : newTicket ? { createTicket: true } : {});
       toast.success('Case created');
       setTitle('');
       setDescription('');
       setTemplateId('');
+      setTicketId('');
+      setNewTicket(true);
       onCreated();
       onClose();
     } catch (err) {
@@ -102,6 +113,16 @@ export function CreateCaseModal({ open, onClose, onCreated }: { open: boolean; o
               Description <span className="text-gray-600">(optional)</span>
             </label>
             <textarea id="case-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${field} resize-none`} />
+          </div>
+          <div>
+            <label htmlFor="case-ticket" className="mb-1 block text-xs font-medium text-gray-400">
+              HaloPSA ticket <span className="text-gray-600">(a case should always have one)</span>
+            </label>
+            <input id="case-ticket" value={ticketId} onChange={(e) => setTicketId(e.target.value)} className={field} placeholder="Link an existing ticket number, or leave blank" inputMode="numeric" />
+            <label className="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <input type="checkbox" checked={newTicket && !ticketId.trim()} disabled={!!ticketId.trim()} onChange={(e) => setNewTicket(e.target.checked)} />
+              Open a new ticket for this case (CORE opens it; its number appears on the case)
+            </label>
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-gray-800 px-5 py-3">

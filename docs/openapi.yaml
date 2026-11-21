@@ -40,6 +40,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/impersonate/{user_id}:
+    post:
+      tags:
+      - auth
+      summary: Impersonate
+      description: 'Sign in as another person of the organization to see the console
+        exactly as they see it, with their permissions.
+
+
+        Returns a one-hour access token (no refresh token) that names the real administrator;
+        the console keeps it beside the administrator''s own sign-in and drops it
+        when the administrator ends the impersonation.
+
+        Refused for: yourself, someone in another organization or an inactive account,
+        an API key, a session that is already impersonating, and anyone who holds
+        the wildcard or a platform permission you do not
+
+        hold yourself (nobody gains power this way). Written to the audit log when
+        it starts, and every change made while impersonating carries ``impersonated_by``
+        in its audit row.'
+      operationId: impersonate_api_v1_auth_impersonate__user_id__post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpersonationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/impersonate/end/now:
+    post:
+      tags:
+      - auth
+      summary: End Impersonation
+      description: 'End an impersonation: the impersonation token stops working at
+        once and the end is written to the audit log. Called by the console''s banner
+        button.'
+      operationId: end_impersonation_api_v1_auth_impersonate_end_now_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+      security:
+      - HTTPBearer: []
   /api/v1/auth/logout:
     post:
       tags:
@@ -6181,6 +6243,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CaseResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/cases/{case_id}/tickets:
+    post:
+      tags:
+      - cases
+      summary: Link a HaloPSA ticket to a case
+      operationId: link_ticket_api_v1_cases__case_id__tickets_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkTicketRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/cases/{case_id}/tickets/create:
+    post:
+      tags:
+      - cases
+      summary: Ask CORE to open a HaloPSA ticket for a case
+      operationId: create_ticket_for_case_api_v1_cases__case_id__tickets_create_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTicketResponse'
         '422':
           description: Validation Error
           content:
@@ -19539,6 +19663,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/app__api__v1__endpoints__compliance_tests__LibraryIn'
+            example:
+              disabled:
+              - backups
       responses:
         '200':
           description: Successful Response
@@ -42061,6 +42188,12 @@ components:
             type: array
           - type: 'null'
           title: Fanout Results
+        ticket_refs:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Ticket Refs
       type: object
       required:
       - id
@@ -45162,6 +45295,16 @@ components:
             format: uuid
           type: array
           title: Push To Connector Ids
+        ticket_id:
+          anyOf:
+          - type: string
+            maxLength: 20
+          - type: 'null'
+          title: Ticket Id
+        create_ticket:
+          type: boolean
+          title: Create Ticket
+          default: false
       type: object
       required:
       - title
@@ -45495,6 +45638,19 @@ components:
       required:
       - title
       title: CreateTaskRequest
+    CreateTicketResponse:
+      properties:
+        queued:
+          type: boolean
+          title: Queued
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - queued
+      - detail
+      title: CreateTicketResponse
     CreateUserRequest:
       properties:
         account_name:
@@ -51908,6 +52064,31 @@ components:
           default: true
       type: object
       title: IgnoreRequest
+    ImpersonationResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        expires_in_minutes:
+          type: integer
+          title: Expires In Minutes
+        user_id:
+          type: string
+          title: User Id
+        label:
+          type: string
+          title: Label
+        role:
+          type: string
+          title: Role
+      type: object
+      required:
+      - access_token
+      - expires_in_minutes
+      - user_id
+      - label
+      - role
+      title: ImpersonationResponse
     ImportIn:
       properties:
         kind:
@@ -53246,6 +53427,17 @@ components:
       - state
       - token
       title: LinkCreated
+    LinkTicketRequest:
+      properties:
+        ticket_id:
+          type: string
+          maxLength: 20
+          title: Ticket Id
+          description: The HaloPSA ticket number (digits).
+      type: object
+      required:
+      - ticket_id
+      title: LinkTicketRequest
     LinkedAlertOut:
       properties:
         id:
@@ -69183,6 +69375,15 @@ components:
           type: array
           title: Hidden Nav
           default: []
+        impersonated_by:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - type: 'null'
+            type: object
+          - type: 'null'
+          title: Impersonated By
       type: object
       required:
       - id

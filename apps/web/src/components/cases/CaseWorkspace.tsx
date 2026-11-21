@@ -27,6 +27,7 @@ import { clsx } from 'clsx';
 import { safeDistance, safeFormat } from '@/lib/safe-date';
 import toast from 'react-hot-toast';
 import { caseTicketNote, loadNoteAlerts } from './ticketNote';
+import { CaseTickets } from './CaseTickets';
 import { alertsApi, ledgerApi } from '@/lib/api';
 import {
   apiErrorDetail,
@@ -743,6 +744,7 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
             suppressHydrationWarning
           />
         </div>
+        <CaseTickets caseId={caseRecord.id || caseId} tickets={caseRecord.tickets ?? []} onChanged={() => void mutate()} />
       </div>
 
       {/* Tabs */}

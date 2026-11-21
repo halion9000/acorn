@@ -2789,6 +2789,8 @@ export interface Case {
   /** The client the case belongs to, when it is one of an organization's clients (only the all-clients list says). */
   clientName?: string;
   alertIds?: string[];
+  /** The HaloPSA tickets the case is linked to. A case should always have one. */
+  tickets?: Array<{ id: string; addedBy?: string }>;
   /** Cached count from the backend so the UI doesn't have to re-aggregate. */
   alertCount?: number;
   tags?: string[];
@@ -3020,6 +3022,11 @@ function normalizeCase(raw: unknown): Case {
       (r.tenant_id as string | undefined) ?? (r.tenantId as string | undefined),
     clientName: (r.client_name as string | null | undefined) ?? undefined,
     alertIds,
+    tickets: Array.isArray(r.ticket_refs)
+      ? (r.ticket_refs as unknown[])
+          .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && String((t as Record<string, unknown>).id ?? '') !== '')
+          .map((t) => ({ id: String(t.id), addedBy: typeof t.added_by === 'string' ? t.added_by : undefined }))
+      : undefined,
     alertCount:
       (r.alert_count as number | undefined) ??
       (r.alertCount as number | undefined) ??
@@ -3140,7 +3147,19 @@ export const casesApi = {
       `/api/v1/cases/${encodeURIComponent(id)}/devices`,
     ),
 
-  create: async (data: Partial<Case>) => {
+  /** Link a HaloPSA ticket (its number) to a case. */
+  linkTicket: async (id: string, ticketId: string) => {
+    const raw = await request<unknown>(`/api/v1/cases/${encodeURIComponent(id)}/tickets`, { method: 'POST', body: JSON.stringify({ ticket_id: ticketId }) });
+    return normalizeCase(raw);
+  },
+
+  /** Ask CORE to open a HaloPSA ticket for a case; resolves to what the API says happens next. */
+  createTicket: async (id: string): Promise<string> => {
+    const out = await request<{ queued: boolean; detail: string }>(`/api/v1/cases/${encodeURIComponent(id)}/tickets/create`, { method: 'POST' });
+    return out.detail;
+  },
+
+  create: async (data: Partial<Case>, extra: { ticketId?: string; createTicket?: boolean } = {}) => {
     // The backend CreateCaseRequest speaks snake_case and does NOT enable
     // populate_by_name, so a raw camelCase Case payload silently drops fields
     // like alertIds (the alert→case promotion never linked the alert). Map the
@@ -3153,6 +3172,8 @@ export const casesApi = {
     if (data.alertIds !== undefined) body.alert_ids = data.alertIds;
     if (data.mitre !== undefined) body.mitre_techniques = data.mitre;
     if (data.dueAt !== undefined) body.sla_due_at = data.dueAt;
+    if (extra.ticketId) body.ticket_id = extra.ticketId;
+    if (extra.createTicket) body.create_ticket = true;
     const raw = await request<unknown>('/api/v1/cases', {
       method: 'POST',
       body: JSON.stringify(body),

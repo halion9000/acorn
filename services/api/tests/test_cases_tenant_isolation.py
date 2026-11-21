@@ -808,6 +808,9 @@ def _no_ticket_step(monkeypatch: pytest.MonkeyPatch) -> None:
         return 0
 
     monkeypatch.setattr(alert_ticket_rules, "queue_tickets_for_new_case", nothing)
+    from app.services import case_tickets
+
+    monkeypatch.setattr(case_tickets, "tie_new_case", nothing)  # linking the tickets the alerts already have is tested in test_case_tickets_postgres.py
 
 
 @pytest.mark.asyncio
