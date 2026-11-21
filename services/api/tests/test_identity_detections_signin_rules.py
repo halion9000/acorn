@@ -156,12 +156,13 @@ def test_a_successful_imap_sign_in_is_one_alert_and_a_modern_client_is_none():
     assert found[0].severity == "medium"
 
 
-def test_the_same_person_and_protocol_is_one_alert_a_day_and_a_new_day_is_a_new_one():
+def test_the_same_person_and_protocol_is_one_alert_a_week_and_a_new_week_is_a_new_one():
     rows = [
         row(1, client_app="POP3"),
         row(2, client_app="POP3", at=T0 + timedelta(hours=3)),
-        row(3, client_app="POP3", at=T0 + timedelta(days=1)),
-        row(4, client_app="SMTP"),
+        row(3, client_app="POP3", at=T0 + timedelta(days=1)),  # the same ISO week as T0 (a Tuesday)
+        row(4, client_app="POP3", at=T0 + timedelta(days=7)),
+        row(5, client_app="SMTP"),
     ]
     found = detect_legacy_protocol(rows)
     assert len(found) == 3

@@ -142,6 +142,8 @@ export function DetectionsView() {
     'all',
   );
   const [category, setCategory] = useState('all');
+  // A rule that has fired is in use; one that never has is library: the library holds almost every rule (none of them can fire without raw log events), so it is easy to mistake it for what protects a client.
+  const [firedFilter, setFiredFilter] = useState<'all' | 'fired' | 'library'>('all');
 
   // Every category the rules fall in, with how many rules each holds (a rule with none is counted under "uncategorised").
   const categories = useMemo(() => {
@@ -165,6 +167,8 @@ export function DetectionsView() {
       if (category !== 'all' && (r.category?.trim() || 'uncategorised') !== category) return false;
       if (enabledFilter === 'on' && !r.enabled) return false;
       if (enabledFilter === 'off' && r.enabled) return false;
+      if (firedFilter === 'fired' && !(r.hitCount && r.hitCount > 0)) return false;
+      if (firedFilter === 'library' && r.hitCount && r.hitCount > 0) return false;
       if (!q) return true;
       const hay = [
         r.name,
@@ -176,7 +180,7 @@ export function DetectionsView() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [rules, search, language, category, enabledFilter]);
+  }, [rules, search, language, category, enabledFilter, firedFilter]);
 
   // ─── Selection helpers ─────────────────────────────────────────────────────
 
@@ -422,6 +426,21 @@ export function DetectionsView() {
               ))}
             </select>
 
+            <div className="inline-flex rounded-md border border-gray-800 bg-gray-950 p-0.5 text-xs" role="group" aria-label="Rules that have fired">
+              {(['all', 'fired', 'library'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  aria-pressed={firedFilter === opt}
+                  onClick={() => setFiredFilter(opt)}
+                  title={opt === 'fired' ? 'Rules that have raised at least one alert' : opt === 'library' ? 'Rules that have never raised an alert' : undefined}
+                  className={clsx('rounded px-3 py-1.5 transition-colors', firedFilter === opt ? 'bg-gray-800 text-gray-100' : 'text-gray-400 hover:text-gray-200')}
+                >
+                  {opt === 'all' ? 'Any' : opt === 'fired' ? 'Has fired' : 'Library'}
+                </button>
+              ))}
+            </div>
+
             <div className="inline-flex rounded-md border border-gray-800 bg-gray-950 p-0.5 text-xs">
               {(['all', 'on', 'off'] as const).map((opt) => (
                 <button
@@ -521,6 +540,7 @@ export function DetectionsView() {
                       setSearch('');
                       setLanguage('all');
                       setEnabledFilter('all');
+                      setFiredFilter('all');
                     }}
                     className="rounded-md border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
                   >

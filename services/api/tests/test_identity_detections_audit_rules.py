@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace as NS
 
-from app.services.identity_detections import detect_app_consent, detect_app_credentials_added, detect_security_info_changed_by_admin
+from app.services.identity_detections import consent_severity, detect_app_consent, detect_app_credentials_added, detect_security_info_changed_by_admin
 
 T0 = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)
 
@@ -68,3 +68,14 @@ def test_a_secret_or_certificate_added_to_an_application_is_an_alert_and_removin
     found = detect_app_credentials_added(rows)
     assert [f.key for f in found] == ["appcred:a1", "appcred:a2", "appcred:a3"]
     assert found[0].technique == "T1098.001"
+
+
+def test_a_grant_record_against_a_microsoft_service_is_low_and_a_tenant_wide_consent_is_high():
+    assert consent_severity("Add delegated permission grant", "Microsoft Graph", "DelegatedPermissionGrant.Scope changed") == "low"
+    assert consent_severity("Add delegated permission grant", "Evil Mail Reader", "") == "medium"  # a grant naming some other application keeps its severity
+    assert consent_severity("Consent to application", "M365 MCP Server for Claude", "ConsentContext.IsAdminConsent set to True; ConsentContext.OnBehalfOfAll set to True via EvoSTS") == "high"
+    assert consent_severity("Consent to application", "Microsoft Graph Command Line Tools", "ConsentContext.OnBehalfOfAll set to False via EvoSTS") == "medium"
+    assert consent_severity("Consent to application", "X", None) == "medium"
+    rows = [audit(1, "Add delegated permission grant", target="Microsoft Graph"), audit(2, "Consent to application", target="Evil")]
+    rows[1].detail = "ConsentContext.OnBehalfOfAll set to True"
+    assert [(f.key, f.severity) for f in detect_app_consent(rows)] == [("consent:a1", "low"), ("consent:a2", "high")]

@@ -195,3 +195,24 @@ describe('bulk actions', () => {
     await waitFor(() => expect(api.bulkToggle).toHaveBeenCalledWith(['r2'], true));
   });
 });
+
+describe('the has-fired filter', () => {
+  it('separates the rules that have raised an alert from the library that never has', async () => {
+    api.list.mockResolvedValue({
+      rules: [rule({ id: 'f1', name: 'Fired rule', hitCount: 4 }), rule({ id: 'l1', name: 'Library rule one' }), rule({ id: 'l2', name: 'Library rule two', hitCount: 0 })],
+      total: 3,
+    });
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText('Fired rule');
+    await user.click(screen.getByRole('button', { name: 'Has fired' }));
+    expect(screen.getByText('Fired rule')).toBeInTheDocument();
+    expect(screen.queryByText('Library rule one')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    expect(screen.queryByText('Fired rule')).toBeNull();
+    expect(screen.getByText('Library rule one')).toBeInTheDocument();
+    expect(screen.getByText('Library rule two')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Any' }));
+    expect(screen.getByText('Fired rule')).toBeInTheDocument();
+  });
+});

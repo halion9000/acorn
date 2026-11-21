@@ -114,3 +114,24 @@ async def sweep_by_design(db: Any, limit: int = 2000, now: datetime | None = Non
         )
         done += 1
     return done
+
+
+# The same Huntress-agent condition raised again for a device that already has one open (about 3,300 alerts in 60 days, one per device per day). The older alert stays open and says the same thing.
+REPEAT_TITLE = r"^(process: .*huntress.* does not exist|the following software : \*?huntress.* was not installed)"
+
+
+async def sweep_repeats(db: Any, limit: int = 2000, now: datetime | None = None) -> int:
+    """Resolve a new Huntress-agent alert when the same device (same client, same title, same devices named) already has an older one still open. Returns how many. The caller commits."""
+    now = now or datetime.now(UTC)
+    result = await db.execute(
+        text(
+            "UPDATE alerts SET status = 'resolved', disposition = 'benign', resolved_at = :now, updated_at = :now, "
+            "enrichment_data = jsonb_set(CASE WHEN jsonb_typeof(enrichment_data) = 'object' THEN enrichment_data ELSE '{}'::jsonb END, '{auto_triage}', "
+            "'{\"rule\": \"repeat\", \"reason\": \"the same device already has this alert open\"}'::jsonb) "
+            "WHERE id IN (SELECT a.id FROM alerts a WHERE a.status = 'new' AND a.title ~* :pat AND jsonb_array_length(CASE WHEN jsonb_typeof(a.affected_hosts) = 'array' THEN a.affected_hosts ELSE '[]'::jsonb END) > 0 "
+            "AND EXISTS (SELECT 1 FROM alerts b WHERE b.tenant_id = a.tenant_id AND b.title = a.title AND b.id <> a.id AND b.created_at < a.created_at "
+            "AND b.status NOT IN ('resolved', 'closed', 'fp') AND b.affected_hosts = a.affected_hosts) ORDER BY a.created_at LIMIT :n)"
+        ),
+        {"now": now, "pat": REPEAT_TITLE, "n": limit},
+    )
+    return int(result.rowcount or 0)

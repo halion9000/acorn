@@ -442,7 +442,8 @@ def detect_legacy_protocol(new: list[Any]) -> list[Finding]:
         client = (getattr(r, "client_app", None) or "").strip()
         if not r.success or client.lower() not in LEGACY_CLIENTS:
             continue
-        key = f"legacy:{r.user_principal}:{client.lower()}:{_utc(r.occurred_at).strftime('%Y%m%d')}"
+        # One alert per person and protocol per ISO week: scanners and copiers sign in this way every day (343 alerts in 60 days, mostly the same few accounts), and a daily alert says nothing a weekly one does not.
+        key = f"legacy:{r.user_principal}:{client.lower()}:{_utc(r.occurred_at).strftime('%G-W%V')}"
         if key in seen:
             continue
         seen.add(key)
@@ -710,23 +711,41 @@ def detect_security_info_changed_by_admin(audits: list[Any]) -> list[Finding]:
     return out
 
 
+# The Microsoft services an application asks permission FOR. A "delegated permission grant" naming one of these is the record that belongs to some application's consent (which has its own "Consent to application"
+# entry naming the application itself), so it adds nothing on its own: 153 of 373 consent alerts in 60 days were grants to "Microsoft Graph".
+MICROSOFT_RESOURCES = frozenset({"microsoft graph", "office 365 exchange online", "office 365 sharepoint online", "windows azure active directory", "microsoft teams"})
+_GRANT = re.compile(r"^add delegated permission grant", re.IGNORECASE)
+
+
+def consent_severity(activity: str | None, target: str | None, detail: str | None) -> str:
+    """How serious a consent entry is (pure). Consent for the WHOLE organization ("on behalf of all") is high: one click gives an application every person's data. A grant record against a Microsoft service is low
+    (the application's own consent entry carries the signal). Everything else stays medium."""
+    if _GRANT.search(activity or "") and (target or "").strip().lower() in MICROSOFT_RESOURCES:
+        return "low"
+    if "onbehalfofall set to true" in (detail or "").lower():
+        return "high"
+    return "medium"
+
+
 def detect_app_consent(audits: list[Any]) -> list[Finding]:
     """Consent was given to an application, or a delegated permission was granted to one: the usual way a phishing app gets lasting access to mail and files."""
     out: list[Finding] = []
     for a in audits:
         if not a.success or not _CONSENT.search(a.activity or ""):
             continue
+        severity = consent_severity(a.activity, a.target, getattr(a, "detail", None))
         out.append(
             _audit_finding(
                 a,
                 rule_id="aisoc-id-app-consent",
                 rule_name="Consent was given to an application",
                 title=f"Consent given to an application - {a.target or 'unknown'}",
-                severity="medium",
+                severity=severity,
                 tactic="Persistence",
                 technique="T1528",
                 key=f"consent:{a.source_id}",
-                summary=f"{a.actor} gave an application consent ({a.activity}). Check that the application is one the client uses; a phishing app asks for exactly this.",
+                summary=f"{a.actor} gave an application consent ({a.activity}). Check that the application is one the client uses; a phishing app asks for exactly this."
+                + (" It was given for the whole organization, not one person." if severity == "high" else ""),
                 target_label="Application",
             )
         )
@@ -1088,6 +1107,7 @@ async def run_takeover_chain(db: Any, tenant_id: uuid.UUID, users: list[str], no
                 select(Alert.id, Alert.rule_id, Alert.title, Alert.event_time, Alert.affected_users).where(
                     Alert.tenant_id == tenant_id,
                     Alert.rule_id.in_([*CHAIN_ENTRY, *CHAIN_FOOTHOLD]),
+                    Alert.severity != "low",  # a low one was judged expected (a grant record against a Microsoft service, the partner service adding the MSP's admins)
                     Alert.event_time >= since,
                 )
             )
